@@ -26,3 +26,19 @@ At its core, WCLAP is the CLAP API compiled to the `wasm32` architecture, provid
 * export a single function table, which can be grown/edited by the host.  This is _probably_ named `__indirect_function_table` as per the [original WASI spec](https://github.com/WebAssembly/WASI/blob/main/legacy/application-abi.md).  
 
 Modules may require WASI imports (only `wasi_snapshot_preview1` is supported here).  If they export _either_ a `_start()` or `_initialize()` function, the host must call it first.
+
+## Design
+
+Aside from the kerfuffle of setting up the WASM engine, this repo also provides a translation layer for every value in the CLAP API.
+
+A "compatible" value is a basic numerical value (32/64-bit ints and floats), or a struct only containing compatible values.  These can be read and written directly by native code, even when located within the WASM instance's memory.
+
+*Non-*compatible values need to be translated.  Pointers to compatible values can be translated from WASM to native by just adding an offset, but structs need to be duplicated (with each field translated), and functions need a more complicated wrapping.  
+
+### Sandboxed WASI
+
+This repo includes an extremely incomplete `wasi_snapshot_preview1` implementation, and functions are only being added when one of our WCLAPs needs them.
+
+**⚠️ I am not a security professional, so don't use this with untrusted code without a proper security review.  I have based it on Wasmtime's `preview1.rs` implementation where possible.**
+
+Although a generic sandboxed WASI implementation seems like a sensible thing to exist, the existing sandboxed implementations (Wasmer/Wasmtime) are tightly coupled to their WASM engines, and the others I've found (uvwasi, Wasm3's `m3_api_wasi.c`) aren't sandboxed. 

@@ -188,20 +188,6 @@ struct Wclap::Translate<const char *> {
 	}
 }
 
-// This translation only gets used for struct fields (not function return values).
-// In that case, it's an opaque value which only the (W)CLAP knows how to interpret.
-// Since it's never actually used from the native side, we just copy (pad) it without translation
-template<>
-struct Wclap::Translate<void *> {
-	using WasmType = uint32_t;
-	void * wasmToNative(Wasm *wasm, uint32_t p) {
-		return (void *)p;
-	}
-	uint32_t wasmToNative(Wasm *wasm, void *v) {
-		return (uint32_t)v;
-	}
-}
-
 #include "./translate-clap-api.h"
 
 /*---------- WCLAP bridge API ----------*/

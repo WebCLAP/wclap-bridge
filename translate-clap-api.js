@@ -97,9 +97,6 @@ function addFile(path) {
 
 				if (fReturn == "void") {
 					fReturn = null;
-				} else if (/^(const )?void \*$/.test(fReturn)) {
-					console.error(cpp);
-					throw Error("void * returns can't be translated - they always get cast to something else, depending on the arguments");
 				}
 				console.log(fName + ": (" + fArgs + ") -> " + fReturn);
 				if (fReturn && !types[fReturn]) {
@@ -182,7 +179,6 @@ addDirect("float32_t", true, 4);
 addDirect("float64_t", true, 8);
 addDirect("bool", true, 1);
 addDirect("const char *", false, wasmPointerSize);
-addDirect("void *", false, wasmPointerSize);
 
 //addDirect("clap_plugin_entry_t", false)
 

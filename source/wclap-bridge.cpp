@@ -13,6 +13,40 @@ static wasm_engine_t *global_wasm_engine = nullptr;
 std::string wclap_error_message_string;
 static const char *wclap_error_message = nullptr;
 
+struct Wclap;
+struct WclapTranslationScope {
+	wasm_instance_t *instance;
+	wasm_memory_t *memory;
+	void * nativeInWasm(uint32_t wasmP) {
+		return wasm_memory_data(memory) + wasmP;
+	}
+
+	size_t arenaSize = 65536;
+	void *nativeTmpStartP, *nativeTmpP;
+	void clearTemporaryNative() {
+		nativeTmpP = nativeTmpStartP;
+	}
+	void * temporaryNativeBytes(size_t size, size_t align) {
+		while (((size_t)nativeTmpP)%align) nativeTmpP = (void *)((size_t)nativeTmpP + 1);
+		void *result = nativeTmpP;
+		nativeTmpP = (void *)((size_t)nativeTmpP + size);
+		assert(nativeTmpP <= nativeTmpStartP + arenaSize);
+		return result;
+	}
+
+	uint32_t wasmTmpStartP, wasmTmpP;
+	void clearTemporaryWasm() {
+		wasmTmpP = wasmTmpStartP;
+	}
+	uint32_t temporaryWasmBytes(uint32_t size, uint32_t align) {
+		while (wasmTmpP%align) ++wasmTmpP;
+		uint32_t result = wasmTmpP;
+		wasmTmpP += size;
+		assert(wasmTmpP <= wasmTmpStartP + arenaSize);
+		return result;
+	}
+};
+
 struct Wclap {
 	wasm_store_t *store;
 	
@@ -129,7 +163,7 @@ private:
 	Wclap(const char *path, wasm_store_t *store) : store(store), wasi(store) {
 		wasi.fileRoot(path);
 	}
-
+	
 	template<class NativeType>
 	struct Translate;
 
@@ -148,10 +182,10 @@ private:
 template<> \
 struct Wclap::Translate<NativeType> { \
 	using WasmType = NativeType; \
-	static NativeType wasmToNative(Wclap *, WasmType v) { \
+	static NativeType wasmToNative(WclapTranslationScope *, WasmType v) { \
 		return v; \
 	} \
-	static WasmType nativeToWasm(Wclap *, NativeType v) { \
+	static WasmType nativeToWasm(WclapTranslationScope *, NativeType v) { \
 		return v; \
 	} \
 };
@@ -168,24 +202,25 @@ WASM_DIRECT_TRANSLATION(float64_t);
 WASM_DIRECT_TRANSLATION(bool);
 #undef WASM_DIRECT_TRANSLATION
 
+// C strings
 template<>
 struct Wclap::Translate<const char *> {
 	using WasmType = uint32_t;
-	const char * wasmToNative(Wclap *wclap, uint32_t p) {
-		if (!p) return nullptr;
-		return wasm_memory_data(wclap->memory) + p;
+	static const char * wasmToNative(WclapTranslationScope *translate, uint32_t wasmP) {
+		if (!wasmP) return nullptr;
+		return (const char *)translate->nativeInWasm(wasmP);
 	}
-	uint32_t wasmToNative(Wclap *wclap, const char *v) {
-		if (!v) return 0;
-		size_t size = std::strlen(v) + 1;
-		uint32_t wasmP = (const char *)wclap->temporaryBytes(size);
-		auto nativeP = wasmToNative(wclap, wasmP);
+	static uint32_t nativeToWasm(WclapTranslationScope *translate, const char *nativeP) {
+		if (!nativeP) return 0;
+		size_t size = std::strlen(nativeP) + 1;
+		uint32_t wasmP = translate->temporaryWasmBytes(size, 1);
+		char *nativeInWasm = (char *)translate->nativeInWasm(wasmP);
 		for (size_t i = 0; i < size; ++i) {
-			nativeP[i] = v[i];
+			nativeInWasm[i] = nativeP[i];
 		}
 		return wasmP;
 	}
-}
+};
 
 #include "./translate-clap-api.h"
 

@@ -45,18 +45,23 @@ function addDirectPointer(name) {
 template<>
 struct Wclap::Translate<${name} *> {
 	using WasmType = uint32_t;
-	// Translate the WASM pointer to a native one
-	static ${name} * wasmToNative(Wclap *wclap, WasmType p) {
-		if (!p) return nullptr;
-		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+	static void assignWasmToNative(WclapTranslationScope *translate, WasmType p, ${name} *nativeP) {
+		void *nativeInWasm = translate->nativeInWasm(p);
+		*nativeP = *(${name} *)nativeInWasm;
+	}
+	static ${name} * wasmToNative(WclapTranslationScope *translate, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = translate->nativeInWasm(wasmP);
 		return (${name} *)nativeInWasm;
 	}
-	// Make a temporary copy in the WASM memory, and point to that
-	static WasmType nativeToWasm(Wclap *wclap, ${name} *v) {
-		if (!v) return 0;
-		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(${name}), alignof(${name}));
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
-		*(${name} *)nativeInWasm = *v;
+	static void assignNativeToWasm(WclapTranslationScope *translate, ${name} *nativeP, WasmType wasmP) {
+		void *nativeInWasm = translate->nativeInWasm(wasmP);
+		*(${name} *)nativeInWasm = *nativeP;
+	}
+	static WasmType nativeToWasm(WclapTranslationScope *translate, ${name} *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = translate->temporaryWasmBytes(sizeof(${name}), alignof(${name}));
+		assignNativeToWasm(translate, nativeP, wasmP);
 		return wasmP;
 	}
 };`;
@@ -194,10 +199,9 @@ template<>
 struct Wclap::Translate<${name} *> {
 	using WasmType = uint32_t;
 	// translate all the fields
-	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, ${name} *nativeP) {
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;`;
+	static void assignWasmToNative(WclapTranslationScope *translate, WasmType wasmP, ${name} *nativeP) {`;
 			structFields.forEach(field => {
-				let wasmPointerValue = field.offset ? "(nativeInWasm + " + field.offset + ")" : "nativeInWasm";
+				let wasmPointerValue = field.offset ? "(wasmP + " + field.offset + ")" : "wasmP";
 				let arraySuffix = '', arrayIndent = '';
 				if (field.arrayCount) {
 					arrayIndent = '\t';
@@ -213,13 +217,13 @@ struct Wclap::Translate<${name} *> {
 				}
 				if (types[field.type]?.compatible) {
 					code += `
-${arrayIndent}		nativeP->${field.name}${arraySuffix} = *(${field.type} *)${wasmPointerValue};`;
+${arrayIndent}		nativeP->${field.name}${arraySuffix} = *(${field.type} *)translate->nativeInWasm(${wasmPointerValue});`;
 				} else if (types[field.type + ' *']) {
 					code += `
-${arrayIndent}		Translate<${field.type} *>::assignWasmToNative(wclap, ${wasmPointerValue}, &nativeP->${field.name}${arraySuffix})`;
+${arrayIndent}		Translate<${field.type} *>::assignWasmToNative(translate, ${wasmPointerValue}, &nativeP->${field.name}${arraySuffix});`;
 				} else if (types[field.type]) {
 					code += `
-${arrayIndent}		nativeP->${field.name}${arraySuffix} = Translate<${field.type}>::wasmToNative(wclap, *${wasmPointerValue});`;
+${arrayIndent}		nativeP->${field.name}${arraySuffix} = Translate<${field.type}>::wasmToNative(translate, *(uint32_t *)translate->nativeInWasm(${wasmPointerValue}));`;
 				} else if (field.argTypes) {
 					code += `
 ${arrayIndent}		BLARGH: ${field.returnType || 'void'} ${field.name}${arraySuffix}(${field.argTypes})`;
@@ -236,18 +240,16 @@ ${arrayIndent}		BLARGH: ${field.type} ${field.name}${arraySuffix}`;
 		return nativeP;
 	}
 	// Copy to native memory and translate that
-	static ${name} * wasmToNative(Wclap *wclap, WasmType wasmP) {
+	static ${name} * wasmToNative(WclapTranslationScope *translate, WasmType wasmP) {
 		if (!wasmP) return nullptr;
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
-		auto *nativeP = (${name} *)wasm->temporaryNativeBytes(sizeof(${name}), alignof(${name}));
-		assignWasmToNative(wclap, wasmP, nativeP);
+		auto *nativeP = (${name} *)translate->temporaryNativeBytes(sizeof(${name}), alignof(${name}));
+		assignWasmToNative(translate, wasmP, nativeP);
 		return nativeP;
 	}
 	// translate all the fields
-	static void assignNativeToWasm(Wclap *wclap, ${name} *nativeP, WasmType wasmP) {
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;`;
+	static void assignNativeToWasm(WclapTranslationScope *translate, ${name} *nativeP, WasmType wasmP) {`;
 			structFields.forEach(field => {
-				let wasmPointerValue = field.offset ? "(nativeInWasm + " + field.offset + ")" : "nativeInWasm";
+				let wasmPointerValue = field.offset ? "(wasmP + " + field.offset + ")" : "wasmP";
 
 				let arraySuffix = '', arrayIndent = '';
 				if (field.arrayCount) {
@@ -265,13 +267,13 @@ ${arrayIndent}		BLARGH: ${field.type} ${field.name}${arraySuffix}`;
 
 				if (types[field.type]?.compatible) {
 					code += `
-${arrayIndent}		*(${field.type} *)${wasmPointerValue} = nativeP->${field.name}${arraySuffix};`;
+${arrayIndent}		*(${field.type} *)translate->nativeInWasm(${wasmPointerValue}) = nativeP->${field.name}${arraySuffix};`;
 				} else if (types[field.type + ' *']) {
 					code += `
-${arrayIndent}		Translate<${field.type} *>::assignNativeToWasm(wclap, &nativeP->${field.name}${arraySuffix}, ${wasmPointerValue});`;
+${arrayIndent}		Translate<${field.type} *>::assignNativeToWasm(translate, &nativeP->${field.name}${arraySuffix}, ${wasmPointerValue});`;
 				} else if (types[field.type]) {
 					code += `
-${arrayIndent}		*(${types[field.type].wasmType} *)${wasmPointerValue} = Translate<${field.type}>::nativeToWasm(wclap, nativeP->${field.name}${arraySuffix});`;
+${arrayIndent}		*(${types[field.type].wasmType} *)translate->nativeInWasm(${wasmPointerValue}) = Translate<${field.type}>::nativeToWasm(translate, nativeP->${field.name}${arraySuffix});`;
 				} else if (field.argTypes) {
 					code += `
 ${arrayIndent}		BLARGH: ${field.returnType || 'void'} ${field.name}${arraySuffix}(${field.argTypes})`;
@@ -288,10 +290,10 @@ ${arrayIndent}		BLARGH: ${field.type} ${field.name}${arraySuffix}`;
 		return wasmP;
 	}
 	// Make a copy in WASM memory, translate all the fields
-	static WasmType nativeToWasm(Wclap *wclap, ${name} *nativeP) {
+	static WasmType nativeToWasm(WclapTranslationScope *translate, ${name} *nativeP) {
 		if (!nativeP) return 0;
-		uint32_t wasmP = wasm->temporaryWasmBytes(${structType.wasmSize}, ${structType.wasmAlign});
-		assignNativeToWasm(wclap, nativeP, wasmP);
+		uint32_t wasmP = translate->temporaryWasmBytes(${structType.wasmSize}, ${structType.wasmAlign});
+		assignNativeToWasm(translate, nativeP, wasmP);
 		return wasmP;
 	}
 };`;

@@ -1,7 +1,6 @@
 #include <iostream>
 #define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
-#import "./wclap-bridge.h"
 #include "./wasi-sandbox.h"
 
 #import "clap/all.h"
@@ -149,13 +148,13 @@ private:
 template<> \
 struct Wclap::Translate<NativeType> { \
 	using WasmType = NativeType; \
-	static NativeType wasmToNative(Wasm *, WasmType v) { \
+	static NativeType wasmToNative(Wclap *, WasmType v) { \
 		return v; \
 	} \
-	static WasmType nativeToWasm(Wasm *, NativeType v) { \
+	static WasmType nativeToWasm(Wclap *, NativeType v) { \
 		return v; \
 	} \
-}; \
+};
 WASM_DIRECT_TRANSLATION(uint8_t);
 WASM_DIRECT_TRANSLATION(uint16_t);
 WASM_DIRECT_TRANSLATION(uint32_t);
@@ -172,15 +171,15 @@ WASM_DIRECT_TRANSLATION(bool);
 template<>
 struct Wclap::Translate<const char *> {
 	using WasmType = uint32_t;
-	const char * wasmToNative(Wasm *wasm, uint32_t p) {
+	const char * wasmToNative(Wclap *wclap, uint32_t p) {
 		if (!p) return nullptr;
-		return wasm_memory_data(wasm->memory) + p;
+		return wasm_memory_data(wclap->memory) + p;
 	}
-	uint32_t wasmToNative(Wasm *wasm, const char *v) {
+	uint32_t wasmToNative(Wclap *wclap, const char *v) {
 		if (!v) return 0;
 		size_t size = std::strlen(v) + 1;
-		uint32_t wasmP = (const char *)wasm->temporaryBytes(size);
-		auto nativeP = wasmToNative(wasm, wasmP);
+		uint32_t wasmP = (const char *)wclap->temporaryBytes(size);
+		auto nativeP = wasmToNative(wclap, wasmP);
 		for (size_t i = 0; i < size; ++i) {
 			nativeP[i] = v[i];
 		}
@@ -190,7 +189,9 @@ struct Wclap::Translate<const char *> {
 
 #include "./translate-clap-api.h"
 
-/*---------- WCLAP bridge API ----------*/
+/*---------- WCLAP bridge C API ----------*/
+
+#import "./wclap-bridge.h"
 
 bool wclap_global_init() {
 	wasm_config_t *config = wasm_config_new();

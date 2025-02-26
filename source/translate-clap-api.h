@@ -5,15 +5,15 @@ template<>
 struct Wclap::Translate<clap_version_t *> {
 	using WasmType = uint32_t;
 	// Translate the WASM pointer to a native one
-	static clap_version_t * wasmToNative(Wasm *wasm, WasmType p) {
+	static clap_version_t * wasmToNative(Wclap *wclap, WasmType p) {
 		if (!p) return nullptr;
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
 		return (clap_version_t *)nativeInWasm;
 	}
 	// Make a temporary copy in the WASM memory, and point to that
-	static WasmType nativeToWasm(Wasm *wasm, clap_version_t *v) {
+	static WasmType nativeToWasm(Wclap *wclap, clap_version_t *v) {
 		if (!v) return 0;
-		uint32_t wasmP = wasm->temporaryWasmBytes(sizeof(clap_version_t), alignof(clap_version_t));
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_version_t), alignof(clap_version_t));
 		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
 		*(clap_version_t *)nativeInWasm = *v;
 		return wasmP;
@@ -24,17 +24,3301 @@ template<>
 struct Wclap::Translate<clap_color_t *> {
 	using WasmType = uint32_t;
 	// Translate the WASM pointer to a native one
-	static clap_color_t * wasmToNative(Wasm *wasm, WasmType p) {
+	static clap_color_t * wasmToNative(Wclap *wclap, WasmType p) {
 		if (!p) return nullptr;
-		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
 		return (clap_color_t *)nativeInWasm;
 	}
 	// Make a temporary copy in the WASM memory, and point to that
-	static WasmType nativeToWasm(Wasm *wasm, clap_color_t *v) {
+	static WasmType nativeToWasm(Wclap *wclap, clap_color_t *v) {
 		if (!v) return 0;
-		uint32_t wasmP = wasm->temporaryWasmBytes(sizeof(clap_color_t), alignof(clap_color_t));
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_color_t), alignof(clap_color_t));
 		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
 		*(clap_color_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_host_t *
+template<>
+struct Wclap::Translate<clap_host_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->clap_version)
+		BLARGH: undefined host_data
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->vendor = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		nativeP->url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		nativeP->version = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 16));
+		BLARGH: undefined get_extension
+		BLARGH: void request_restart(clap_host_t *)
+		BLARGH: void request_process(clap_host_t *)
+		BLARGH: void request_callback(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_t *)wasm->temporaryNativeBytes(sizeof(clap_host_t), alignof(clap_host_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignNativeToWasm(wclap, &nativeP->clap_version, nativeInWasm);
+		BLARGH: undefined host_data
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->vendor);
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->url);
+		*(uint32_t *)(nativeInWasm + 16) = Translate<const char *>::nativeToWasm(wclap, nativeP->version);
+		BLARGH: undefined get_extension
+		BLARGH: void request_restart(clap_host_t *)
+		BLARGH: void request_process(clap_host_t *)
+		BLARGH: void request_callback(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(32, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_istream_t *
+template<>
+struct Wclap::Translate<clap_istream_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_istream_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined read
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_istream_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_istream_t *)wasm->temporaryNativeBytes(sizeof(clap_istream_t), alignof(clap_istream_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_istream_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined read
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_istream_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(0, 1);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_ostream_t *
+template<>
+struct Wclap::Translate<clap_ostream_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_ostream_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined write
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_ostream_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_ostream_t *)wasm->temporaryNativeBytes(sizeof(clap_ostream_t), alignof(clap_ostream_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_ostream_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined write
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_ostream_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(0, 1);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_audio_buffer_t *
+template<>
+struct Wclap::Translate<clap_audio_buffer_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_audio_buffer_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined data32
+		BLARGH: undefined data64
+		nativeP->channel_count = *(uint32_t *)nativeInWasm;
+		nativeP->latency = *(uint32_t *)(nativeInWasm + 4);
+		nativeP->constant_mask = *(uint64_t *)(nativeInWasm + 8);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_audio_buffer_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_audio_buffer_t *)wasm->temporaryNativeBytes(sizeof(clap_audio_buffer_t), alignof(clap_audio_buffer_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_audio_buffer_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined data32
+		BLARGH: undefined data64
+		*(uint32_t *)nativeInWasm = nativeP->channel_count;
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->latency;
+		*(uint64_t *)(nativeInWasm + 8) = nativeP->constant_mask;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_audio_buffer_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(16, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_header_t *
+template<>
+struct Wclap::Translate<clap_event_header_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_event_header_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_event_header_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_header_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_event_header_t), alignof(clap_event_header_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_event_header_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_event_note_t *
+template<>
+struct Wclap::Translate<clap_event_note_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_note_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->note_id = *(int32_t *)(nativeInWasm + 4);
+		nativeP->port_index = *(int16_t *)(nativeInWasm + 8);
+		nativeP->channel = *(int16_t *)(nativeInWasm + 10);
+		nativeP->key = *(int16_t *)(nativeInWasm + 12);
+		nativeP->velocity = *(double *)(nativeInWasm + 16);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_note_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_note_t *)wasm->temporaryNativeBytes(sizeof(clap_event_note_t), alignof(clap_event_note_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_note_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(int32_t *)(nativeInWasm + 4) = nativeP->note_id;
+		*(int16_t *)(nativeInWasm + 8) = nativeP->port_index;
+		*(int16_t *)(nativeInWasm + 10) = nativeP->channel;
+		*(int16_t *)(nativeInWasm + 12) = nativeP->key;
+		*(double *)(nativeInWasm + 16) = nativeP->velocity;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_note_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(22, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_note_expression_t *
+template<>
+struct Wclap::Translate<clap_event_note_expression_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_note_expression_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->expression_id = *(int32_t *)(nativeInWasm + 4);
+		nativeP->note_id = *(int32_t *)(nativeInWasm + 8);
+		nativeP->port_index = *(int16_t *)(nativeInWasm + 12);
+		nativeP->channel = *(int16_t *)(nativeInWasm + 14);
+		nativeP->key = *(int16_t *)(nativeInWasm + 16);
+		nativeP->value = *(double *)(nativeInWasm + 24);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_note_expression_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_note_expression_t *)wasm->temporaryNativeBytes(sizeof(clap_event_note_expression_t), alignof(clap_event_note_expression_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_note_expression_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(int32_t *)(nativeInWasm + 4) = nativeP->expression_id;
+		*(int32_t *)(nativeInWasm + 8) = nativeP->note_id;
+		*(int16_t *)(nativeInWasm + 12) = nativeP->port_index;
+		*(int16_t *)(nativeInWasm + 14) = nativeP->channel;
+		*(int16_t *)(nativeInWasm + 16) = nativeP->key;
+		*(double *)(nativeInWasm + 24) = nativeP->value;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_note_expression_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(26, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_param_value_t *
+template<>
+struct Wclap::Translate<clap_event_param_value_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_param_value_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->param_id = *(uint32_t *)(nativeInWasm + 4);
+		BLARGH: undefined cookie
+		nativeP->note_id = *(int32_t *)(nativeInWasm + 8);
+		nativeP->port_index = *(int16_t *)(nativeInWasm + 12);
+		nativeP->channel = *(int16_t *)(nativeInWasm + 14);
+		nativeP->key = *(int16_t *)(nativeInWasm + 16);
+		nativeP->value = *(double *)(nativeInWasm + 24);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_param_value_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_param_value_t *)wasm->temporaryNativeBytes(sizeof(clap_event_param_value_t), alignof(clap_event_param_value_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_param_value_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->param_id;
+		BLARGH: undefined cookie
+		*(int32_t *)(nativeInWasm + 8) = nativeP->note_id;
+		*(int16_t *)(nativeInWasm + 12) = nativeP->port_index;
+		*(int16_t *)(nativeInWasm + 14) = nativeP->channel;
+		*(int16_t *)(nativeInWasm + 16) = nativeP->key;
+		*(double *)(nativeInWasm + 24) = nativeP->value;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_param_value_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(26, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_param_mod_t *
+template<>
+struct Wclap::Translate<clap_event_param_mod_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_param_mod_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->param_id = *(uint32_t *)(nativeInWasm + 4);
+		BLARGH: undefined cookie
+		nativeP->note_id = *(int32_t *)(nativeInWasm + 8);
+		nativeP->port_index = *(int16_t *)(nativeInWasm + 12);
+		nativeP->channel = *(int16_t *)(nativeInWasm + 14);
+		nativeP->key = *(int16_t *)(nativeInWasm + 16);
+		nativeP->amount = *(double *)(nativeInWasm + 24);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_param_mod_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_param_mod_t *)wasm->temporaryNativeBytes(sizeof(clap_event_param_mod_t), alignof(clap_event_param_mod_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_param_mod_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->param_id;
+		BLARGH: undefined cookie
+		*(int32_t *)(nativeInWasm + 8) = nativeP->note_id;
+		*(int16_t *)(nativeInWasm + 12) = nativeP->port_index;
+		*(int16_t *)(nativeInWasm + 14) = nativeP->channel;
+		*(int16_t *)(nativeInWasm + 16) = nativeP->key;
+		*(double *)(nativeInWasm + 24) = nativeP->amount;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_param_mod_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(26, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_param_gesture_t *
+template<>
+struct Wclap::Translate<clap_event_param_gesture_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_param_gesture_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->param_id = *(uint32_t *)(nativeInWasm + 4);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_param_gesture_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_param_gesture_t *)wasm->temporaryNativeBytes(sizeof(clap_event_param_gesture_t), alignof(clap_event_param_gesture_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_param_gesture_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->param_id;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_param_gesture_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_transport_t *
+template<>
+struct Wclap::Translate<clap_event_transport_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_transport_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->flags = *(uint32_t *)(nativeInWasm + 4);
+		nativeP->song_pos_beats = *(int64_t *)(nativeInWasm + 8);
+		nativeP->song_pos_seconds = *(int64_t *)(nativeInWasm + 16);
+		nativeP->tempo = *(double *)(nativeInWasm + 24);
+		nativeP->tempo_inc = *(double *)(nativeInWasm + 32);
+		nativeP->loop_start_beats = *(int64_t *)(nativeInWasm + 40);
+		nativeP->loop_end_beats = *(int64_t *)(nativeInWasm + 48);
+		nativeP->loop_start_seconds = *(int64_t *)(nativeInWasm + 56);
+		nativeP->loop_end_seconds = *(int64_t *)(nativeInWasm + 64);
+		nativeP->bar_start = *(int64_t *)(nativeInWasm + 72);
+		nativeP->bar_number = *(int32_t *)(nativeInWasm + 80);
+		nativeP->tsig_num = *(uint16_t *)(nativeInWasm + 84);
+		nativeP->tsig_denom = *(uint16_t *)(nativeInWasm + 86);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_transport_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_transport_t *)wasm->temporaryNativeBytes(sizeof(clap_event_transport_t), alignof(clap_event_transport_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_transport_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->flags;
+		*(int64_t *)(nativeInWasm + 8) = nativeP->song_pos_beats;
+		*(int64_t *)(nativeInWasm + 16) = nativeP->song_pos_seconds;
+		*(double *)(nativeInWasm + 24) = nativeP->tempo;
+		*(double *)(nativeInWasm + 32) = nativeP->tempo_inc;
+		*(int64_t *)(nativeInWasm + 40) = nativeP->loop_start_beats;
+		*(int64_t *)(nativeInWasm + 48) = nativeP->loop_end_beats;
+		*(int64_t *)(nativeInWasm + 56) = nativeP->loop_start_seconds;
+		*(int64_t *)(nativeInWasm + 64) = nativeP->loop_end_seconds;
+		*(int64_t *)(nativeInWasm + 72) = nativeP->bar_start;
+		*(int32_t *)(nativeInWasm + 80) = nativeP->bar_number;
+		*(uint16_t *)(nativeInWasm + 84) = nativeP->tsig_num;
+		*(uint16_t *)(nativeInWasm + 86) = nativeP->tsig_denom;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_transport_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(88, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_midi_t *
+template<>
+struct Wclap::Translate<clap_event_midi_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_midi_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->port_index = *(uint16_t *)(nativeInWasm + 4);
+		for (size_t a = 0; a < 3; ++a) {
+			nativeP->data[a] = *(uint8_t *)((nativeInWasm + 6) + a);
+		}
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_midi_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_midi_t *)wasm->temporaryNativeBytes(sizeof(clap_event_midi_t), alignof(clap_event_midi_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_midi_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint16_t *)(nativeInWasm + 4) = nativeP->port_index;
+		for (size_t a = 0; a < 3; ++a) {
+			*(uint8_t *)((nativeInWasm + 6) + a) = nativeP->data[a];
+		}
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_midi_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(9, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_midi_sysex_t *
+template<>
+struct Wclap::Translate<clap_event_midi_sysex_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_midi_sysex_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->port_index = *(uint16_t *)(nativeInWasm + 4);
+		BLARGH: undefined buffer
+		nativeP->size = *(uint32_t *)(nativeInWasm + 8);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_midi_sysex_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_midi_sysex_t *)wasm->temporaryNativeBytes(sizeof(clap_event_midi_sysex_t), alignof(clap_event_midi_sysex_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_midi_sysex_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint16_t *)(nativeInWasm + 4) = nativeP->port_index;
+		BLARGH: undefined buffer
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->size;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_midi_sysex_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(10, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_event_midi2_t *
+template<>
+struct Wclap::Translate<clap_event_midi2_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_event_midi2_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->header)
+		nativeP->port_index = *(uint16_t *)(nativeInWasm + 4);
+		for (size_t a = 0; a < 4; ++a) {
+			nativeP->data[a] = *(uint32_t *)((nativeInWasm + 8) + a*4);
+		}
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_event_midi2_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_event_midi2_t *)wasm->temporaryNativeBytes(sizeof(clap_event_midi2_t), alignof(clap_event_midi2_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_event_midi2_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_event_header_t *>::assignNativeToWasm(wclap, &nativeP->header, nativeInWasm);
+		*(uint16_t *)(nativeInWasm + 4) = nativeP->port_index;
+		for (size_t a = 0; a < 4; ++a) {
+			*(uint32_t *)((nativeInWasm + 8) + a*4) = nativeP->data[a];
+		}
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_event_midi2_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(22, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_input_events_t *
+template<>
+struct Wclap::Translate<clap_input_events_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_input_events_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: uint32_t size(clap_input_events_t *)
+		BLARGH: clap_event_header_t * get(clap_input_events_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_input_events_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_input_events_t *)wasm->temporaryNativeBytes(sizeof(clap_input_events_t), alignof(clap_input_events_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_input_events_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: uint32_t size(clap_input_events_t *)
+		BLARGH: clap_event_header_t * get(clap_input_events_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_input_events_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_output_events_t *
+template<>
+struct Wclap::Translate<clap_output_events_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_output_events_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: bool try_push(clap_output_events_t *,clap_event_header_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_output_events_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_output_events_t *)wasm->temporaryNativeBytes(sizeof(clap_output_events_t), alignof(clap_output_events_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_output_events_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: bool try_push(clap_output_events_t *,clap_event_header_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_output_events_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_process_t *
+template<>
+struct Wclap::Translate<clap_process_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_process_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->steady_time = *(int64_t *)nativeInWasm;
+		nativeP->frames_count = *(uint32_t *)(nativeInWasm + 8);
+		nativeP->transport = Translate<clap_event_transport_t *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		nativeP->audio_inputs = Translate<clap_audio_buffer_t *>::wasmToNative(wclap, *(nativeInWasm + 16));
+		nativeP->audio_outputs = Translate<clap_audio_buffer_t *>::wasmToNative(wclap, *(nativeInWasm + 20));
+		nativeP->audio_inputs_count = *(uint32_t *)(nativeInWasm + 24);
+		nativeP->audio_outputs_count = *(uint32_t *)(nativeInWasm + 28);
+		nativeP->in_events = Translate<clap_input_events_t *>::wasmToNative(wclap, *(nativeInWasm + 32));
+		nativeP->out_events = Translate<clap_output_events_t *>::wasmToNative(wclap, *(nativeInWasm + 36));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_process_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_process_t *)wasm->temporaryNativeBytes(sizeof(clap_process_t), alignof(clap_process_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_process_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(int64_t *)nativeInWasm = nativeP->steady_time;
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->frames_count;
+		*(uint32_t *)(nativeInWasm + 12) = Translate<clap_event_transport_t *>::nativeToWasm(wclap, nativeP->transport);
+		*(uint32_t *)(nativeInWasm + 16) = Translate<clap_audio_buffer_t *>::nativeToWasm(wclap, nativeP->audio_inputs);
+		*(uint32_t *)(nativeInWasm + 20) = Translate<clap_audio_buffer_t *>::nativeToWasm(wclap, nativeP->audio_outputs);
+		*(uint32_t *)(nativeInWasm + 24) = nativeP->audio_inputs_count;
+		*(uint32_t *)(nativeInWasm + 28) = nativeP->audio_outputs_count;
+		*(uint32_t *)(nativeInWasm + 32) = Translate<clap_input_events_t *>::nativeToWasm(wclap, nativeP->in_events);
+		*(uint32_t *)(nativeInWasm + 36) = Translate<clap_output_events_t *>::nativeToWasm(wclap, nativeP->out_events);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_process_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(40, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_descriptor_t *
+template<>
+struct Wclap::Translate<clap_plugin_descriptor_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_descriptor_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->clap_version)
+		nativeP->id = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		nativeP->vendor = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		nativeP->url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 16));
+		nativeP->manual_url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 20));
+		nativeP->support_url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 24));
+		nativeP->version = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 28));
+		nativeP->description = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 32));
+		BLARGH: undefined features
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_descriptor_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_descriptor_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_descriptor_t), alignof(clap_plugin_descriptor_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_descriptor_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignNativeToWasm(wclap, &nativeP->clap_version, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->id);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->vendor);
+		*(uint32_t *)(nativeInWasm + 16) = Translate<const char *>::nativeToWasm(wclap, nativeP->url);
+		*(uint32_t *)(nativeInWasm + 20) = Translate<const char *>::nativeToWasm(wclap, nativeP->manual_url);
+		*(uint32_t *)(nativeInWasm + 24) = Translate<const char *>::nativeToWasm(wclap, nativeP->support_url);
+		*(uint32_t *)(nativeInWasm + 28) = Translate<const char *>::nativeToWasm(wclap, nativeP->version);
+		*(uint32_t *)(nativeInWasm + 32) = Translate<const char *>::nativeToWasm(wclap, nativeP->description);
+		BLARGH: undefined features
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_descriptor_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(36, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_t *
+template<>
+struct Wclap::Translate<clap_plugin_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->desc = Translate<clap_plugin_descriptor_t *>::wasmToNative(wclap, *nativeInWasm);
+		BLARGH: undefined plugin_data
+		BLARGH: bool init(clap_plugin_t *)
+		BLARGH: void destroy(clap_plugin_t *)
+		BLARGH: bool activate(clap_plugin_t *,double,uint32_t,uint32_t)
+		BLARGH: void deactivate(clap_plugin_t *)
+		BLARGH: bool start_processing(clap_plugin_t *)
+		BLARGH: void stop_processing(clap_plugin_t *)
+		BLARGH: void reset(clap_plugin_t *)
+		BLARGH: int32_t process(clap_plugin_t *,clap_process_t *)
+		BLARGH: undefined get_extension
+		BLARGH: void on_main_thread(clap_plugin_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_t), alignof(clap_plugin_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<clap_plugin_descriptor_t *>::nativeToWasm(wclap, nativeP->desc);
+		BLARGH: undefined plugin_data
+		BLARGH: bool init(clap_plugin_t *)
+		BLARGH: void destroy(clap_plugin_t *)
+		BLARGH: bool activate(clap_plugin_t *,double,uint32_t,uint32_t)
+		BLARGH: void deactivate(clap_plugin_t *)
+		BLARGH: bool start_processing(clap_plugin_t *)
+		BLARGH: void stop_processing(clap_plugin_t *)
+		BLARGH: void reset(clap_plugin_t *)
+		BLARGH: int32_t process(clap_plugin_t *,clap_process_t *)
+		BLARGH: undefined get_extension
+		BLARGH: void on_main_thread(clap_plugin_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(40, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_universal_plugin_id_t *
+template<>
+struct Wclap::Translate<clap_universal_plugin_id_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_universal_plugin_id_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->abi = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->id = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_universal_plugin_id_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_universal_plugin_id_t *)wasm->temporaryNativeBytes(sizeof(clap_universal_plugin_id_t), alignof(clap_universal_plugin_id_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_universal_plugin_id_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->abi);
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->id);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_universal_plugin_id_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_factory_t *
+template<>
+struct Wclap::Translate<clap_plugin_factory_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_factory_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get_plugin_count(clap_plugin_factory_t *)
+		BLARGH: clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
+		BLARGH: clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_factory_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_factory_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_factory_t), alignof(clap_plugin_factory_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_factory_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get_plugin_count(clap_plugin_factory_t *)
+		BLARGH: clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
+		BLARGH: clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_factory_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_metadata_receiver_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_metadata_receiver_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_metadata_receiver_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined receiver_data
+		BLARGH: void on_error(clap_preset_discovery_metadata_receiver_t *,int32_t,const char *)
+		BLARGH: bool begin_preset(clap_preset_discovery_metadata_receiver_t *,const char *,const char *)
+		BLARGH: void add_plugin_id(clap_preset_discovery_metadata_receiver_t *,clap_universal_plugin_id_t *)
+		BLARGH: void set_soundpack_id(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_flags(clap_preset_discovery_metadata_receiver_t *,uint32_t)
+		BLARGH: void add_creator(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_description(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_timestamps(clap_preset_discovery_metadata_receiver_t *,uint64_t,uint64_t)
+		BLARGH: void add_feature(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void add_extra_info(clap_preset_discovery_metadata_receiver_t *,const char *,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_metadata_receiver_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_metadata_receiver_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_metadata_receiver_t), alignof(clap_preset_discovery_metadata_receiver_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_metadata_receiver_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined receiver_data
+		BLARGH: void on_error(clap_preset_discovery_metadata_receiver_t *,int32_t,const char *)
+		BLARGH: bool begin_preset(clap_preset_discovery_metadata_receiver_t *,const char *,const char *)
+		BLARGH: void add_plugin_id(clap_preset_discovery_metadata_receiver_t *,clap_universal_plugin_id_t *)
+		BLARGH: void set_soundpack_id(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_flags(clap_preset_discovery_metadata_receiver_t *,uint32_t)
+		BLARGH: void add_creator(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_description(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void set_timestamps(clap_preset_discovery_metadata_receiver_t *,uint64_t,uint64_t)
+		BLARGH: void add_feature(clap_preset_discovery_metadata_receiver_t *,const char *)
+		BLARGH: void add_extra_info(clap_preset_discovery_metadata_receiver_t *,const char *,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_metadata_receiver_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(40, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_filetype_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_filetype_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_filetype_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->description = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->file_extension = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_filetype_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_filetype_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_filetype_t), alignof(clap_preset_discovery_filetype_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_filetype_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->description);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->file_extension);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_filetype_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_location_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_location_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_location_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->flags = *(uint32_t *)nativeInWasm;
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->kind = *(uint32_t *)(nativeInWasm + 8);
+		nativeP->location = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_location_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_location_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_location_t), alignof(clap_preset_discovery_location_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_location_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = nativeP->flags;
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->kind;
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->location);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_location_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(16, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_soundpack_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_soundpack_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_soundpack_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->flags = *(uint32_t *)nativeInWasm;
+		nativeP->id = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		nativeP->description = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		nativeP->homepage_url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 16));
+		nativeP->vendor = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 20));
+		nativeP->image_path = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 24));
+		nativeP->release_timestamp = *(uint64_t *)(nativeInWasm + 32);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_soundpack_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_soundpack_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_soundpack_t), alignof(clap_preset_discovery_soundpack_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_soundpack_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = nativeP->flags;
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->id);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->description);
+		*(uint32_t *)(nativeInWasm + 16) = Translate<const char *>::nativeToWasm(wclap, nativeP->homepage_url);
+		*(uint32_t *)(nativeInWasm + 20) = Translate<const char *>::nativeToWasm(wclap, nativeP->vendor);
+		*(uint32_t *)(nativeInWasm + 24) = Translate<const char *>::nativeToWasm(wclap, nativeP->image_path);
+		*(uint64_t *)(nativeInWasm + 32) = nativeP->release_timestamp;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_soundpack_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(36, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_provider_descriptor_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_provider_descriptor_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_provider_descriptor_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->clap_version)
+		nativeP->id = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		nativeP->vendor = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_provider_descriptor_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_provider_descriptor_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_provider_descriptor_t), alignof(clap_preset_discovery_provider_descriptor_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_provider_descriptor_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignNativeToWasm(wclap, &nativeP->clap_version, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->id);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->vendor);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_provider_descriptor_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(16, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_provider_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_provider_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_provider_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->desc = Translate<clap_preset_discovery_provider_descriptor_t *>::wasmToNative(wclap, *nativeInWasm);
+		BLARGH: undefined provider_data
+		BLARGH: bool init(clap_preset_discovery_provider_t *)
+		BLARGH: void destroy(clap_preset_discovery_provider_t *)
+		BLARGH: bool get_metadata(clap_preset_discovery_provider_t *,uint32_t,const char *,clap_preset_discovery_metadata_receiver_t *)
+		BLARGH: undefined get_extension
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_provider_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_provider_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_provider_t), alignof(clap_preset_discovery_provider_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_provider_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<clap_preset_discovery_provider_descriptor_t *>::nativeToWasm(wclap, nativeP->desc);
+		BLARGH: undefined provider_data
+		BLARGH: bool init(clap_preset_discovery_provider_t *)
+		BLARGH: void destroy(clap_preset_discovery_provider_t *)
+		BLARGH: bool get_metadata(clap_preset_discovery_provider_t *,uint32_t,const char *,clap_preset_discovery_metadata_receiver_t *)
+		BLARGH: undefined get_extension
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_provider_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(16, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_indexer_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_indexer_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_indexer_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignWasmToNative(wclap, nativeInWasm, &nativeP->clap_version)
+		nativeP->name = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 4));
+		nativeP->vendor = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 8));
+		nativeP->url = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		nativeP->version = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 16));
+		BLARGH: undefined indexer_data
+		BLARGH: bool declare_filetype(clap_preset_discovery_indexer_t *,clap_preset_discovery_filetype_t *)
+		BLARGH: bool declare_location(clap_preset_discovery_indexer_t *,clap_preset_discovery_location_t *)
+		BLARGH: bool declare_soundpack(clap_preset_discovery_indexer_t *,clap_preset_discovery_soundpack_t *)
+		BLARGH: undefined get_extension
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_indexer_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_indexer_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_indexer_t), alignof(clap_preset_discovery_indexer_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_indexer_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		Translate<clap_version_t *>::assignNativeToWasm(wclap, &nativeP->clap_version, nativeInWasm);
+		*(uint32_t *)(nativeInWasm + 4) = Translate<const char *>::nativeToWasm(wclap, nativeP->name);
+		*(uint32_t *)(nativeInWasm + 8) = Translate<const char *>::nativeToWasm(wclap, nativeP->vendor);
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->url);
+		*(uint32_t *)(nativeInWasm + 16) = Translate<const char *>::nativeToWasm(wclap, nativeP->version);
+		BLARGH: undefined indexer_data
+		BLARGH: bool declare_filetype(clap_preset_discovery_indexer_t *,clap_preset_discovery_filetype_t *)
+		BLARGH: bool declare_location(clap_preset_discovery_indexer_t *,clap_preset_discovery_location_t *)
+		BLARGH: bool declare_soundpack(clap_preset_discovery_indexer_t *,clap_preset_discovery_soundpack_t *)
+		BLARGH: undefined get_extension
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_indexer_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(32, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_preset_discovery_factory_t *
+template<>
+struct Wclap::Translate<clap_preset_discovery_factory_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_preset_discovery_factory_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_preset_discovery_factory_t *)
+		BLARGH: clap_preset_discovery_provider_descriptor_t * get_descriptor(clap_preset_discovery_factory_t *,uint32_t)
+		BLARGH: clap_preset_discovery_provider_t * create(clap_preset_discovery_factory_t *,clap_preset_discovery_indexer_t *,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_preset_discovery_factory_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_preset_discovery_factory_t *)wasm->temporaryNativeBytes(sizeof(clap_preset_discovery_factory_t), alignof(clap_preset_discovery_factory_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_preset_discovery_factory_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_preset_discovery_factory_t *)
+		BLARGH: clap_preset_discovery_provider_descriptor_t * get_descriptor(clap_preset_discovery_factory_t *,uint32_t)
+		BLARGH: clap_preset_discovery_provider_t * create(clap_preset_discovery_factory_t *,clap_preset_discovery_indexer_t *,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_preset_discovery_factory_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_ambisonic_config_t *
+template<>
+struct Wclap::Translate<clap_ambisonic_config_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_ambisonic_config_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_ambisonic_config_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_ambisonic_config_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_ambisonic_config_t), alignof(clap_ambisonic_config_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_ambisonic_config_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_ambisonic_t *
+template<>
+struct Wclap::Translate<clap_plugin_ambisonic_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_ambisonic_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_config_supported(clap_plugin_t *,clap_ambisonic_config_t *)
+		BLARGH: bool get_config(clap_plugin_t *,bool,uint32_t,clap_ambisonic_config_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_ambisonic_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_ambisonic_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_ambisonic_t), alignof(clap_plugin_ambisonic_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_ambisonic_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_config_supported(clap_plugin_t *,clap_ambisonic_config_t *)
+		BLARGH: bool get_config(clap_plugin_t *,bool,uint32_t,clap_ambisonic_config_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_ambisonic_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_ambisonic_t *
+template<>
+struct Wclap::Translate<clap_host_ambisonic_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_ambisonic_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_ambisonic_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_ambisonic_t *)wasm->temporaryNativeBytes(sizeof(clap_host_ambisonic_t), alignof(clap_host_ambisonic_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_ambisonic_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_ambisonic_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_audio_port_info_t *
+template<>
+struct Wclap::Translate<clap_audio_port_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_audio_port_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->id = *(uint32_t *)nativeInWasm;
+		for (size_t a = 0; a < 256; ++a) {
+			nativeP->name[a] = *(char *)((nativeInWasm + 4) + a);
+		}
+		nativeP->flags = *(uint32_t *)(nativeInWasm + 260);
+		nativeP->channel_count = *(uint32_t *)(nativeInWasm + 264);
+		nativeP->port_type = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 268));
+		nativeP->in_place_pair = *(uint32_t *)(nativeInWasm + 272);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_audio_port_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_audio_port_info_t *)wasm->temporaryNativeBytes(sizeof(clap_audio_port_info_t), alignof(clap_audio_port_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_audio_port_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = nativeP->id;
+		for (size_t a = 0; a < 256; ++a) {
+			*(char *)((nativeInWasm + 4) + a) = nativeP->name[a];
+		}
+		*(uint32_t *)(nativeInWasm + 260) = nativeP->flags;
+		*(uint32_t *)(nativeInWasm + 264) = nativeP->channel_count;
+		*(uint32_t *)(nativeInWasm + 268) = Translate<const char *>::nativeToWasm(wclap, nativeP->port_type);
+		*(uint32_t *)(nativeInWasm + 272) = nativeP->in_place_pair;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_audio_port_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(276, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_audio_ports_t *
+template<>
+struct Wclap::Translate<clap_plugin_audio_ports_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_audio_ports_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *,bool)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,bool,clap_audio_port_info_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_audio_ports_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_audio_ports_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_audio_ports_t), alignof(clap_plugin_audio_ports_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_audio_ports_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *,bool)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,bool,clap_audio_port_info_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_audio_ports_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_audio_ports_t *
+template<>
+struct Wclap::Translate<clap_host_audio_ports_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_audio_ports_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_rescan_flag_supported(clap_host_t *,uint32_t)
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_audio_ports_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_audio_ports_t *)wasm->temporaryNativeBytes(sizeof(clap_host_audio_ports_t), alignof(clap_host_audio_ports_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_audio_ports_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_rescan_flag_supported(clap_host_t *,uint32_t)
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_audio_ports_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_audio_ports_activation_t *
+template<>
+struct Wclap::Translate<clap_plugin_audio_ports_activation_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_audio_ports_activation_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool can_activate_while_processing(clap_plugin_t *)
+		BLARGH: bool set_active(clap_plugin_t *,bool,uint32_t,bool,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_audio_ports_activation_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_audio_ports_activation_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_audio_ports_activation_t), alignof(clap_plugin_audio_ports_activation_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_audio_ports_activation_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool can_activate_while_processing(clap_plugin_t *)
+		BLARGH: bool set_active(clap_plugin_t *,bool,uint32_t,bool,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_audio_ports_activation_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_audio_ports_config_t *
+template<>
+struct Wclap::Translate<clap_audio_ports_config_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_audio_ports_config_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->id = *(uint32_t *)nativeInWasm;
+		for (size_t a = 0; a < 256; ++a) {
+			nativeP->name[a] = *(char *)((nativeInWasm + 4) + a);
+		}
+		nativeP->input_port_count = *(uint32_t *)(nativeInWasm + 260);
+		nativeP->output_port_count = *(uint32_t *)(nativeInWasm + 264);
+		nativeP->has_main_input = *(bool *)(nativeInWasm + 268);
+		nativeP->main_input_channel_count = *(uint32_t *)(nativeInWasm + 272);
+		nativeP->main_input_port_type = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 276));
+		nativeP->has_main_output = *(bool *)(nativeInWasm + 277);
+		nativeP->main_output_channel_count = *(uint32_t *)(nativeInWasm + 280);
+		nativeP->main_output_port_type = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 284));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_audio_ports_config_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_audio_ports_config_t *)wasm->temporaryNativeBytes(sizeof(clap_audio_ports_config_t), alignof(clap_audio_ports_config_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_audio_ports_config_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = nativeP->id;
+		for (size_t a = 0; a < 256; ++a) {
+			*(char *)((nativeInWasm + 4) + a) = nativeP->name[a];
+		}
+		*(uint32_t *)(nativeInWasm + 260) = nativeP->input_port_count;
+		*(uint32_t *)(nativeInWasm + 264) = nativeP->output_port_count;
+		*(bool *)(nativeInWasm + 268) = nativeP->has_main_input;
+		*(uint32_t *)(nativeInWasm + 272) = nativeP->main_input_channel_count;
+		*(uint32_t *)(nativeInWasm + 276) = Translate<const char *>::nativeToWasm(wclap, nativeP->main_input_port_type);
+		*(bool *)(nativeInWasm + 277) = nativeP->has_main_output;
+		*(uint32_t *)(nativeInWasm + 280) = nativeP->main_output_channel_count;
+		*(uint32_t *)(nativeInWasm + 284) = Translate<const char *>::nativeToWasm(wclap, nativeP->main_output_port_type);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_audio_ports_config_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(286, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_audio_ports_config_t *
+template<>
+struct Wclap::Translate<clap_plugin_audio_ports_config_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_audio_ports_config_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_audio_ports_config_t *)
+		BLARGH: bool select(clap_plugin_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_audio_ports_config_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_audio_ports_config_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_audio_ports_config_t), alignof(clap_plugin_audio_ports_config_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_audio_ports_config_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_audio_ports_config_t *)
+		BLARGH: bool select(clap_plugin_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_audio_ports_config_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_audio_ports_config_info_t *
+template<>
+struct Wclap::Translate<clap_plugin_audio_ports_config_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_audio_ports_config_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t current_config(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,uint32_t,bool,clap_audio_port_info_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_audio_ports_config_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_audio_ports_config_info_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_audio_ports_config_info_t), alignof(clap_plugin_audio_ports_config_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_audio_ports_config_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t current_config(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,uint32_t,bool,clap_audio_port_info_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_audio_ports_config_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_audio_ports_config_t *
+template<>
+struct Wclap::Translate<clap_host_audio_ports_config_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_audio_ports_config_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void rescan(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_audio_ports_config_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_audio_ports_config_t *)wasm->temporaryNativeBytes(sizeof(clap_host_audio_ports_config_t), alignof(clap_host_audio_ports_config_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_audio_ports_config_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void rescan(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_audio_ports_config_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_audio_port_configuration_request_t *
+template<>
+struct Wclap::Translate<clap_audio_port_configuration_request_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_audio_port_configuration_request_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->is_input = *(bool *)nativeInWasm;
+		nativeP->port_index = *(uint32_t *)(nativeInWasm + 4);
+		nativeP->channel_count = *(uint32_t *)(nativeInWasm + 8);
+		nativeP->port_type = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 12));
+		BLARGH: undefined port_details
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_audio_port_configuration_request_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_audio_port_configuration_request_t *)wasm->temporaryNativeBytes(sizeof(clap_audio_port_configuration_request_t), alignof(clap_audio_port_configuration_request_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_audio_port_configuration_request_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(bool *)nativeInWasm = nativeP->is_input;
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->port_index;
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->channel_count;
+		*(uint32_t *)(nativeInWasm + 12) = Translate<const char *>::nativeToWasm(wclap, nativeP->port_type);
+		BLARGH: undefined port_details
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_audio_port_configuration_request_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(13, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_configurable_audio_ports_t *
+template<>
+struct Wclap::Translate<clap_plugin_configurable_audio_ports_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_configurable_audio_ports_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool can_apply_configuration(clap_plugin_t *,clap_audio_port_configuration_request_t *,uint32_t)
+		BLARGH: bool apply_configuration(clap_plugin_t *,clap_audio_port_configuration_request_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_configurable_audio_ports_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_configurable_audio_ports_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_configurable_audio_ports_t), alignof(clap_plugin_configurable_audio_ports_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_configurable_audio_ports_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool can_apply_configuration(clap_plugin_t *,clap_audio_port_configuration_request_t *,uint32_t)
+		BLARGH: bool apply_configuration(clap_plugin_t *,clap_audio_port_configuration_request_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_configurable_audio_ports_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_target_t *
+template<>
+struct Wclap::Translate<clap_context_menu_target_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_context_menu_target_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_context_menu_target_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_target_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_context_menu_target_t), alignof(clap_context_menu_target_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_context_menu_target_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_entry_t *
+template<>
+struct Wclap::Translate<clap_context_menu_entry_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_context_menu_entry_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->label = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->is_enabled = *(bool *)(nativeInWasm + 4);
+		nativeP->action_id = *(uint32_t *)(nativeInWasm + 8);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_context_menu_entry_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_context_menu_entry_t *)wasm->temporaryNativeBytes(sizeof(clap_context_menu_entry_t), alignof(clap_context_menu_entry_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_context_menu_entry_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->label);
+		*(bool *)(nativeInWasm + 4) = nativeP->is_enabled;
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->action_id;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_entry_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(9, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_check_entry_t *
+template<>
+struct Wclap::Translate<clap_context_menu_check_entry_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_context_menu_check_entry_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->label = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->is_enabled = *(bool *)(nativeInWasm + 4);
+		nativeP->is_checked = *(bool *)(nativeInWasm + 5);
+		nativeP->action_id = *(uint32_t *)(nativeInWasm + 8);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_context_menu_check_entry_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_context_menu_check_entry_t *)wasm->temporaryNativeBytes(sizeof(clap_context_menu_check_entry_t), alignof(clap_context_menu_check_entry_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_context_menu_check_entry_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->label);
+		*(bool *)(nativeInWasm + 4) = nativeP->is_enabled;
+		*(bool *)(nativeInWasm + 5) = nativeP->is_checked;
+		*(uint32_t *)(nativeInWasm + 8) = nativeP->action_id;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_check_entry_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(10, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_item_title_t *
+template<>
+struct Wclap::Translate<clap_context_menu_item_title_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_context_menu_item_title_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->title = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->is_enabled = *(bool *)(nativeInWasm + 4);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_context_menu_item_title_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_context_menu_item_title_t *)wasm->temporaryNativeBytes(sizeof(clap_context_menu_item_title_t), alignof(clap_context_menu_item_title_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_context_menu_item_title_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->title);
+		*(bool *)(nativeInWasm + 4) = nativeP->is_enabled;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_item_title_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(5, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_submenu_t *
+template<>
+struct Wclap::Translate<clap_context_menu_submenu_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_context_menu_submenu_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->label = Translate<const char *>::wasmToNative(wclap, *nativeInWasm);
+		nativeP->is_enabled = *(bool *)(nativeInWasm + 4);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_context_menu_submenu_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_context_menu_submenu_t *)wasm->temporaryNativeBytes(sizeof(clap_context_menu_submenu_t), alignof(clap_context_menu_submenu_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_context_menu_submenu_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = Translate<const char *>::nativeToWasm(wclap, nativeP->label);
+		*(bool *)(nativeInWasm + 4) = nativeP->is_enabled;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_submenu_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(5, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_context_menu_builder_t *
+template<>
+struct Wclap::Translate<clap_context_menu_builder_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_context_menu_builder_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined add_item
+		BLARGH: bool supports(clap_context_menu_builder_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_context_menu_builder_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_context_menu_builder_t *)wasm->temporaryNativeBytes(sizeof(clap_context_menu_builder_t), alignof(clap_context_menu_builder_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_context_menu_builder_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined ctx
+		BLARGH: undefined add_item
+		BLARGH: bool supports(clap_context_menu_builder_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_context_menu_builder_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_context_menu_t *
+template<>
+struct Wclap::Translate<clap_plugin_context_menu_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_context_menu_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool populate(clap_plugin_t *,clap_context_menu_target_t *,clap_context_menu_builder_t *)
+		BLARGH: bool perform(clap_plugin_t *,clap_context_menu_target_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_context_menu_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_context_menu_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_context_menu_t), alignof(clap_plugin_context_menu_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_context_menu_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool populate(clap_plugin_t *,clap_context_menu_target_t *,clap_context_menu_builder_t *)
+		BLARGH: bool perform(clap_plugin_t *,clap_context_menu_target_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_context_menu_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_context_menu_t *
+template<>
+struct Wclap::Translate<clap_host_context_menu_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_context_menu_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool populate(clap_host_t *,clap_context_menu_target_t *,clap_context_menu_builder_t *)
+		BLARGH: bool perform(clap_host_t *,clap_context_menu_target_t *,uint32_t)
+		BLARGH: bool can_popup(clap_host_t *)
+		BLARGH: bool popup(clap_host_t *,clap_context_menu_target_t *,int32_t,int32_t,int32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_context_menu_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_context_menu_t *)wasm->temporaryNativeBytes(sizeof(clap_host_context_menu_t), alignof(clap_host_context_menu_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_context_menu_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool populate(clap_host_t *,clap_context_menu_target_t *,clap_context_menu_builder_t *)
+		BLARGH: bool perform(clap_host_t *,clap_context_menu_target_t *,uint32_t)
+		BLARGH: bool can_popup(clap_host_t *)
+		BLARGH: bool popup(clap_host_t *,clap_context_menu_target_t *,int32_t,int32_t,int32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_context_menu_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(16, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_event_registry_t *
+template<>
+struct Wclap::Translate<clap_host_event_registry_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_event_registry_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined query
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_event_registry_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_event_registry_t *)wasm->temporaryNativeBytes(sizeof(clap_host_event_registry_t), alignof(clap_host_event_registry_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_event_registry_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined query
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_event_registry_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(0, 1);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_gui_resize_hints_t *
+template<>
+struct Wclap::Translate<clap_gui_resize_hints_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_gui_resize_hints_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_gui_resize_hints_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_gui_resize_hints_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_gui_resize_hints_t), alignof(clap_gui_resize_hints_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_gui_resize_hints_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_gui_t *
+template<>
+struct Wclap::Translate<clap_plugin_gui_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_gui_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_api_supported(clap_plugin_t *,const char *,bool)
+		BLARGH: undefined get_preferred_api
+		BLARGH: bool create(clap_plugin_t *,const char *,bool)
+		BLARGH: void destroy(clap_plugin_t *)
+		BLARGH: bool set_scale(clap_plugin_t *,double)
+		BLARGH: undefined get_size
+		BLARGH: bool can_resize(clap_plugin_t *)
+		BLARGH: bool get_resize_hints(clap_plugin_t *,clap_gui_resize_hints_t *)
+		BLARGH: undefined adjust_size
+		BLARGH: bool set_size(clap_plugin_t *,uint32_t,uint32_t)
+		BLARGH: bool set_parent(clap_plugin_t *,clap_window_t *)
+		BLARGH: bool set_transient(clap_plugin_t *,clap_window_t *)
+		BLARGH: void suggest_title(clap_plugin_t *,const char *)
+		BLARGH: bool show(clap_plugin_t *)
+		BLARGH: bool hide(clap_plugin_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_gui_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_gui_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_gui_t), alignof(clap_plugin_gui_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_gui_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_api_supported(clap_plugin_t *,const char *,bool)
+		BLARGH: undefined get_preferred_api
+		BLARGH: bool create(clap_plugin_t *,const char *,bool)
+		BLARGH: void destroy(clap_plugin_t *)
+		BLARGH: bool set_scale(clap_plugin_t *,double)
+		BLARGH: undefined get_size
+		BLARGH: bool can_resize(clap_plugin_t *)
+		BLARGH: bool get_resize_hints(clap_plugin_t *,clap_gui_resize_hints_t *)
+		BLARGH: undefined adjust_size
+		BLARGH: bool set_size(clap_plugin_t *,uint32_t,uint32_t)
+		BLARGH: bool set_parent(clap_plugin_t *,clap_window_t *)
+		BLARGH: bool set_transient(clap_plugin_t *,clap_window_t *)
+		BLARGH: void suggest_title(clap_plugin_t *,const char *)
+		BLARGH: bool show(clap_plugin_t *)
+		BLARGH: bool hide(clap_plugin_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_gui_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(48, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_gui_t *
+template<>
+struct Wclap::Translate<clap_host_gui_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_gui_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void resize_hints_changed(clap_host_t *)
+		BLARGH: bool request_resize(clap_host_t *,uint32_t,uint32_t)
+		BLARGH: bool request_show(clap_host_t *)
+		BLARGH: bool request_hide(clap_host_t *)
+		BLARGH: void closed(clap_host_t *,bool)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_gui_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_gui_t *)wasm->temporaryNativeBytes(sizeof(clap_host_gui_t), alignof(clap_host_gui_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_gui_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void resize_hints_changed(clap_host_t *)
+		BLARGH: bool request_resize(clap_host_t *,uint32_t,uint32_t)
+		BLARGH: bool request_show(clap_host_t *)
+		BLARGH: bool request_hide(clap_host_t *)
+		BLARGH: void closed(clap_host_t *,bool)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_gui_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(20, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_latency_t *
+template<>
+struct Wclap::Translate<clap_plugin_latency_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_latency_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get(clap_plugin_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_latency_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_latency_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_latency_t), alignof(clap_plugin_latency_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_latency_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get(clap_plugin_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_latency_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_latency_t *
+template<>
+struct Wclap::Translate<clap_host_latency_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_latency_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_latency_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_latency_t *)wasm->temporaryNativeBytes(sizeof(clap_host_latency_t), alignof(clap_host_latency_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_latency_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_latency_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_log_t *
+template<>
+struct Wclap::Translate<clap_host_log_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_log_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void log(clap_host_t *,int32_t,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_log_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_log_t *)wasm->temporaryNativeBytes(sizeof(clap_host_log_t), alignof(clap_host_log_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_log_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void log(clap_host_t *,int32_t,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_log_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_note_name_t *
+template<>
+struct Wclap::Translate<clap_note_name_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_note_name_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_note_name_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_note_name_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_note_name_t), alignof(clap_note_name_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_note_name_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_note_name_t *
+template<>
+struct Wclap::Translate<clap_plugin_note_name_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_note_name_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_note_name_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_note_name_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_note_name_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_note_name_t), alignof(clap_plugin_note_name_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_note_name_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_note_name_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_note_name_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_note_name_t *
+template<>
+struct Wclap::Translate<clap_host_note_name_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_note_name_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_note_name_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_note_name_t *)wasm->temporaryNativeBytes(sizeof(clap_host_note_name_t), alignof(clap_host_note_name_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_note_name_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_note_name_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_note_port_info_t *
+template<>
+struct Wclap::Translate<clap_note_port_info_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_note_port_info_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_note_port_info_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_note_port_info_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_note_port_info_t), alignof(clap_note_port_info_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_note_port_info_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_note_ports_t *
+template<>
+struct Wclap::Translate<clap_plugin_note_ports_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_note_ports_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *,bool)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,bool,clap_note_port_info_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_note_ports_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_note_ports_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_note_ports_t), alignof(clap_plugin_note_ports_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_note_ports_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *,bool)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,bool,clap_note_port_info_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_note_ports_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_note_ports_t *
+template<>
+struct Wclap::Translate<clap_host_note_ports_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_note_ports_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t supported_dialects(clap_host_t *)
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_note_ports_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_note_ports_t *)wasm->temporaryNativeBytes(sizeof(clap_host_note_ports_t), alignof(clap_host_note_ports_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_note_ports_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t supported_dialects(clap_host_t *)
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_note_ports_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_param_indication_t *
+template<>
+struct Wclap::Translate<clap_plugin_param_indication_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_param_indication_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void set_mapping(clap_plugin_t *,uint32_t,bool,clap_color_t *,const char *,const char *)
+		BLARGH: void set_automation(clap_plugin_t *,uint32_t,uint32_t,clap_color_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_param_indication_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_param_indication_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_param_indication_t), alignof(clap_plugin_param_indication_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_param_indication_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void set_mapping(clap_plugin_t *,uint32_t,bool,clap_color_t *,const char *,const char *)
+		BLARGH: void set_automation(clap_plugin_t *,uint32_t,uint32_t,clap_color_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_param_indication_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_param_info_t *
+template<>
+struct Wclap::Translate<clap_param_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_param_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->id = *(uint32_t *)nativeInWasm;
+		nativeP->flags = *(uint32_t *)(nativeInWasm + 4);
+		BLARGH: undefined cookie
+		for (size_t a = 0; a < 256; ++a) {
+			nativeP->name[a] = *(char *)((nativeInWasm + 8) + a);
+		}
+		for (size_t a = 0; a < 1024; ++a) {
+			nativeP->module[a] = *(char *)((nativeInWasm + 264) + a);
+		}
+		nativeP->min_value = *(double *)(nativeInWasm + 1288);
+		nativeP->max_value = *(double *)(nativeInWasm + 1296);
+		nativeP->default_value = *(double *)(nativeInWasm + 1304);
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_param_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_param_info_t *)wasm->temporaryNativeBytes(sizeof(clap_param_info_t), alignof(clap_param_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_param_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint32_t *)nativeInWasm = nativeP->id;
+		*(uint32_t *)(nativeInWasm + 4) = nativeP->flags;
+		BLARGH: undefined cookie
+		for (size_t a = 0; a < 256; ++a) {
+			*(char *)((nativeInWasm + 8) + a) = nativeP->name[a];
+		}
+		for (size_t a = 0; a < 1024; ++a) {
+			*(char *)((nativeInWasm + 264) + a) = nativeP->module[a];
+		}
+		*(double *)(nativeInWasm + 1288) = nativeP->min_value;
+		*(double *)(nativeInWasm + 1296) = nativeP->max_value;
+		*(double *)(nativeInWasm + 1304) = nativeP->default_value;
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_param_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(1312, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_params_t *
+template<>
+struct Wclap::Translate<clap_plugin_params_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_params_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get_info(clap_plugin_t *,uint32_t,clap_param_info_t *)
+		BLARGH: undefined get_value
+		BLARGH: undefined value_to_text
+		BLARGH: undefined text_to_value
+		BLARGH: void flush(clap_plugin_t *,clap_input_events_t *,clap_output_events_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_params_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_params_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_params_t), alignof(clap_plugin_params_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_params_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get_info(clap_plugin_t *,uint32_t,clap_param_info_t *)
+		BLARGH: undefined get_value
+		BLARGH: undefined value_to_text
+		BLARGH: undefined text_to_value
+		BLARGH: void flush(clap_plugin_t *,clap_input_events_t *,clap_output_events_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_params_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_params_t *
+template<>
+struct Wclap::Translate<clap_host_params_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_params_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		BLARGH: void clear(clap_host_t *,uint32_t,uint32_t)
+		BLARGH: void request_flush(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_params_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_params_t *)wasm->temporaryNativeBytes(sizeof(clap_host_params_t), alignof(clap_host_params_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_params_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void rescan(clap_host_t *,uint32_t)
+		BLARGH: void clear(clap_host_t *,uint32_t,uint32_t)
+		BLARGH: void request_flush(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_params_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(12, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_preset_load_t *
+template<>
+struct Wclap::Translate<clap_plugin_preset_load_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_preset_load_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool from_location(clap_plugin_t *,uint32_t,const char *,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_preset_load_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_preset_load_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_preset_load_t), alignof(clap_plugin_preset_load_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_preset_load_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool from_location(clap_plugin_t *,uint32_t,const char *,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_preset_load_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_preset_load_t *
+template<>
+struct Wclap::Translate<clap_host_preset_load_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_preset_load_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void on_error(clap_host_t *,uint32_t,const char *,const char *,int32_t,const char *)
+		BLARGH: void loaded(clap_host_t *,uint32_t,const char *,const char *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_preset_load_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_preset_load_t *)wasm->temporaryNativeBytes(sizeof(clap_host_preset_load_t), alignof(clap_host_preset_load_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_preset_load_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void on_error(clap_host_t *,uint32_t,const char *,const char *,int32_t,const char *)
+		BLARGH: void loaded(clap_host_t *,uint32_t,const char *,const char *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_preset_load_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_remote_controls_page_t *
+template<>
+struct Wclap::Translate<clap_remote_controls_page_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_remote_controls_page_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_remote_controls_page_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_remote_controls_page_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_remote_controls_page_t), alignof(clap_remote_controls_page_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_remote_controls_page_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_remote_controls_t *
+template<>
+struct Wclap::Translate<clap_plugin_remote_controls_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_remote_controls_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_remote_controls_page_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_remote_controls_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_remote_controls_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_remote_controls_t), alignof(clap_plugin_remote_controls_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_remote_controls_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t count(clap_plugin_t *)
+		BLARGH: bool get(clap_plugin_t *,uint32_t,clap_remote_controls_page_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_remote_controls_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_remote_controls_t *
+template<>
+struct Wclap::Translate<clap_host_remote_controls_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_remote_controls_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		BLARGH: void suggest_page(clap_host_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_remote_controls_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_remote_controls_t *)wasm->temporaryNativeBytes(sizeof(clap_host_remote_controls_t), alignof(clap_host_remote_controls_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_remote_controls_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		BLARGH: void suggest_page(clap_host_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_remote_controls_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_render_t *
+template<>
+struct Wclap::Translate<clap_plugin_render_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_render_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool has_hard_realtime_requirement(clap_plugin_t *)
+		BLARGH: bool set(clap_plugin_t *,int32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_render_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_render_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_render_t), alignof(clap_plugin_render_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_render_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool has_hard_realtime_requirement(clap_plugin_t *)
+		BLARGH: bool set(clap_plugin_t *,int32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_render_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_state_context_t *
+template<>
+struct Wclap::Translate<clap_plugin_state_context_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_state_context_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool save(clap_plugin_t *,clap_ostream_t *,uint32_t)
+		BLARGH: bool load(clap_plugin_t *,clap_istream_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_state_context_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_state_context_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_state_context_t), alignof(clap_plugin_state_context_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_state_context_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool save(clap_plugin_t *,clap_ostream_t *,uint32_t)
+		BLARGH: bool load(clap_plugin_t *,clap_istream_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_state_context_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_state_t *
+template<>
+struct Wclap::Translate<clap_plugin_state_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_state_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool save(clap_plugin_t *,clap_ostream_t *)
+		BLARGH: bool load(clap_plugin_t *,clap_istream_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_state_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_state_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_state_t), alignof(clap_plugin_state_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_state_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool save(clap_plugin_t *,clap_ostream_t *)
+		BLARGH: bool load(clap_plugin_t *,clap_istream_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_state_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_state_t *
+template<>
+struct Wclap::Translate<clap_host_state_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_state_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void mark_dirty(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_state_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_state_t *)wasm->temporaryNativeBytes(sizeof(clap_host_state_t), alignof(clap_host_state_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_state_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void mark_dirty(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_state_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_surround_t *
+template<>
+struct Wclap::Translate<clap_plugin_surround_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_surround_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_channel_mask_supported(clap_plugin_t *,uint64_t)
+		BLARGH: undefined get_channel_map
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_surround_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_surround_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_surround_t), alignof(clap_plugin_surround_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_surround_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_channel_mask_supported(clap_plugin_t *,uint64_t)
+		BLARGH: undefined get_channel_map
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_surround_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_surround_t *
+template<>
+struct Wclap::Translate<clap_host_surround_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_surround_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_surround_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_surround_t *)wasm->temporaryNativeBytes(sizeof(clap_host_surround_t), alignof(clap_host_surround_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_surround_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_surround_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_tail_t *
+template<>
+struct Wclap::Translate<clap_plugin_tail_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_tail_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get(clap_plugin_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_tail_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_tail_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_tail_t), alignof(clap_plugin_tail_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_tail_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: uint32_t get(clap_plugin_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_tail_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_tail_t *
+template<>
+struct Wclap::Translate<clap_host_tail_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_tail_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_tail_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_tail_t *)wasm->temporaryNativeBytes(sizeof(clap_host_tail_t), alignof(clap_host_tail_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_tail_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_tail_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_thread_check_t *
+template<>
+struct Wclap::Translate<clap_host_thread_check_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_thread_check_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_main_thread(clap_host_t *)
+		BLARGH: bool is_audio_thread(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_thread_check_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_thread_check_t *)wasm->temporaryNativeBytes(sizeof(clap_host_thread_check_t), alignof(clap_host_thread_check_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_thread_check_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool is_main_thread(clap_host_t *)
+		BLARGH: bool is_audio_thread(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_thread_check_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(8, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_thread_pool_t *
+template<>
+struct Wclap::Translate<clap_plugin_thread_pool_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_thread_pool_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void exec(clap_plugin_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_thread_pool_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_thread_pool_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_thread_pool_t), alignof(clap_plugin_thread_pool_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_thread_pool_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void exec(clap_plugin_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_thread_pool_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_thread_pool_t *
+template<>
+struct Wclap::Translate<clap_host_thread_pool_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_thread_pool_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool request_exec(clap_host_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_thread_pool_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_thread_pool_t *)wasm->temporaryNativeBytes(sizeof(clap_host_thread_pool_t), alignof(clap_host_thread_pool_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_thread_pool_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool request_exec(clap_host_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_thread_pool_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_timer_support_t *
+template<>
+struct Wclap::Translate<clap_plugin_timer_support_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_timer_support_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void on_timer(clap_plugin_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_timer_support_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_timer_support_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_timer_support_t), alignof(clap_plugin_timer_support_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_timer_support_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void on_timer(clap_plugin_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_timer_support_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_timer_support_t *
+template<>
+struct Wclap::Translate<clap_host_timer_support_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_timer_support_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined register_timer
+		BLARGH: bool unregister_timer(clap_host_t *,uint32_t)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_timer_support_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_timer_support_t *)wasm->temporaryNativeBytes(sizeof(clap_host_timer_support_t), alignof(clap_host_timer_support_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_timer_support_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: undefined register_timer
+		BLARGH: bool unregister_timer(clap_host_t *,uint32_t)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_timer_support_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_track_info_t *
+template<>
+struct Wclap::Translate<clap_track_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_track_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		nativeP->flags = *(uint64_t *)nativeInWasm;
+		for (size_t a = 0; a < 256; ++a) {
+			nativeP->name[a] = *(char *)((nativeInWasm + 8) + a);
+		}
+		Translate<clap_color_t *>::assignWasmToNative(wclap, (nativeInWasm + 264), &nativeP->color)
+		nativeP->audio_channel_count = *(int32_t *)(nativeInWasm + 268);
+		nativeP->audio_port_type = Translate<const char *>::wasmToNative(wclap, *(nativeInWasm + 272));
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_track_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_track_info_t *)wasm->temporaryNativeBytes(sizeof(clap_track_info_t), alignof(clap_track_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_track_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		*(uint64_t *)nativeInWasm = nativeP->flags;
+		for (size_t a = 0; a < 256; ++a) {
+			*(char *)((nativeInWasm + 8) + a) = nativeP->name[a];
+		}
+		Translate<clap_color_t *>::assignNativeToWasm(wclap, &nativeP->color, (nativeInWasm + 264));
+		*(int32_t *)(nativeInWasm + 268) = nativeP->audio_channel_count;
+		*(uint32_t *)(nativeInWasm + 272) = Translate<const char *>::nativeToWasm(wclap, nativeP->audio_port_type);
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_track_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(276, 8);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_track_info_t *
+template<>
+struct Wclap::Translate<clap_plugin_track_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_track_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_plugin_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_track_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_track_info_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_track_info_t), alignof(clap_plugin_track_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_track_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_plugin_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_track_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_track_info_t *
+template<>
+struct Wclap::Translate<clap_host_track_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_track_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool get(clap_host_t *,clap_track_info_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_track_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_track_info_t *)wasm->temporaryNativeBytes(sizeof(clap_host_track_info_t), alignof(clap_host_track_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_track_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool get(clap_host_t *,clap_track_info_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_track_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_voice_info_t *
+template<>
+struct Wclap::Translate<clap_voice_info_t *> {
+	using WasmType = uint32_t;
+	// Translate the WASM pointer to a native one
+	static clap_voice_info_t * wasmToNative(Wclap *wclap, WasmType p) {
+		if (!p) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wclap->memory) + p;
+		return (clap_voice_info_t *)nativeInWasm;
+	}
+	// Make a temporary copy in the WASM memory, and point to that
+	static WasmType nativeToWasm(Wclap *wclap, clap_voice_info_t *v) {
+		if (!v) return 0;
+		uint32_t wasmP = wclap->temporaryWasmBytes(sizeof(clap_voice_info_t), alignof(clap_voice_info_t));
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + p;
+		*(clap_voice_info_t *)nativeInWasm = *v;
+		return wasmP;
+	}
+};
+// Translate: clap_plugin_voice_info_t *
+template<>
+struct Wclap::Translate<clap_plugin_voice_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_plugin_voice_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool get(clap_plugin_t *,clap_voice_info_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_plugin_voice_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_plugin_voice_info_t *)wasm->temporaryNativeBytes(sizeof(clap_plugin_voice_info_t), alignof(clap_plugin_voice_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_plugin_voice_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: bool get(clap_plugin_t *,clap_voice_info_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_plugin_voice_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
+		return wasmP;
+	}
+};
+// Translate: clap_host_voice_info_t *
+template<>
+struct Wclap::Translate<clap_host_voice_info_t *> {
+	using WasmType = uint32_t;
+	// translate all the fields
+	static void assignWasmToNative(Wclap *wclap, WasmType wasmP, clap_host_voice_info_t *nativeP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return nativeP;
+	}
+	// Copy to native memory and translate that
+	static clap_host_voice_info_t * wasmToNative(Wclap *wclap, WasmType wasmP) {
+		if (!wasmP) return nullptr;
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		auto *nativeP = (clap_host_voice_info_t *)wasm->temporaryNativeBytes(sizeof(clap_host_voice_info_t), alignof(clap_host_voice_info_t));
+		assignWasmToNative(wclap, wasmP, nativeP);
+		return nativeP;
+	}
+	// translate all the fields
+	static void assignNativeToWasm(Wclap *wclap, clap_host_voice_info_t *nativeP, WasmType wasmP) {
+		void *nativeInWasm = wasm_memory_data(wasm->memory) + wasmP;
+		BLARGH: void changed(clap_host_t *)
+		return wasmP;
+	}
+	// Make a copy in WASM memory, translate all the fields
+	static WasmType nativeToWasm(Wclap *wclap, clap_host_voice_info_t *nativeP) {
+		if (!nativeP) return 0;
+		uint32_t wasmP = wasm->temporaryWasmBytes(4, 4);
+		assignNativeToWasm(wclap, nativeP, wasmP);
 		return wasmP;
 	}
 };

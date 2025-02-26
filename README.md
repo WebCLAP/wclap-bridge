@@ -29,16 +29,50 @@ Modules may require WASI imports (only `wasi_snapshot_preview1` is supported her
 
 ## Design
 
-Aside from the kerfuffle of setting up the WASM engine, this repo also provides a translation layer for every value in the CLAP API.
+Aside from the kerfuffle of setting up the WASM engine, this repo also provides a translation layer for every value in the CLAP API.  All CLAP API functions only accept/return basic numerical values or pointers to structs. 
 
-A "compatible" value is a basic numerical value (32/64-bit ints and floats), or a struct only containing compatible values.  These can be read and written directly by native code, even when located within the WASM instance's memory.
+Pointers to structs made entirely of numerical values can be used by native code by simply offsetting to their location in the WASM instance's memory.  Native structs need to be copied into the WASM memory first.
 
-*Non-*compatible values need to be translated.  Pointers to compatible values can be translated from WASM to native by just adding an offset, but structs need to be duplicated (with each field translated), and functions need a more complicated wrapping.  
+Pointers to other structs (containing pointers or function-pointers) need to be translated, by translating each of their members individually.  There are no circular references in the CLAP API, so pointers to structs can be translated by translating the pointed-to struct and referencing that.
+
+### Objects and methods
+
+With the exception of `clap_entry::get_factory`, all CLAP API functions are effectively methods, called with an "object" first argument which always contains an opaque `void *` context/data field.
+
+Whenever we translate a function, we expect to know what object will be used as this first argument, and we can store translation data in that object.
+
+We create a distinct native function for each "API position" (struct/field combination) in the CLAP API, and this position is used as part of mapping as well.  
+
+### Native → WASM
+
+We assume(⚠️) that the native host is not constantly compiling/assembling new functions, and therefore there are a finite number of function pointers which could possibly be passed to the WCLAP.  We therefore adapt/insert native functions into the WASM instance's function table.  This requires an `O(log(N))` lookup (for a `std::map`) for each incoming function (to re-use the existing index), but `O(1)` overhead when calling them from WASM.
+
+Structs which contain a `.destroy` method are given a persistent mapping, and their own chunk of memory for temporary data.
+
+### WASM → Native
+
+For WASM functions, 
+
+When making a native proxy for a WASM structs, we fill that pointer to a support data structure which contains:
+
+* which WASM instance it lives in
+* a (WASM) pointer to the equivalent WASM struct
+* an array mapping every CLAP API function (which might use this struct as its "object" argument) to a WASM function-table index
+
+We assume(⚠️) that the WCLAP will only use one function for a given API-position/object combo, so whenever we translate a WASM function pointer, we set the corresponding entry in the object's function mapping.
+
+### Structs and lifetime
+
+When making a WASM proxy for a native struct, we fill that pointer to a support data structure which contains:
+
+* a (native) pointer to the equivalent native struct
+
+When translating any function 
 
 ### Sandboxed WASI
 
 This repo includes an extremely incomplete `wasi_snapshot_preview1` implementation, and functions are only being added when one of our WCLAPs needs them.
 
-**⚠️ I am not a security professional, so don't use this with untrusted code without a proper security review.  I have based it on Wasmtime's `preview1.rs` implementation where possible.**
+**⚠️ I am not an infosec professional, so don't use this with untrusted code without a proper review by someone more qualified.  I have based it on Wasmtime's `preview1.rs` implementation where possible.**
 
 Although a generic sandboxed WASI implementation seems like a sensible thing to exist, the existing sandboxed implementations (Wasmer/Wasmtime) are tightly coupled to their WASM engines, and the others I've found (uvwasi, Wasm3's `m3_api_wasi.c`) aren't sandboxed. 

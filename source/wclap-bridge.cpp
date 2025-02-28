@@ -45,6 +45,22 @@ struct WclapTranslationScope {
 		assert(wasmTmpP <= wasmTmpStartP + arenaSize);
 		return result;
 	}
+	
+	template<class V>
+	void assignWasmToNative(uint32_t wasmP, V &native);
+	template<class V>
+	void assignNativeToWasm(const V &native, uint32_t wasmP);
+
+	template<class V>
+	void assignWasmToNativeDirect(uint32_t wasmP, V &native) {
+		auto *nativeWasmP = (const V *)nativeInWasm(wasmP);
+		native = *nativeWasmP;
+	}
+	template<class V>
+	void assignNativeToWasmDirect(const V &native, uint32_t wasmP) {
+		auto *nativeWasmP = (V *)nativeInWasm(wasmP);
+		*nativeWasmP = native;
+	}
 };
 
 struct Wclap {
@@ -164,63 +180,53 @@ private:
 		wasi.fileRoot(path);
 	}
 	
-	template<class NativeType>
-	struct Translate;
-
-	template<class NativeType>
-	NativeType wasmToNative(typename Translate<NativeType>::WasmType v) {
-		return Translate<NativeType>::wasmToNative(*this, v);
-	}
-
-	template<class NativeType>
-	typename Translate<NativeType>::WasmType nativeToWasm(NativeType v) {
-		return Translate<NativeType>::nativeToWasm(*this, v);
-	}
+	template<class NativeStruct>
+	struct TranslateStruct;
 };
 
-#define WASM_DIRECT_TRANSLATION(NativeType) \
-template<> \
-struct Wclap::Translate<NativeType> { \
-	using WasmType = NativeType; \
-	static NativeType wasmToNative(WclapTranslationScope *, WasmType v) { \
-		return v; \
-	} \
-	static WasmType nativeToWasm(WclapTranslationScope *, NativeType v) { \
-		return v; \
-	} \
-};
-WASM_DIRECT_TRANSLATION(uint8_t);
-WASM_DIRECT_TRANSLATION(uint16_t);
-WASM_DIRECT_TRANSLATION(uint32_t);
-WASM_DIRECT_TRANSLATION(uint64_t);
-WASM_DIRECT_TRANSLATION(int8_t);
-WASM_DIRECT_TRANSLATION(int16_t);
-WASM_DIRECT_TRANSLATION(int32_t);
-WASM_DIRECT_TRANSLATION(int64_t);
-WASM_DIRECT_TRANSLATION(float32_t);
-WASM_DIRECT_TRANSLATION(float64_t);
-WASM_DIRECT_TRANSLATION(bool);
-#undef WASM_DIRECT_TRANSLATION
+//#define WASM_DIRECT_TRANSLATION(NativeType) \
+//template<> \
+//struct Wclap::Translate<NativeType> { \
+//	using WasmType = NativeType; \
+//	static NativeType wasmToNative(WclapTranslationScope *, WasmType v) { \
+//		return v; \
+//	} \
+//	static WasmType nativeToWasm(WclapTranslationScope *, NativeType v) { \
+//		return v; \
+//	} \
+//};
+//WASM_DIRECT_TRANSLATION(uint8_t);
+//WASM_DIRECT_TRANSLATION(uint16_t);
+//WASM_DIRECT_TRANSLATION(uint32_t);
+//WASM_DIRECT_TRANSLATION(uint64_t);
+//WASM_DIRECT_TRANSLATION(int8_t);
+//WASM_DIRECT_TRANSLATION(int16_t);
+//WASM_DIRECT_TRANSLATION(int32_t);
+//WASM_DIRECT_TRANSLATION(int64_t);
+//WASM_DIRECT_TRANSLATION(float32_t);
+//WASM_DIRECT_TRANSLATION(float64_t);
+//WASM_DIRECT_TRANSLATION(bool);
+//#undef WASM_DIRECT_TRANSLATION
 
-// C strings
-template<>
-struct Wclap::Translate<const char *> {
-	using WasmType = uint32_t;
-	static const char * wasmToNative(WclapTranslationScope *translate, uint32_t wasmP) {
-		if (!wasmP) return nullptr;
-		return (const char *)translate->nativeInWasm(wasmP);
-	}
-	static uint32_t nativeToWasm(WclapTranslationScope *translate, const char *nativeP) {
-		if (!nativeP) return 0;
-		size_t size = std::strlen(nativeP) + 1;
-		uint32_t wasmP = translate->temporaryWasmBytes(size, 1);
-		char *nativeInWasm = (char *)translate->nativeInWasm(wasmP);
-		for (size_t i = 0; i < size; ++i) {
-			nativeInWasm[i] = nativeP[i];
-		}
-		return wasmP;
-	}
-};
+//// C strings
+//template<>
+//struct Wclap::Translate<const char *> {
+//	using WasmType = uint32_t;
+//	static const char * wasmToNative(WclapTranslationScope *translate, uint32_t wasmP) {
+//		if (!wasmP) return nullptr;
+//		return (const char *)translate->nativeInWasm(wasmP);
+//	}
+//	static uint32_t nativeToWasm(WclapTranslationScope *translate, const char *nativeP) {
+//		if (!nativeP) return 0;
+//		size_t size = std::strlen(nativeP) + 1;
+//		uint32_t wasmP = translate->temporaryWasmBytes(size, 1);
+//		char *nativeInWasm = (char *)translate->nativeInWasm(wasmP);
+//		for (size_t i = 0; i < size; ++i) {
+//			nativeInWasm[i] = nativeP[i];
+//		}
+//		return wasmP;
+//	}
+//};
 
 #include "./translate-clap-api.h"
 

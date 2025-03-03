@@ -2,10 +2,8 @@
 #define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
 #include "wclap-translation-scope.h"
-#include "wasi-sandbox.h"
 
-#import "clap/all.h"
-#import "wasm.h"
+#include "wasi.h"
 
 #include <fstream>
 #include <vector>
@@ -24,14 +22,14 @@ struct Wclap {
 	wasm_module_t *module = nullptr;
 	wasm_shared_module_t *shared = nullptr;
 	wasm_instance_t *instance = nullptr;
+	wasi_config_t *wasiConfig = nullptr;
+	wasi_instance_t *wasiInstance = nullptr;
 
 	// Maybe defined, but not our job to delete it
 	wasm_memory_t *memory = nullptr;
 	wasm_table_t *functionTable = nullptr;
 	uint32_t clapEntryP = 0; // WASM pointer to clap_entry
 	wasm_func_t *malloc = nullptr;
-	
-	WasiSandbox wasi;
 	
 	static char typeCode(wasm_valkind_t k) {
 		if (k < 4) {
@@ -46,22 +44,11 @@ struct Wclap {
 	static char typeCode(const wasm_valtype_t *t) {
 		return typeCode(wasm_valtype_kind(t));
 	}
-			
-	wasm_extern_t *getImport(wasm_importtype_t *type) {
-		auto *module = wasm_importtype_module(type);
-		auto *name = wasm_importtype_name(type);
-		
-		auto *wasiImport = wasi.resolve(type);
-		if (wasiImport) return wasiImport;
-		
-		std::cout << "\tUnresolved import: " << *module << ":" << *name << "\n";
-		return nullptr;
-	}
-		
-	static Wclap * open(const char *path) {
-		std::ifstream wasmFile{path, std::ios::binary};
+	
+	static Wclap * open(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir, bool mustLinkDirs) {
+		std::ifstream wasmFile{ensureTrailingSlash(wclapDir) + "module.wasm", std::ios::binary};
 		if (!wasmFile) {
-			wclap_error_message = "Couldn't open WASM file";
+			wclap_error_message = "Couldn't open plugin/module.wasm file";
 			return nullptr;
 		}
 		std::vector<char> wasmBytes{std::istreambuf_iterator<char>{wasmFile}, {}};
@@ -84,7 +71,7 @@ struct Wclap {
 			return nullptr;
 		}
 
-		auto *wclap = new Wclap(path, store);
+		auto *wclap = new Wclap(store);
 
 		wclap->module = wasm_module_new(store, &bytes);
 		if (!wclap->module) {
@@ -99,6 +86,63 @@ struct Wclap {
 			delete wclap;
 			return nullptr;
 		}
+		
+		wclap->wasiConfig = wasi_config_new();
+		if (!wclap->wasiConfig) {
+			wclap_error_message = "Failed to create WASI config";
+			delete wclap;
+			return nullptr;
+		}
+		// Link various directories - failure is a dealbreaker if mustLinkDirs is set
+		if (!wasi_config_preopen_dir(wclap->wasiConfig, wclapDir, "/plugin/", WASI_DIR_PERMS_READ, WASI_FILE_PERMS_READ)) {
+			wclap_error_message = "Failed to open /plugin/ in WASI config";
+			if (mustLinkDirs) {
+				delete wclap;
+				return nullptr;
+			} else {
+				std::cerr << wclap_error_message << std::endl;
+			}
+		}
+		if (presetDir) {
+			if (!wasi_config_preopen_dir(wclap->wasiConfig, presetDir, "/presets/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+				wclap_error_message = "Failed to open /presets/ in WASI config";
+				if (mustLinkDirs) {
+					delete wclap;
+					return nullptr;
+				} else {
+					std::cerr << wclap_error_message << std::endl;
+				}
+			}
+		}
+		if (cacheDir) {
+			if (!wasi_config_preopen_dir(wclap->wasiConfig, cacheDir, "/cache/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+				wclap_error_message = "Failed to open /cache/ in WASI config";
+				if (mustLinkDirs) {
+					delete wclap;
+					return nullptr;
+				} else {
+					std::cerr << wclap_error_message << std::endl;
+				}
+			}
+		}
+		if (varDir) {
+			if (!wasi_config_preopen_dir(wclap->wasiConfig, varDir, "/var/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+				wclap_error_message = "Failed to open /var/ in WASI config";
+				if (mustLinkDirs) {
+					delete wclap;
+					return nullptr;
+				} else {
+					std::cerr << wclap_error_message << std::endl;
+				}
+			}
+		}
+		
+		wclap->wasiInstance = wasi_instance_new(wclap->wasiConfig, wclap->store);
+		if (!wclap->wasiInstance) {
+			wclap_error_message = "Failed to create WASI instance";
+			delete wclap;
+			return nullptr;
+		}
 
 		// Assemble imports
 		wasm_importtype_vec_t importTypes;
@@ -108,10 +152,20 @@ struct Wclap {
 
 		for (size_t i = 0; i < importTypes.size; ++i) {
 			wasm_importtype_t *type = importTypes.data[i];
-			imports.data[i] = wclap->getImport(type);
+			imports.data[i] = wasi_instance_resolve(wclap->wasiInstance, type);
 			if (!imports.data[i]) {
-				wclap_error_message_string = "unrecognised import #" + std::to_string(i);
+				wclap_error_message_string = "unresolved import #" + std::to_string(i) + ": ";
+				auto *moduleName = wasm_importtype_module(type);
+				auto *name = wasm_importtype_name(type);
+				for (size_t i = 0; i < moduleName->size; ++i) {
+					wclap_error_message_string += moduleName->data[i];
+				};
+				wclap_error_message_string += " / ";
+				for (size_t i = 0; i < name->size; ++i) {
+					wclap_error_message_string += name->data[i];
+				};
 				wclap_error_message = wclap_error_message_string.c_str();
+
 				wasm_importtype_vec_delete(&importTypes);
 				wasm_extern_vec_delete(&imports);
 				delete wclap;
@@ -190,15 +244,18 @@ struct Wclap {
 					}
 				}
 			} else if (memory) {
-				if (!wclap->memory) wclap->memory = memory;
+				if (!wclap->memory) {
+					wclap->memory = memory;
+					wasi_instance_link_memory(wclap->wasiInstance, memory);
+				}
 			} else if (table) {
 				wasm_tabletype_t *type = wasm_table_type(table);
-				const wasm_limits_t *limits = wasm_tabletype_limits(type);
-				wasm_tabletype_delete(type);
+				const wasm_limits_t limits = *wasm_tabletype_limits(type);
 				auto elementKind = wasm_valtype_kind(wasm_tabletype_element(type));
+				wasm_tabletype_delete(type);
 				
 				if (elementKind == WASM_FUNCREF) {
-					if (limits->max < 65536 || limits->max - 65536 < limits->min) {
+					if (limits.max < 65536 || limits.max - 65536 < limits.min) {
 						wasm_exporttype_vec_delete(&exportTypes);
 						wasm_extern_vec_delete(&exports);
 						wclap_error_message = "exported function table is can't grow sufficiently";
@@ -212,12 +269,14 @@ struct Wclap {
 		wasm_exporttype_vec_delete(&exportTypes);
 		wasm_extern_vec_delete(&exports);
 
-		// TODO: find clap_entry and call .init()
+		// TODO: find clap_entry and call .init(), with "/plugin/" as plugin location
 
 		return wclap;
 	}
 	
 	~Wclap() {
+		if (wasiInstance) wasi_instance_delete(wasiInstance);
+		if (wasiConfig) wasi_config_delete(wasiConfig);
 		if (instance) wasm_instance_delete(instance);
 		if (shared) wasm_shared_module_delete(shared);
 		if (module) wasm_module_delete(module);
@@ -230,9 +289,7 @@ struct Wclap {
 	}
 
 private:
-	Wclap(const char *path, wasm_store_t *store) : store(store), wasi(store) {
-		wasi.fileRoot(path);
-	}
+	Wclap(wasm_store_t *store) : store(store) {}
 
 	static bool nameEquals(const wasm_name_t *name, const char *cName) {
 		if (name->size != std::strlen(cName)) return false;
@@ -240,6 +297,12 @@ private:
 			if (name->data[i] != cName[i]) return false;
 		}
 		return true;
+	}
+	
+	static std::string ensureTrailingSlash(const char *dirC) {
+		std::string dir = dirC;
+		if (dir.size() && dir.back() != '/') dir += "/";
+		return dir;
 	}
 };
 
@@ -274,12 +337,19 @@ const char * wclap_error() {
 	return message;
 }
 
-void * wclap_open(const char *path) {
+void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir) {
 	if (!global_wasm_engine) {
 		wclap_error_message = "No WASM engine - did you call wclap_global_init()?";
 		return nullptr;
 	}
-	return Wclap::open(path);
+	return Wclap::open(wclapDir, presetDir, cacheDir, varDir, true);
+}
+void * wclap_open(const char *wclapDir) {
+	if (!global_wasm_engine) {
+		wclap_error_message = "No WASM engine - did you call wclap_global_init()?";
+		return nullptr;
+	}
+	return Wclap::open(wclapDir, nullptr, nullptr, nullptr, false);
 }
 bool wclap_close(void *wclap) {
 	if (!wclap) {

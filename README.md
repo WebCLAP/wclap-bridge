@@ -6,11 +6,12 @@ It can be linked against any WASM engine which implements the [C API](https://gi
 
 ## How to use it
 
-It's only 6 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
+It's only 7 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
 
 * `wclap_global_init()`: call only once, before any other API calls
 * `wclap_global_deinit()`: call at the end to clean up
 * `wclap_open()`: opens a WCLAP (including calling its `clap_entry->init()`), returning an opaque pointer
+* `wclap_open_with_dirs()`: opens a WCLAP, providing optional preset/cache/var directories
 * `wclap_close()`: closes a WCLAP (including calling its `clap_entry->deinit()`)
 * `wclap_get_factory()`: returns a CLAP-compatible factory, if supported by the WCLAP and the bridge
 * `wclap_error()`: returns a `const char *` string for the latest API-call failure, or null pointer.

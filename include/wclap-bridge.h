@@ -6,7 +6,11 @@ bool wclap_global_init();
 void wclap_global_deinit();
 
 // Opens a WCLAP, returning an opaque identifier (or null on failure)
-void * wclap_open(const char *path);
+void * wclap_open(const char *wclapDir);
+
+// Opens a WCLAP with read-only directory `/plugin/` and optional read-write directories `/presets/`, `/cache/` and `/var/`
+void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir);
+
 // Closes a WCLAP using its opaque identifier
 bool wclap_close(void *);
 

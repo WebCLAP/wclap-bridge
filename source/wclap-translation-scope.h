@@ -92,6 +92,33 @@ abort();
 	void assignWasmToNative_clap_plugin_descriptor_t_features(uint32_t wasmP, const char * const * &features);
 	// Not sure why the host would ever pass a plugin feature-list back *into* the WASM, but 🤷
 	void assignNativeToWasm_clap_plugin_descriptor_t_features(const char * const * const &features, uint32_t wasmP);
+	
+	template<class Return, class Arg1>
+	void assignWasmToNative_ii(uint32_t wasmP, Return(*&fnPointer)(Arg1)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1>
+	void assignNativeToWasm_ii(Return(* const &fnPointer)(Arg1), uint32_t wasmP) {
+		valueInWasm<uint32_t>(wasmP) = 0;
+	}
+
+	template<class Return, class Arg1, class Arg2>
+	void assignWasmToNative_iii(uint32_t wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1, class Arg2>
+	void assignNativeToWasm_iii(Return(* const &fnPointer)(Arg1, Arg2), uint32_t wasmP) {
+		valueInWasm<uint32_t>(wasmP) = 0;
+	}
+	
+	template<class Return, class Arg1, class Arg2, class Arg3>
+	void assignWasmToNative_iiii(uint32_t wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1, class Arg2, class Arg3>
+	void assignNativeToWasm_iiii(Return(* const &fnPointer)(Arg1, Arg2, Arg3), uint32_t wasmP) {
+		valueInWasm<uint32_t>(wasmP) = 0;
+	}
 };
 
 template<>

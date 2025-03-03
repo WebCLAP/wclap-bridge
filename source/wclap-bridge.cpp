@@ -2,7 +2,6 @@
 #define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
 #include "wclap-translation-scope.h"
-
 #include "wasi-sandbox.h"
 
 #import "clap/all.h"
@@ -18,10 +17,19 @@ static const char *wclap_error_message = nullptr;
 struct Wclap;
 
 struct Wclap {
+	// Always defined
 	wasm_store_t *store;
 	
+	// Maybe defined (but not if we bail halfway through construction) and we should delete
 	wasm_module_t *module = nullptr;
 	wasm_shared_module_t *shared = nullptr;
+	wasm_instance_t *instance = nullptr;
+
+	// Maybe defined, but not our job to delete it
+	wasm_memory_t *memory = nullptr;
+	wasm_table_t *functionTable = nullptr;
+	uint32_t clapEntryP = 0; // WASM pointer to clap_entry
+	wasm_func_t *malloc = nullptr;
 	
 	WasiSandbox wasi;
 	
@@ -110,8 +118,99 @@ struct Wclap {
 				return nullptr;
 			}
 		}
+		wasm_trap_t *trap = nullptr;
+		wclap->instance = wasm_instance_new(wclap->store, wclap->module, &imports, &trap);
 		wasm_importtype_vec_delete(&importTypes);
 		wasm_extern_vec_delete(&imports);
+
+		if (trap) { // this calls `start()`, which could throw
+			// get the error message
+			wasm_message_t message;
+			wasm_trap_message(trap, &message);
+			wclap_error_message_string = "failed to create instance: ";
+			wclap_error_message_string.append(message.data, message.data + message.size);
+			wclap_error_message = wclap_error_message_string.c_str();
+			wasm_byte_vec_delete(&message);
+
+			wasm_trap_delete(trap);
+			delete wclap;
+			return nullptr;
+		} else if (!wclap->instance) {
+			wclap_error_message = "Failed to create instance";
+			delete wclap;
+			return nullptr;
+		}
+
+		wasm_exporttype_vec_t exportTypes;
+		wasm_module_exports(wclap->module, &exportTypes);
+		wasm_extern_vec_t exports;
+		wasm_instance_exports(wclap->instance, &exports);
+		for (size_t i = 0; i < exports.size; ++i) {
+			const wasm_name_t *name = wasm_exporttype_name(exportTypes.data[i]);
+			wasm_func_t *func = wasm_extern_as_func(exports.data[i]);
+			wasm_global_t *global = wasm_extern_as_global(exports.data[i]);
+			wasm_memory_t *memory = wasm_extern_as_memory(exports.data[i]);
+			wasm_table_t *table = wasm_extern_as_table(exports.data[i]);
+			if (func) {
+				wasm_functype_t *type = wasm_func_type(func);
+				const wasm_valtype_vec_t *params = wasm_functype_params(type);
+				const wasm_valtype_vec_t *results = wasm_functype_results(type);
+				if (nameEquals(name, "malloc")) {
+					if (params->size == 1 && wasm_valtype_kind(params->data[0]) == WASM_I32 && results->size == 1 && wasm_valtype_kind(results->data[0]) == WASM_I32) {
+						wclap->malloc = func;
+					}
+				} else if (nameEquals(name, "_initialize") || nameEquals(name, "_start")) { // WASI init methods
+					if (params->size == 0 && results->size == 0) {
+						wasm_val_vec_t args, results;
+						args.size = 0;
+						results.size = 0;
+						wasm_trap_t *trap = wasm_func_call(func, &args, &results);
+						if (trap) {
+							wasm_message_t message;
+							wasm_trap_message(trap, &message);
+							wclap_error_message_string = "calling _start()/_initialize() failed: ";
+							wclap_error_message_string.append(message.data, message.data + message.size);
+							wclap_error_message = wclap_error_message_string.c_str();
+							wasm_byte_vec_delete(&message);
+
+							wasm_exporttype_vec_delete(&exportTypes);
+							wasm_extern_vec_delete(&exports);
+							delete wclap;
+							return nullptr;
+						}
+					}
+				}
+				wasm_functype_delete(type);
+			} else if (global) {
+				if (nameEquals(name, "clap_entry")) {
+					wasm_val_t val;
+					wasm_global_get(global, &val);
+					if (val.kind == WASM_I32) {
+						wclap->clapEntryP = (uint32_t)val.of.i32;
+					}
+				}
+			} else if (memory) {
+				if (!wclap->memory) wclap->memory = memory;
+			} else if (table) {
+				wasm_tabletype_t *type = wasm_table_type(table);
+				const wasm_limits_t *limits = wasm_tabletype_limits(type);
+				wasm_tabletype_delete(type);
+				auto elementKind = wasm_valtype_kind(wasm_tabletype_element(type));
+				
+				if (elementKind == WASM_FUNCREF) {
+					if (limits->max < 65536 || limits->max - 65536 < limits->min) {
+						wasm_exporttype_vec_delete(&exportTypes);
+						wasm_extern_vec_delete(&exports);
+						wclap_error_message = "exported function table is can't grow sufficiently";
+						delete wclap;
+						return nullptr;
+					}
+					if (!wclap->functionTable) wclap->functionTable = table;
+				}
+			}
+		}
+		wasm_exporttype_vec_delete(&exportTypes);
+		wasm_extern_vec_delete(&exports);
 
 		// TODO: find clap_entry and call .init()
 
@@ -119,6 +218,7 @@ struct Wclap {
 	}
 	
 	~Wclap() {
+		if (instance) wasm_instance_delete(instance);
 		if (shared) wasm_shared_module_delete(shared);
 		if (module) wasm_module_delete(module);
 		wasm_store_delete(store);
@@ -133,9 +233,15 @@ private:
 	Wclap(const char *path, wasm_store_t *store) : store(store), wasi(store) {
 		wasi.fileRoot(path);
 	}
-};
 
-#include "./translate-clap-api.h"
+	static bool nameEquals(const wasm_name_t *name, const char *cName) {
+		if (name->size != std::strlen(cName)) return false;
+		for (size_t i = 0; i < name->size; ++i) {
+			if (name->data[i] != cName[i]) return false;
+		}
+		return true;
+	}
+};
 
 /*---------- WCLAP bridge C API ----------*/
 

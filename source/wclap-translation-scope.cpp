@@ -31,7 +31,7 @@ void WclapTranslationScope::assignWasmToNative_clap_plugin_descriptor_t_features
 	features[featureCount] = nullptr;
 	commitNative();
 }
-void assignNativeToWasm_clap_plugin_descriptor_t_features(const char * const * const &features, uint32_t wasmP) {
+void WclapTranslationScope::assignNativeToWasm_clap_plugin_descriptor_t_features(const char * const * const &features, uint32_t wasmP) {
 	if (!features) {
 		// TODO: not sure if this is a valid value.  If not, should we fix it, or pass it on?
 		wasmP = 0;
@@ -44,13 +44,13 @@ void assignNativeToWasm_clap_plugin_descriptor_t_features(const char * const * c
 		if (!nativeString) break;
 		++featureCount;
 	}
-	valueInWasm(wasmP) = temporaryWasmBytes(sizeof(uint32_t)*(featureCount + 1), alignof(uint32_t));
-	uint32_t *wasmStringArray = valueInWasm<uint32_t *>(wasmP);
+	uint32_t &wasmStringArray = valueInWasm<uint32_t>(wasmP);
+	wasmStringArray = temporaryWasmBytes(sizeof(uint32_t)*(featureCount + 1), alignof(uint32_t));
 
 	for (size_t i = 0; i < featureCount; ++i) {
-		assignNativeToWasm(features[i], wasmStringArray[i]);
+		assignNativeToWasm(features[i], wasmStringArray + i*sizeof(uint32_t));
 	}
-	wasmStringArray[featureCount] = 0;
+	valueInWasm<uint32_t>(wasmStringArray + featureCount*sizeof(uint32_t)) = 0;
 	commitWasm();
 }
 

@@ -1,10 +1,15 @@
 #include <iostream>
 #define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
-#include "wasi.h"
+#include "wasm.h"
+#include "wasic.h"
 
 #include <string>
 #include <array>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 // Helper functions
 static bool nameEquals(const wasm_name_t *name, const char *cName) {
@@ -102,6 +107,66 @@ std::ostream& operator<<(std::ostream& os, const wasm_byte_vec_t &name) {
 	
 struct WasiSandboxConfig {
 	std::vector<std::string> env, args;
+	std::istream *cin;
+	std::ostream *cout, *cerr;
+	
+	std::unique_ptr<std::ifstream> fin;
+	std::unique_ptr<std::ofstream> fout, ferr;
+	std::unique_ptr<std::istringstream> sin;
+	
+	WasiSandboxConfig() {
+		// unopened - will be in error state, but won't crash
+		fout = std::unique_ptr<std::ofstream>{new std::ofstream()};
+		cout = fout.get();
+		ferr = std::unique_ptr<std::ofstream>{new std::ofstream()};
+		cerr = ferr.get();
+		
+		sin = std::unique_ptr<std::istringstream>{new std::istringstream("", std::ios_base::binary)};
+		cin = sin.get();
+	}
+	
+	void clearStdIn() {
+		cin = nullptr;
+		fin = nullptr;
+		sin = nullptr;
+	}
+	void clearStdOut() {
+		cout = nullptr;
+		fout = nullptr;
+	}
+	void clearStdErr() {
+		cerr = nullptr;
+		ferr = nullptr;
+	}
+	
+	struct DirMap {
+		std::string nativePrefix, wasmPrefix;
+		bool dirRead, dirWrite;
+		bool fileRead, fileWrite;
+	};
+	std::vector<DirMap> dirMaps;
+	bool addDirMap(const char *host_path, const char *guest_path, wasic_dir_perms dir_perms, wasic_file_perms file_perms) {
+		dirMaps.emplace_back();
+		DirMap &map = dirMaps.back();
+		map.nativePrefix = host_path;
+		if (!map.nativePrefix.size()) return false;
+		if (map.nativePrefix.back() != '/') map.nativePrefix += "/";
+		map.wasmPrefix = guest_path;
+		if (!map.wasmPrefix.size() || map.wasmPrefix.back() != '/') map.wasmPrefix += "/";
+		if (map.wasmPrefix[0] != '/') map.wasmPrefix = "/" + map.wasmPrefix;
+		map.dirRead = dir_perms&WASIC_DIR_PERMS_READ;
+		map.dirWrite = dir_perms&WASIC_DIR_PERMS_WRITE;
+		map.fileRead = file_perms&WASIC_FILE_PERMS_READ;
+		map.fileWrite = file_perms&WASIC_FILE_PERMS_WRITE;
+		
+		std::error_code error;
+		auto canonical = std::filesystem::canonical(map.nativePrefix, error);
+		LOG_EXPR(map.nativePrefix);
+		LOG_EXPR(canonical);
+		LOG_EXPR(!error); // this will fail if the file doesn't exist
+		
+		return true;
+	}
 };
 
 struct WasiSandboxBase {
@@ -137,32 +202,55 @@ struct WasiSandbox : private WasiSandboxBase {
 	T & wasmValue(uint32_t wasmP) {
 		return *(T *)(wasm_memory_data(memory) + wasmP);
 	}
-	
-	wasm_trap_t * wasip1_environ_sizes_get(const wasm_val_t *args, wasm_val_t *results) {
-		if (!memory) return fail("WASI not linked to memory");
+
+	wasm_trap_t * wasip1_strlist_get(const std::vector<std::string> &list, const wasm_val_t *args, wasm_val_t *results) {
+		if (!memory) return memFail();
+		uint32_t indexP = args[0].of.i32;
+		uint32_t bufP = args[1].of.i32;
+		
+		for (auto &item : config->env) {
+			if (!validPointer<uint32_t>(indexP) || !validPointer<char>(bufP) || !validPointer<char>(bufP + item.size())) return boundsFail();
+			wasmValue<uint32_t>(indexP) = config->env.size();
+			for (size_t i = 0; i < item.size(); ++i) {
+				wasmValue<char>(bufP + i) = item[i];
+			}
+			wasmValue<char>(bufP + item.size()) = 0;
+			indexP += sizeof(uint32_t);
+			bufP += item.size() + 1;
+		}
+		results[0].kind = WASM_I32;
+		results[0].of.i32 = WASIC_SUCCESS;
+		return nullptr;
+	}
+
+	wasm_trap_t * wasip1_strlist_sizes_get(const std::vector<std::string> &list, const wasm_val_t *args, wasm_val_t *results) {
+		if (!memory) return memFail();
 		uint32_t countP = args[0].of.i32;
 		uint32_t bufSizeP = args[1].of.i32;
-		if (!validPointer<uint32_t>(countP)) return fail("memory out of bounds");
-		if (!validPointer<uint32_t>(bufSizeP)) return fail("memory out of bounds");
+		if (!validPointer<uint32_t>(countP) || !validPointer<uint32_t>(bufSizeP)) return boundsFail();
 
 		wasmValue<uint32_t>(countP) = config->env.size();
 		size_t totalSize = 0;
-LOG_EXPR(config);
-LOG_EXPR(config->env.size());
 		for (auto &v : config->env) {
-LOG_EXPR(v);
 			totalSize += v.size() + 1;
-LOG_EXPR(totalSize);
 		}
-LOG_EXPR(bufSizeP);
-return fail("Hello A");
 		wasmValue<uint32_t>(bufSizeP) = totalSize;
-return fail("Hello B");
 		results[0].kind = WASM_I32;
-		results[0].of.i32 = 0;
-
-
+		results[0].of.i32 = WASIC_SUCCESS;
 		return nullptr;
+	}
+
+	wasm_trap_t * wasip1_args_sizes_get(const wasm_val_t *args, wasm_val_t *results) {
+		return wasip1_strlist_sizes_get(config->args, args, results);
+	}
+	wasm_trap_t * wasip1_argss_get(const wasm_val_t *args, wasm_val_t *results) {
+		return wasip1_strlist_get(config->args, args, results);
+	}
+	wasm_trap_t * wasip1_environ_sizes_get(const wasm_val_t *args, wasm_val_t *results) {
+		return wasip1_strlist_sizes_get(config->env, args, results);
+	}
+	wasm_trap_t * wasip1_environ_get(const wasm_val_t *args, wasm_val_t *results) {
+		return wasip1_strlist_get(config->env, args, results);
 	}
 
 #define FORWARD_TO_METHOD(fn_name, _p, _r) \
@@ -209,6 +297,13 @@ return fail("Hello B");
 private:
 	const WasiSandboxConfig *config;
 	wasm_memory_t *memory;
+
+	wasm_trap_t * memFail() {
+		return fail("WASI not linked to memory");
+	}
+	wasm_trap_t *boundsFail() {
+		return fail("memory out of bounds");
+	}
 };
 
 
@@ -216,34 +311,130 @@ private:
 
 //---------- C API ----------
 
-#import "wasi.h"
-
-wasi_config_t * wasi_config_new() {
+wasic_config_t * wasic_config_new() {
 	auto *config = new WasiSandboxConfig();
-	return (wasi_config_t *)config;
+	return (wasic_config_t *)config;
 }
 
-void wasi_config_delete() {
+void wasic_config_delete(wasic_config_t *) {
 	auto *config = new WasiSandboxConfig();
 	delete config;
 }
 
-wasi_instance_t * wasi_instance_new(const wasi_config_t *config, wasm_store_t *store) {
-	auto *sandbox = new WasiSandbox((const WasiSandboxConfig *)config, store);
-	return (wasi_instance_t *)sandbox;
+bool wasic_config_set_argv(wasic_config_t *config, size_t argc, const char *argv[]) {
+	if (!config) return false;
+	auto *sandboxConfig = new WasiSandboxConfig();
+	sandboxConfig->args.clear();
+	for (size_t i = 0; i < argc; ++i) {
+		sandboxConfig->args.emplace_back(argv[i]);
+	}
+	return true;
 }
-void wasi_instance_delete(wasi_instance_t *instance) {
+
+void wasic_config_inherit_argv(wasic_config_t *config) {
+	if (!config) return;
+	auto *sandboxConfig = new WasiSandboxConfig();
+	sandboxConfig->args.clear();
+}
+
+bool wasic_config_set_env(wasic_config_t *config, size_t envc, const char *names[], const char *values[]) {
+	if (!config) return false;
+	auto *sandboxConfig = new WasiSandboxConfig();
+	sandboxConfig->env.clear();
+	for (size_t i = 0; i < envc; ++i) {
+		std::string item = std::string(names[i]) + "=" + values[i];
+		sandboxConfig->env.emplace_back(std::move(item));
+	}
+	return false;
+}
+
+void wasic_config_inherit_env(wasic_config_t *config) {
+	if (!config) return;
+	auto *sandboxConfig = new WasiSandboxConfig();
+	sandboxConfig->env.clear();
+}
+
+bool wasic_config_set_stdin_file(wasic_config_t *config, const char *path) {
+	if (!config || !path) return false;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdIn();
+	sandboxConfig->fin = std::unique_ptr<std::ifstream>{new std::ifstream(path, std::ios_base::binary)};
+	sandboxConfig->cin = sandboxConfig->fin.get();
+	return sandboxConfig->fin->good();
+}
+
+void wasic_config_set_stdin_bytes(wasic_config_t *config, wasm_byte_vec_t *binary) {
+	if (!config || !binary) return;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdIn();
+	std::string inStr{binary->data, binary->size};
+	sandboxConfig->sin = std::unique_ptr<std::istringstream>{new std::istringstream(std::move(inStr), std::ios_base::binary)};
+	sandboxConfig->cin = sandboxConfig->sin.get();
+}
+
+void wasic_config_inherit_stdin(wasic_config_t *config) {
+	if (!config) return;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdIn();
+	sandboxConfig->cin = &std::cin;
+}
+
+bool wasic_config_set_stdout_file(wasic_config_t *config, const char *path) {
+	if (!config || !path) return false;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdOut();
+	sandboxConfig->fout = std::unique_ptr<std::ofstream>{new std::ofstream(path, std::ios_base::binary)};
+	sandboxConfig->cout = sandboxConfig->fout.get();
+	return sandboxConfig->fout->good();
+}
+
+void wasic_config_inherit_stdout(wasic_config_t *config) {
+	if (!config) return;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdOut();
+	sandboxConfig->cerr = &std::cout;
+}
+
+bool wasic_config_set_stderr_file(wasic_config_t *config, const char *path) {
+	if (!config || !path) return false;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdErr();
+	sandboxConfig->ferr = std::unique_ptr<std::ofstream>{new std::ofstream(path, std::ios_base::binary)};
+	sandboxConfig->cerr = sandboxConfig->ferr.get();
+	return sandboxConfig->ferr->good();
+}
+
+void wasic_config_inherit_stderr(wasic_config_t *config) {
+	if (!config) return;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	sandboxConfig->clearStdErr();
+	sandboxConfig->cerr = &std::cerr;
+}
+
+bool wasic_config_preopen_dir(wasic_config_t *config, const char *host_path, const char *guest_path, wasic_dir_perms dir_perms, wasic_file_perms file_perms) {
+	if (!config) return false;
+	auto *sandboxConfig = (WasiSandboxConfig *)config;
+	return sandboxConfig->addDirMap(host_path, guest_path, dir_perms, file_perms);
+}
+
+wasic_instance_t * wasic_instance_new(const wasic_config_t *config, wasm_store_t *store) {
+	if (!config || !store) return nullptr;
+	auto *sandbox = new WasiSandbox((const WasiSandboxConfig *)config, store);
+	return (wasic_instance_t *)sandbox;
+}
+void wasic_instance_delete(wasic_instance_t *instance) {
+	if (!instance) return;
 	auto *sandbox = (WasiSandbox *)instance;
 	delete sandbox;
 }
 
-bool wasi_instance_link_memory(wasi_instance_t *instance, wasm_memory_t *memory) {
+bool wasic_instance_link_memory(wasic_instance_t *instance, wasm_memory_t *memory) {
 	if (!instance || !memory) return false;
 	auto *sandbox = (WasiSandbox *)instance;
 	return sandbox->linkMemory(memory);
 }
 
-wasm_extern_t * wasi_instance_resolve(wasi_instance_t *instance, const wasm_importtype_t *type) {
+wasm_extern_t * wasic_instance_resolve(wasic_instance_t *instance, const wasm_importtype_t *type) {
 	if (!instance || !type) return nullptr;
 	auto *sandbox = (WasiSandbox *)instance;
 	return sandbox->resolve(type);

@@ -3,7 +3,7 @@
 
 #include "wclap-translation-scope.h"
 
-#include "wasi.h"
+#include "wasic.h"
 
 #include <fstream>
 #include <vector>
@@ -22,8 +22,8 @@ struct Wclap {
 	wasm_module_t *module = nullptr;
 	wasm_shared_module_t *shared = nullptr;
 	wasm_instance_t *instance = nullptr;
-	wasi_config_t *wasiConfig = nullptr;
-	wasi_instance_t *wasiInstance = nullptr;
+	wasic_config_t *wasiConfig = nullptr;
+	wasic_instance_t *wasiInstance = nullptr;
 
 	// Maybe defined, but not our job to delete it
 	wasm_memory_t *memory = nullptr;
@@ -87,14 +87,14 @@ struct Wclap {
 			return nullptr;
 		}
 		
-		wclap->wasiConfig = wasi_config_new();
+		wclap->wasiConfig = wasic_config_new();
 		if (!wclap->wasiConfig) {
 			wclap_error_message = "Failed to create WASI config";
 			delete wclap;
 			return nullptr;
 		}
 		// Link various directories - failure is a dealbreaker if mustLinkDirs is set
-		if (!wasi_config_preopen_dir(wclap->wasiConfig, wclapDir, "/plugin/", WASI_DIR_PERMS_READ, WASI_FILE_PERMS_READ)) {
+		if (!wasic_config_preopen_dir(wclap->wasiConfig, wclapDir, "/plugin/", WASIC_DIR_PERMS_READ, WASIC_FILE_PERMS_READ)) {
 			wclap_error_message = "Failed to open /plugin/ in WASI config";
 			if (mustLinkDirs) {
 				delete wclap;
@@ -104,7 +104,7 @@ struct Wclap {
 			}
 		}
 		if (presetDir) {
-			if (!wasi_config_preopen_dir(wclap->wasiConfig, presetDir, "/presets/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+			if (!wasic_config_preopen_dir(wclap->wasiConfig, presetDir, "/presets/", WASIC_DIR_PERMS_READ|WASIC_DIR_PERMS_WRITE, WASIC_FILE_PERMS_READ|WASIC_FILE_PERMS_WRITE)) {
 				wclap_error_message = "Failed to open /presets/ in WASI config";
 				if (mustLinkDirs) {
 					delete wclap;
@@ -115,7 +115,7 @@ struct Wclap {
 			}
 		}
 		if (cacheDir) {
-			if (!wasi_config_preopen_dir(wclap->wasiConfig, cacheDir, "/cache/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+			if (!wasic_config_preopen_dir(wclap->wasiConfig, cacheDir, "/cache/", WASIC_DIR_PERMS_READ|WASIC_DIR_PERMS_WRITE, WASIC_FILE_PERMS_READ|WASIC_FILE_PERMS_WRITE)) {
 				wclap_error_message = "Failed to open /cache/ in WASI config";
 				if (mustLinkDirs) {
 					delete wclap;
@@ -126,7 +126,7 @@ struct Wclap {
 			}
 		}
 		if (varDir) {
-			if (!wasi_config_preopen_dir(wclap->wasiConfig, varDir, "/var/", WASI_DIR_PERMS_READ|WASI_DIR_PERMS_WRITE, WASI_FILE_PERMS_READ|WASI_FILE_PERMS_WRITE)) {
+			if (!wasic_config_preopen_dir(wclap->wasiConfig, varDir, "/var/", WASIC_DIR_PERMS_READ|WASIC_DIR_PERMS_WRITE, WASIC_FILE_PERMS_READ|WASIC_FILE_PERMS_WRITE)) {
 				wclap_error_message = "Failed to open /var/ in WASI config";
 				if (mustLinkDirs) {
 					delete wclap;
@@ -137,7 +137,7 @@ struct Wclap {
 			}
 		}
 		
-		wclap->wasiInstance = wasi_instance_new(wclap->wasiConfig, wclap->store);
+		wclap->wasiInstance = wasic_instance_new(wclap->wasiConfig, wclap->store);
 		if (!wclap->wasiInstance) {
 			wclap_error_message = "Failed to create WASI instance";
 			delete wclap;
@@ -152,7 +152,7 @@ struct Wclap {
 
 		for (size_t i = 0; i < importTypes.size; ++i) {
 			wasm_importtype_t *type = importTypes.data[i];
-			imports.data[i] = wasi_instance_resolve(wclap->wasiInstance, type);
+			imports.data[i] = wasic_instance_resolve(wclap->wasiInstance, type);
 			if (!imports.data[i]) {
 				wclap_error_message_string = "unresolved import #" + std::to_string(i) + ": ";
 				auto *moduleName = wasm_importtype_module(type);
@@ -246,7 +246,7 @@ struct Wclap {
 			} else if (memory) {
 				if (!wclap->memory) {
 					wclap->memory = memory;
-					wasi_instance_link_memory(wclap->wasiInstance, memory);
+					wasic_instance_link_memory(wclap->wasiInstance, memory);
 				}
 			} else if (table) {
 				wasm_tabletype_t *type = wasm_table_type(table);
@@ -275,8 +275,8 @@ struct Wclap {
 	}
 	
 	~Wclap() {
-		if (wasiInstance) wasi_instance_delete(wasiInstance);
-		if (wasiConfig) wasi_config_delete(wasiConfig);
+		if (wasiInstance) wasic_instance_delete(wasiInstance);
+		if (wasiConfig) wasic_config_delete(wasiConfig);
 		if (instance) wasm_instance_delete(instance);
 		if (shared) wasm_shared_module_delete(shared);
 		if (module) wasm_module_delete(module);

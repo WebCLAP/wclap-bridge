@@ -14,6 +14,9 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 // Closes a WCLAP using its opaque identifier
 bool wclap_close(void *);
 
+// Returns a pointer to the opened WCLAP's CLAP API version
+const struct clap_version * wclap_version(void *);
+
 // Gets a factory (if supported by both the WCLAP and the bridge)
 const void * wclap_get_factory(void *, const char *factory_id);
 

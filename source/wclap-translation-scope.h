@@ -12,10 +12,10 @@ struct WclapTranslationScope {
 
 	wasm_instance_t *instance;
 	wasm_memory_t *memory;
-	uint32_t wasmObject; // WASM object whose lifetime this scope is tied to
+	uint32_t wasmObjectP; // WASM object whose lifetime this scope is tied to
 	uint32_t wasmPointerToThis; // If we point WASM context fields to here, we can find this
 
-	WclapTranslationScope(wasm_instance_t *instance, wasm_memory_t *memory, uint32_t wasmObject) : instance(instance), memory(memory), wasmObject(wasmObject) {
+	WclapTranslationScope(wasm_instance_t *instance, wasm_memory_t *memory, uint32_t wasmObjectP) : instance(instance), memory(memory), wasmObjectP(wasmObjectP) {
 		nativeArena = nativeTmpStartP = nativeTmpP = (unsigned char *)malloc(arenaBytes);
 //		wasmArena = wasmTmpStartP = wasmTmpP = wasm_malloc(arenaBytes);
 wasmArena = wasmTmpStartP = wasmTmpP = 0;
@@ -25,12 +25,13 @@ abort();
 		*(WclapTranslationScope **)nativeInWasm(wasmPointerToThis) = this;
 		commitWasm();
 	}
-	// Should only happen when the WASM instance is destroyed
+	// Should only happen when the WASM instance is destroyed - otherwise it should be returned to a pool (since we can't free the arena memory)
 	~WclapTranslationScope() {
 		free(nativeArena);
 	}
 	
 	void * nativeInWasm(uint32_t wasmP) {
+		// TODO: bounds-check
 		return wasm_memory_data(memory) + wasmP;
 	}
 	template<class T>

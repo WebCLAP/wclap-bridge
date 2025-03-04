@@ -7,6 +7,7 @@
 
 #include <fstream>
 #include <vector>
+#include <map>
 
 static wasm_engine_t *global_wasm_engine = nullptr;
 std::string wclap_error_message_string;
@@ -17,6 +18,7 @@ struct Wclap;
 struct Wclap {
 	// Always defined
 	wasm_store_t *store;
+	wasm_extern_vec_t exports;
 	
 	// Maybe defined (but not if we bail halfway through construction) and we should delete
 	wasm_module_t *module = nullptr;
@@ -93,6 +95,8 @@ struct Wclap {
 			delete wclap;
 			return nullptr;
 		}
+		wasic_config_inherit_stdout(wclap->wasiConfig);
+		wasic_config_inherit_stderr(wclap->wasiConfig);
 		// Link various directories - failure is a dealbreaker if mustLinkDirs is set
 		if (!wasic_config_preopen_dir(wclap->wasiConfig, wclapDir, "/plugin/", WASIC_DIR_PERMS_READ, WASIC_FILE_PERMS_READ)) {
 			wclap_error_message = "Failed to open /plugin/ in WASI config";
@@ -196,15 +200,16 @@ struct Wclap {
 		}
 
 		wasm_exporttype_vec_t exportTypes;
+		wasm_exporttype_vec_new_empty(&exportTypes);
 		wasm_module_exports(wclap->module, &exportTypes);
-		wasm_extern_vec_t exports;
-		wasm_instance_exports(wclap->instance, &exports);
-		for (size_t i = 0; i < exports.size; ++i) {
+		wasm_instance_exports(wclap->instance, &wclap->exports);
+		for (size_t i = 0; i < wclap->exports.size; ++i) {
+			auto *exp = wclap->exports.data[i];
 			const wasm_name_t *name = wasm_exporttype_name(exportTypes.data[i]);
-			wasm_func_t *func = wasm_extern_as_func(exports.data[i]);
-			wasm_global_t *global = wasm_extern_as_global(exports.data[i]);
-			wasm_memory_t *memory = wasm_extern_as_memory(exports.data[i]);
-			wasm_table_t *table = wasm_extern_as_table(exports.data[i]);
+			wasm_func_t *func = wasm_extern_as_func(exp);
+			wasm_global_t *global = wasm_extern_as_global(exp);
+			wasm_memory_t *memory = wasm_extern_as_memory(exp);
+			wasm_table_t *table = wasm_extern_as_table(exp);
 			if (func) {
 				wasm_functype_t *type = wasm_func_type(func);
 				const wasm_valtype_vec_t *params = wasm_functype_params(type);
@@ -228,7 +233,6 @@ struct Wclap {
 							wasm_byte_vec_delete(&message);
 
 							wasm_exporttype_vec_delete(&exportTypes);
-							wasm_extern_vec_delete(&exports);
 							delete wclap;
 							return nullptr;
 						}
@@ -257,7 +261,6 @@ struct Wclap {
 				if (elementKind == WASM_FUNCREF) {
 					if (limits.max < 65536 || limits.max - 65536 < limits.min) {
 						wasm_exporttype_vec_delete(&exportTypes);
-						wasm_extern_vec_delete(&exports);
 						wclap_error_message = "exported function table is can't grow sufficiently";
 						delete wclap;
 						return nullptr;
@@ -267,14 +270,76 @@ struct Wclap {
 			}
 		}
 		wasm_exporttype_vec_delete(&exportTypes);
-		wasm_extern_vec_delete(&exports);
+		
+		if (!wclap->clapEntryP) {
+			wclap_error_message = "clap_entry not found in exports";
+			delete wclap;
+			return nullptr;
+		}
+		if (!wclap->memory) {
+			wclap_error_message = "memory not found in exports";
+			delete wclap;
+			return nullptr;
+		}
+		if (!wclap->functionTable) {
+			wclap_error_message = "function table not found in exports";
+			delete wclap;
+			return nullptr;
+		}
+		if (!wclap->malloc) {
+			wclap_error_message = "malloc table not found in exports";
+			delete wclap;
+			return nullptr;
+		}
 
 		// TODO: find clap_entry and call .init(), with "/plugin/" as plugin location
+		if (!wclap->init()) {
+			wclap_error_message = "init() failed";
+			delete wclap;
+			return nullptr;
+		}
 
 		return wclap;
 	}
 	
+	bool init() {
+		wasm_ref_t *initFuncRef = nullptr;
+		wasm_func_t *initFunc = nullptr;
+		{
+			auto *wasmEntry = (Wasm32PluginEntry *)(wasm_memory_data(memory) + clapEntryP);
+			clapVersion = wasmEntry->clap_version;
+			initFuncRef = wasm_table_get(functionTable, wasmEntry->initP);
+			if (!initFuncRef) return false;
+			LOG_EXPR(initFuncRef);
+			initFunc = wasm_ref_as_func(initFuncRef);
+		}
+		LOG_EXPR(initFunc);
+		LOG_EXPR(wasm_func_param_arity(initFunc));
+		LOG_EXPR(wasm_func_result_arity(initFunc));
+		
+		uint32_t pluginPath = copyStringConstantToWasm("/plugin/");
+		if (!pluginPath) {
+			return false;
+		}
+		
+		wasm_val_t args[1];
+		wasm_val_vec_t argsV{1, args};
+		wasm_val_t results[1];
+		wasm_val_vec_t resultsV{1, results};
+		
+		{
+			auto *wasmEntry = (Wasm32PluginEntry *)(wasm_memory_data(memory) + clapEntryP);
+			args[0].kind = WASM_I32;
+			args[0].of.i32 = pluginPath;
+			auto *trap = wasm_func_call(initFunc, &argsV, &resultsV);
+			if (trap) return false;
+		}
+
+		return results[0].of.i32;
+	}
+	
 	~Wclap() {
+		wasm_extern_vec_delete(&exports);
 		if (wasiInstance) wasic_instance_delete(wasiInstance);
 		if (wasiConfig) wasic_config_delete(wasiConfig);
 		if (instance) wasm_instance_delete(instance);
@@ -283,13 +348,28 @@ struct Wclap {
 		wasm_store_delete(store);
 	}
 	
+	clap_plugin_factory nativePluginFactory;
+	std::unique_ptr<WclapTranslationScope> pluginFactoryScope;
+	
 	const void * getFactory(const char *factory_id) {
+		if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
+			if (!pluginFactoryScope) {
+				pluginFactoryScope = std::unique_ptr<WclapTranslationScope>{
+					
+				};
+			}
+			return &nativePluginFactory;
+		}
 		LOG_EXPR(factory_id);
 		return nullptr;
 	}
+	
+	clap_version clapVersion;
 
 private:
-	Wclap(wasm_store_t *store) : store(store) {}
+	Wclap(wasm_store_t *store) : store(store) {
+		wasm_extern_vec_new_empty(&exports);
+	}
 
 	static bool nameEquals(const wasm_name_t *name, const char *cName) {
 		if (name->size != std::strlen(cName)) return false;
@@ -303,6 +383,35 @@ private:
 		std::string dir = dirC;
 		if (dir.size() && dir.back() != '/') dir += "/";
 		return dir;
+	}
+	
+	// clap_entry as it will appear in a 32-bit WCLAP
+	struct Wasm32PluginEntry {
+		clap_version_t clap_version;
+		uint32_t initP;
+		uint32_t deinitP;
+		uint32_t getFactoryP;
+	};
+	
+	uint32_t copyStringConstantToWasm(const char *str) {
+		size_t bytes = std::strlen(str) + 1;
+		
+		wasm_val_t args[1];
+		args[0].kind = WASM_I32;
+		args[0].of.i32 = bytes;
+		wasm_val_vec_t argsV{1, args};
+		wasm_val_t results[1];
+		wasm_val_vec_t resultsV{1, results};
+		
+		auto *trap = wasm_func_call(malloc, &argsV, &resultsV);
+		if (trap) return 0;
+		uint32_t wasmP = results[0].of.i32;
+		
+		auto *wasmBytes = (char *)(wasm_memory_data(memory) + wasmP);
+		for (size_t i = 0; i < bytes; ++i) {
+			wasmBytes[i] = str[i];
+		}
+		return wasmP;
 	}
 };
 
@@ -358,6 +467,13 @@ bool wclap_close(void *wclap) {
 	}
 	delete (Wclap *)wclap;
 	return true;
+}
+const clap_version_t * wclap_version(void *wclap) {
+	if (!wclap) {
+		wclap_error_message = "null pointer";
+		return nullptr;
+	}
+	return &((Wclap *)wclap)->clapVersion;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {

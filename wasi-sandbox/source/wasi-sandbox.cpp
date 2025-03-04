@@ -158,12 +158,14 @@ struct WasiSandboxConfig {
 		map.dirWrite = dir_perms&WASIC_DIR_PERMS_WRITE;
 		map.fileRead = file_perms&WASIC_FILE_PERMS_READ;
 		map.fileWrite = file_perms&WASIC_FILE_PERMS_WRITE;
-		
+
+		/*
 		std::error_code error;
 		auto canonical = std::filesystem::canonical(map.nativePrefix, error);
 		LOG_EXPR(map.nativePrefix);
 		LOG_EXPR(canonical);
 		LOG_EXPR(!error); // this will fail if the file doesn't exist
+		*/
 		
 		return true;
 	}

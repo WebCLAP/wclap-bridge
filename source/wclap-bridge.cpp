@@ -1,12 +1,16 @@
-#include <iostream>
-#define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
+#ifndef LOG_EXPR
+#	include <iostream>
+#	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
+#endif
 
 #include "wclap-translation-scope.h"
 #include "wasi.h"
 
 #include <fstream>
 #include <vector>
-#include <map>
+#include <shared_mutex>
+#include <unordered_map>
+#include <unordered_set>
 
 static wasm_engine_t *global_wasm_engine = nullptr;
 std::string wclap_error_message_string;
@@ -19,15 +23,129 @@ static std::string ensureTrailingSlash(const char *dirC) {
 }
 
 struct Wclap;
+struct WclapThread;
+
+struct WclapThreadContext {
+	WclapThreadContext() {}
+	WclapThreadContext(const WclapThreadContext &other) = delete;
+	
+	~WclapThreadContext() {
+		for (auto &wclap : wclaps) {
+			wclap->removeThread();
+		}
+	}
+	
+	void addWclap(Wclap *wclap) {
+		std::lock_guard<std::mutex> lock{mutex};
+		wclaps.insert(wclap);
+	}
+	
+	void removeWclap(Wclap *wclap) {
+		std::lock_guard<std::mutex> lock{mutex};
+
+		if (auto iter = mySet.find(wclap); iter != mySet.end()) {
+			mySet.erase(iter);
+		}
+	}
+private:
+	std::mutex mutex; // some methods are called out-of-thread
+	// A list of every Wclap which currently has a WclapThread for a given thread
+	std::unordered_set<Wclap *> wclaps;
+};
+thread_local static WclapThreadContext wclapThreadContext;
 
 struct Wclap {
+	wasmtime_module_t *module = nullptr;
 //	wasmtime_memory_t *sharedMemory = nullptr;
+
+	Wclap() {}
+	~Wclap() {
+		if (module) wasmtime_module_delete(module);
+	}
+
+	const char * setupWasmBytes(const uint8_t *bytes, size_t size) {
+		error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
+		if (error) return "Failed to compile module";
+		
+		return "Not implemented - is it single-threaded?"
+		return nullptr;
+	}
+	
+	std::unique_ptr<WclapThread> singleThread;
+	struct ScopedThread {
+		WclapThread &thread;
+		
+		ScopedThread(WclapThread &thread, std::shared_mutex *mutex=nullptr) : thread(thread), mutex(mutex) {}
+		ScopedThread(const ScopedThread &other) = delete;
+		ScopedThread(ScopedThread &&other) : thread(other.thread), mutex(other.mutex) {
+			other.mutex = nullptr;
+		}
+		ScopedThread & operator=(const ScopedThread &other) = delete;
+		ScopedThread & operator=(ScopedThread &&other) = delete;
+		~ScopedThread() {
+			if (mutex) mutex->unlock_shared();
+		}
+	private:
+		std::shared_mutex *mutex;
+	};
+
+	// find or create the instance/etc. associated with the current native thread
+	ScopedThread getThread() {
+		if (singleThread) {
+			// If the WCLAP didn't import shared memory, it's single-threaded
+			mutex.lock_shared();
+			return {*singleThread, &mutex};
+		}
+	
+		{
+			auto lock = readLock();
+			auto iter = threadMap.find(std::this_thread::id);
+			if (iter != threadMap.end()) return {*iter.second};
+		}
+		
+		// Put ourselves in this thread's list, so we get notified when the thread closes
+		wclapThreadContext.addWclap(this);
+
+		auto lock = writeLock();
+		auto *wclapThread = new WclapThread(*this, wclapThreadContext);
+		threadMap[std::this_thread::id] = std::unique_ptr<WclapThread>{wclapThread};
+		return {*wclapThread};
+	}
+	
+	// The current thread is shutting down - remove it from our map
+	void removeThread() {
+		auto lock = writeLock();
+
+		auto iter = threadMap.find(std::this_thread::id);
+		if (iter == threadMap.end()) {
+			abort(); // This shouldn't be called unless we had a WclapThread for this thread
+		}
+		threadMap.erase(iter);
+	}
+	
+private:
+	mutable std::shared_mutex mutex;
+	// Scoped lock suitable for reading the thread map
+	std::shared_lock<std::shared_mutex> readLock() const {
+		return {mutex};
+	}
+	// Scoped lock suitable for changing the thread map
+	std::unique_lock<std::shared_mutex> writeLock() {
+		return {mutex};
+	}
+	std::unordered_map<std::thread::id, std::unique_ptr<WclapThread>> threadMap;
+};
+
+struct WclapThread {
+	using WasmP = typename std::conditional<use64, uint64_t, uint32_t>::type;
+	
+	Wclap &wclap;
+	WclapThreadContext *threadContext;
 
 	// We should delete these (in reverse order) if they're defined
 	wasi_config_t *wasiConfig = nullptr;
 	wasmtime_store_t *store = nullptr;
 	wasmtime_linker_t *linker = nullptr;
-	wasmtime_module_t *module = nullptr;
 	wasmtime_error_t *error = nullptr;
 
 	// Maybe defined, but not our job to delete it
@@ -37,10 +155,15 @@ struct Wclap {
 	wasmtime_table_t functionTable;
 	wasmtime_func_t malloc;
 
-	uint32_t clapEntryP = 0; // WASM pointer to clap_entry
+	WasmP clapEntryP = 0; // WASM pointer to clap_entry
 	wasmtime_instance_t instance;
+	
+	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {}
 
-	~Wclap() {
+	// destructor is the only method allowed to be called from outside the assigned thread
+	~WclapThread() {
+		if (threadContext) threadContext->removeWclap(&wclap);
+		
 		if (trap) {
 			wclap_error_message_string = wclap_error_message;
 			wclap_error_message_string += ": ";
@@ -65,7 +188,7 @@ struct Wclap {
 		if (store) wasmtime_store_delete(store);
 	}
 	
-	const char * setupWasiDirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir, bool mustLinkDirs) {
+	const char * startInstance(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir, bool mustLinkDirs) {
 		wasiConfig = wasi_config_new();
 		if (!wasiConfig) return "Failed to create WASI config";
 
@@ -92,12 +215,8 @@ struct Wclap {
 				if (mustLinkDirs) return "Failed to open /var/ in WASI config";
 			}
 		}
-		return nullptr;
-	}
-	
-	const char * setupWasmBytes(const uint8_t *bytes, size_t size) {
-		error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
-		if (error) return "Failed to compile module";
+		
+		//---------- Start the instance ----------//
 
 		store = wasmtime_store_new(global_wasm_engine, nullptr, nullptr);
 		if (!store)  return "Failed to create store";
@@ -118,11 +237,9 @@ struct Wclap {
 		error = wasmtime_linker_instantiate(linker, context, module, &instance, &trap);
 		if (error) return "failed to create instance";
 		if (trap) return "failed to start instance";
-		
-		return nullptr;
-	}
-	
-	const char * findExports() {
+
+		//---------- Find exports ----------//
+
 		char *name;
 		size_t nameSize;
 		wasmtime_extern_t item;
@@ -208,110 +325,6 @@ struct Wclap {
 	static char typeCode(const wasm_valtype_t *t) {
 		return typeCode(wasm_valtype_kind(t));
 	}
-	
-	
-//		wasm_exporttype_vec_t exportTypes;
-//		wasm_exporttype_vec_new_empty(&exportTypes);
-//		wasm_module_exports(wclap->module, &exportTypes);
-//		wasm_instance_exports(wclap->instance, &wclap->exports);
-//		for (size_t i = 0; i < wclap->exports.size; ++i) {
-//			auto *exp = wclap->exports.data[i];
-//			const wasm_name_t *name = wasm_exporttype_name(exportTypes.data[i]);
-//			wasm_func_t *func = wasm_extern_as_func(exp);
-//			wasm_global_t *global = wasm_extern_as_global(exp);
-//			wasm_memory_t *memory = wasm_extern_as_memory(exp);
-//			wasm_table_t *table = wasm_extern_as_table(exp);
-//			if (func) {
-//				wasm_functype_t *type = wasm_func_type(func);
-//				const wasm_valtype_vec_t *params = wasm_functype_params(type);
-//				const wasm_valtype_vec_t *results = wasm_functype_results(type);
-//				if (nameEquals(name, "malloc")) {
-//					if (params->size == 1 && wasm_valtype_kind(params->data[0]) == WASM_I32 && results->size == 1 && wasm_valtype_kind(results->data[0]) == WASM_I32) {
-//						wclap->malloc = func;
-//					}
-//				} else if (nameEquals(name, "_initialize") || nameEquals(name, "_start")) { // WASI init methods
-//					if (params->size == 0 && results->size == 0) {
-//						wasm_val_vec_t args, results;
-//						args.size = 0;
-//						results.size = 0;
-//						wasm_trap_t *trap = wasm_func_call(func, &args, &results);
-//						if (trap) {
-//							wasm_message_t message;
-//							wasm_trap_message(trap, &message);
-//							wclap_error_message_string = "calling _start()/_initialize() failed: ";
-//							wclap_error_message_string.append(message.data, message.data + message.size);
-//							wclap_error_message = wclap_error_message_string.c_str();
-//							wasm_byte_vec_delete(&message);
-//
-//							wasm_exporttype_vec_delete(&exportTypes);
-//							delete wclap;
-//							return nullptr;
-//						}
-//					}
-//				}
-//				wasm_functype_delete(type);
-//			} else if (global) {
-//				if (nameEquals(name, "clap_entry")) {
-//					wasm_val_t val;
-//					wasm_global_get(global, &val);
-//					if (val.kind == WASM_I32) {
-//						wclap->clapEntryP = (uint32_t)val.of.i32;
-//					}
-//				}
-//			} else if (memory) {
-//				if (!wclap->memory) {
-//					wclap->memory = memory;
-//					wasic_instance_link_memory(wclap->wasiInstance, memory);
-//				}
-//			} else if (table) {
-//				wasm_tabletype_t *type = wasm_table_type(table);
-//				const wasm_limits_t limits = *wasm_tabletype_limits(type);
-//				auto elementKind = wasm_valtype_kind(wasm_tabletype_element(type));
-//				wasm_tabletype_delete(type);
-//
-//				if (elementKind == WASM_FUNCREF) {
-//					if (limits.max < 65536 || limits.max - 65536 < limits.min) {
-//						wasm_exporttype_vec_delete(&exportTypes);
-//						wclap_error_message = "exported function table is can't grow sufficiently";
-//						delete wclap;
-//						return nullptr;
-//					}
-//					if (!wclap->functionTable) wclap->functionTable = table;
-//				}
-//			}
-//		}
-//		wasm_exporttype_vec_delete(&exportTypes);
-//
-//		if (!wclap->clapEntryP) {
-//			wclap_error_message = "clap_entry not found in exports";
-//			delete wclap;
-//			return nullptr;
-//		}
-//		if (!wclap->memory) {
-//			wclap_error_message = "memory not found in exports";
-//			delete wclap;
-//			return nullptr;
-//		}
-//		if (!wclap->functionTable) {
-//			wclap_error_message = "function table not found in exports";
-//			delete wclap;
-//			return nullptr;
-//		}
-//		if (!wclap->malloc) {
-//			wclap_error_message = "malloc table not found in exports";
-//			delete wclap;
-//			return nullptr;
-//		}
-//
-//		// TODO: find clap_entry and call .init(), with "/plugin/" as plugin location
-//		if (!wclap->init()) {
-//			wclap_error_message = "init() failed";
-//			delete wclap;
-//			return nullptr;
-//		}
-//
-//		return wclap;
-//	}
 	
 	bool init() {
 		wasm_ref_t *initFuncRef = nullptr;
@@ -417,6 +430,7 @@ bool wclap_global_init() {
 		return false;
 	}
 
+	// TODO: enable epoch_interruption to prevent locks
 	global_wasm_engine = wasm_engine_new_with_config(config);
 	if (!global_wasm_engine) {
 		wclap_error_message = "couldn't create engine";

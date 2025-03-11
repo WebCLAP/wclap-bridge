@@ -5,7 +5,7 @@
 #include "wasic.h"
 
 #include <string>
-#include <array>
+#include <vector>
 #include <iostream>
 #include <fstream>
 #include <sstream>

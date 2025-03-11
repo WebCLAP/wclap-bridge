@@ -9,7 +9,18 @@ target_sources(wclap-bridge PRIVATE
 )
 target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/modules/clap/include)
-target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/modules/wasm-c-api/include)
 
-add_subdirectory(wasi-sandbox/)
-target_link_libraries(wclap-bridge PRIVATE wasi-sandbox)
+#include(FetchContent)
+#set(FETCHCONTENT_QUIET False)
+#FetchContent_Declare(
+#	wasmtime
+#	GIT_REPOSITORY https://github.com/bytecodealliance/wasmtime.git
+#	GIT_TAG v30.0.2
+#	GIT_SHALLOW ON
+#	SOURCE_SUBDIR crates/c-api
+#)
+#FetchContent_MakeAvailable(wasmtime)
+include(wasmtime-fetched.cmake)
+
+target_include_directories(wclap-bridge PUBLIC wasmtime)
+target_link_libraries(wclap-bridge PUBLIC wasmtime)

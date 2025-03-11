@@ -2,7 +2,7 @@
 #define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
 #import "clap/all.h"
-#import "wasm.h"
+#import "wasmtime.h"
 
 template<class NativeClapStruct>
 struct WclapTranslateStruct;

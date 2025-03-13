@@ -5,14 +5,10 @@
 
 #include "./wclap-bridge-impl.h"
 
-static wasm_engine_t *global_wasm_engine = nullptr;
-std::string wclap_error_message_string;
+wasm_engine_t *global_wasm_engine = nullptr;
+const char *wclap_error_message = nullptr;
 
-static std::string ensureTrailingSlash(const char *dirC) {
-	std::string dir = dirC;
-	if (dir.size() && dir.back() != '/') dir += "/";
-	return dir;
-}
+std::string wclap_error_message_string;
 
 //---------- Thread Context ----------//
 
@@ -21,6 +17,8 @@ void WclapThreadContext::addWclap(Wclap *wclap) {
 	wclaps.insert(wclap);
 }
 void WclapThreadContext::removeWclap(Wclap *wclap) {
+	// This might be called off-thread, if the Wclap is shutting down (and taking the WclapThreads with it)
+	if (isDestroying.load()) return; // this thread is stopping (and taking the Wclap pointer with it), so it's fine
 	std::lock_guard<std::mutex> lock{mutex};
 
 	if (auto iter = wclaps.find(wclap); iter != wclaps.end()) {
@@ -28,6 +26,8 @@ void WclapThreadContext::removeWclap(Wclap *wclap) {
 	}
 }
 WclapThreadContext::~WclapThreadContext() {
+	isDestroying.store(true);
+	std::lock_guard<std::mutex> lock{mutex};
 	for (auto &wclap : wclaps) {
 		wclap->removeThread();
 	}
@@ -40,6 +40,30 @@ thread_local static WclapThreadContext wclapThreadContext;
 const char * Wclap::setupWasmBytes(const uint8_t *bytes, size_t size) {
 	error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
 	if (error) return "Failed to compile module";
+	
+	wasm_exporttype_vec_t exportTypes;
+	wasmtime_module_exports(module, &exportTypes);
+	// Find `clap_entry`, which is a memory-address pointer, so the type of it tells us if it's 64-bit
+	for (size_t i = 0; i < exportTypes.size; ++i) {
+		auto *exportType = exportTypes.data[i];
+		auto *name = wasm_exporttype_name(type);
+		if (!nameEquals(name, "clap_entry")) continue;
+		auto *externType = wasm_exportType_type(type);
+		auto *globalType = wasm_externtype_as_globaltype_const(externType);
+		if (!globalType) return "clap_entry is not a global (value) export";
+		auto *valType = wasm_globaltype_content(globalType);
+		auto kind = wasm_valtype_kind(valType);
+		
+		LOG_EXPR(kind);
+		
+		if (kind == WASMTIME_I64) {
+			wasm64 = true;
+			break;
+		} else if (kind != WASMTIME_I32) {
+			return "clap_entry must be 32-bit or 64-bit memory address";
+		}
+	}
+	wasm_exporttype_vec_delete(&exportTypes);
 	
 	return "Not implemented - is it single-threaded?";
 	return nullptr;
@@ -59,6 +83,7 @@ ScopedThread Wclap::getThread() {
 	}
 	
 	// Put ourselves in this thread's list, so we get notified when the thread closes
+	// The thread will remove us from this list when it gets destroyed
 	wclapThreadContext.addWclap(this);
 
 	auto lock = writeLock();
@@ -86,24 +111,24 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 	wasi_config_inherit_stdout(wasiConfig);
 	wasi_config_inherit_stderr(wasiConfig);
 	// Link various directories - failure is allowed if `mustLinkDirs` is false
-	if (wclapDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, wclapDir, "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
-			if (mustLinkDirs) return "Failed to open /plugin/ in WASI config";
+	if (wclap.wclapDir.size()) {
+		if (!wasi_config_preopen_dir(wasiConfig, wclap.wclapDir.c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
+			if (wclap.mustLinkDirs) return "Failed to open /plugin/ in WASI config";
 		}
 	}
-	if (presetDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, presetDir, "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (mustLinkDirs) return "Failed to open /presets/ in WASI config";
+	if (wclap.presetDir.size()) {
+		if (!wasi_config_preopen_dir(wasiConfig, wclap.presetDir.c_str(), "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			if (wclap.mustLinkDirs) return "Failed to open /presets/ in WASI config";
 		}
 	}
-	if (cacheDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, cacheDir, "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (mustLinkDirs) return "Failed to open /cache/ in WASI config";
+	if (wclap.cacheDir.size()) {
+		if (!wasi_config_preopen_dir(wasiConfig, wclap.cacheDir.c_str(), "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			if (wclap.mustLinkDirs) return "Failed to open /cache/ in WASI config";
 		}
 	}
-	if (varDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, varDir, "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (mustLinkDirs) return "Failed to open /var/ in WASI config";
+	if (wclap.varDir.size()) {
+		if (!wasi_config_preopen_dir(wasiConfig, wclap.varDir.c_str(), "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			if (wclap.mustLinkDirs) return "Failed to open /var/ in WASI config";
 		}
 	}
 	
@@ -167,11 +192,14 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 		wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
 		const wasm_valtype_vec_t *params = wasm_functype_params(type);
 		const wasm_valtype_vec_t *results = wasm_functype_results(type);
-		if (params->size == 1 && wasm_valtype_kind(params->data[0]) == WASM_I32 && results->size == 1 && wasm_valtype_kind(results->data[0]) == WASM_I32) {
-			malloc = item.of.func;
+		if (params->size != 1 || results->size != 1) return "malloc() function signature mismatch";
+		if (wasm_valtype_kind(params->data[0]) != wasm_valtype_kind(results->data[0])) return "malloc() function signature mismatch";
+		if (wclap.wasm64) {
+			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I64) return "malloc() function signature mismatch";
 		} else {
-			return "malloc() function signature mismatch";
+			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I32) return "malloc() function signature mismatch";
 		}
+		mallocFunc = item.of.func;
 		wasm_functype_delete(type);
 	} else {
 		wasmtime_extern_delete(&item);
@@ -204,38 +232,39 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 }
 
 bool WclapThread::init() {
-	wasm_ref_t *initFuncRef = nullptr;
-	wasm_func_t *initFunc = nullptr;
-	{
-		auto *wasmEntry = (Wasm32PluginEntry *)(wasmtime_memory_data(context, &memory) + clapEntryP);
+	wasmtime_func_t initFunc;
+	if (wclap.wasm64) {
+		assert(false); // WCLAP-64 not implemented yet
+		abort();
+	} else {
+		auto *wasmEntry = (Wasm32PluginEntry *)(wasmtime_memory_data(context, &memory) + clapEntryP64);
 		clapVersion = wasmEntry->clap_version;
 		wasmtime_val_t val;
 		if (!wasmtime_table_get(context, &functionTable, wasmEntry->initP, &val)) return false;
-		
+		if (val.kind != WASMTIME_FUNCREF) return false; // should never happen, since we checked the function table type
+		initFunc = val.of.funcref;
 	}
-	LOG_EXPR(initFunc);
-	LOG_EXPR(wasm_func_param_arity(initFunc));
-	LOG_EXPR(wasm_func_result_arity(initFunc));
+	auto *initFuncType = wasmtime_func_type(context, &initFunc);
+	LOG_EXPR(wasm_functype_params(initFuncType)->size);
+	LOG_EXPR(wasm_functype_results(initFuncType)->size);
 	
-	uint32_t pluginPath = copyStringConstantToWasm("/plugin/");
-	if (!pluginPath) {
-		return false;
-	}
+	uint64_t pluginPath = copyStringConstantToWasm("/plugin/");
+	if (!pluginPath) return false;
 	
-	wasm_val_t args[1];
-	wasm_val_vec_t argsV{1, args};
-	wasm_val_t results[1];
-	wasm_val_vec_t resultsV{1, results};
+	wasmtime_val_t args[1];
+	wasmtime_val_t results[1];
 	
-	{
-		auto *wasmEntry = (Wasm32PluginEntry *)(wasm_memory_data(memory) + clapEntryP);
-		args[0].kind = WASM_I32;
+	if (wclap.wasm64) {
+		args[0].kind = WASMTIME_I64;
+		args[0].of.i64 = pluginPath;
+	} else {
+		args[0].kind = WASMTIME_I32;
 		args[0].of.i32 = pluginPath;
-		auto *trap = wasm_func_call(initFunc, &argsV, &resultsV);
-		if (trap) return false;
 	}
+	wasmtime_func_call(context, &initFunc, args, 1, results, 1, &trap);
+	if (trap) return false;
 
-	return results[0].of.i32;
+	return results[0].of.i32; // bool, regardless of 32/64 bits
 }
 
 WclapThread::~WclapThread() {

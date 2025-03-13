@@ -4,12 +4,13 @@
 #include <fstream>
 #include <vector>
 #include <thread>
+#include <atomic>
 #include <shared_mutex>
 #include <unordered_map>
 #include <unordered_set>
 
-
-const char *wclap_error_message = nullptr;
+wasm_engine_t *global_wasm_engine;
+const char *wclap_error_message;
 
 struct Wclap;
 struct WclapThread;
@@ -26,15 +27,25 @@ private:
 	std::mutex mutex; // some methods are called out-of-thread
 	// A list of every Wclap which currently has a WclapThread for a given thread
 	std::unordered_set<Wclap *> wclaps;
+	std::atomic<bool> isDestroying{false};
 };
 
 struct Wclap {
 	wasmtime_module_t *module = nullptr;
 	wasmtime_error_t *error = nullptr;
+	bool wasm64 = false;
 //	wasmtime_memory_t *sharedMemory = nullptr;
 
-	Wclap() {}
+	std::string wclapDir, presetDir, cacheDir, varDir;
+	bool mustLinkDirs = false;
+
+	Wclap(const std::string &wclapDir, const std::string &presetDir, const std::string &cacheDir, const std::string &varDir, bool mustLinkDirs) : wclapDir(wclapDir), presetDir(presetDir), cacheDir(cacheDir), varDir(varDir), mustLinkDirs(mustLinkDirs) {}
 	~Wclap() {
+		{ // Lock while we clear all the threads
+			auto lock = writeLock();
+			threadMap.clear();
+		}
+		
 		if (error) wasmtime_error_delete(error);
 		if (module) wasmtime_module_delete(module);
 	}
@@ -93,7 +104,7 @@ struct WclapThread {
 	wasm_trap_t *trap = nullptr;
 	wasmtime_memory_t memory;
 	wasmtime_table_t functionTable;
-	wasmtime_func_t malloc;
+	wasmtime_func_t mallocFunc;
 
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry
 	wasmtime_instance_t instance;
@@ -119,45 +130,7 @@ struct WclapThread {
 		return typeCode(wasm_valtype_kind(t));
 	}
 	
-	bool init() {
-//		wasm_ref_t *initFuncRef = nullptr;
-		wasmtime_func_t initFunc;
-		if (wclap.wasm64) {
-			abort();
-		} else {
-			auto *wasmEntry = (Wasm32PluginEntry *)(wasmtime_memory_data(context, &memory) + clapEntryP64);
-			clapVersion = wasmEntry->clap_version;
-			wasmtime_val_t val;
-			if (!wasmtime_table_get(context, &functionTable, wasmEntry->initP, &val)) return false;
-			abort();
-		}
-		LOG_EXPR(initFunc);
-		LOG_EXPR(wasm_func_param_arity(initFunc));
-		LOG_EXPR(wasm_func_result_arity(initFunc));
-		
-		uint32_t pluginPath = copyStringConstantToWasm("/plugin/");
-		if (!pluginPath) {
-			return false;
-		}
-		
-		wasm_val_t args[1];
-		wasm_val_vec_t argsV{1, args};
-		wasm_val_t results[1];
-		wasm_val_vec_t resultsV{1, results};
-		
-		if (wclap.wasm64) {
-			assert(false); // WCLAP-64 not implemented yet
-			abort();
-		} else {
-			auto *wasmEntry = (Wasm32PluginEntry *)(wasm_memory_data(memory) + clapEntryP64);
-			args[0].kind = WASM_I32;
-			args[0].of.i32 = pluginPath;
-			auto *trap = wasm_func_call(initFunc, &argsV, &resultsV);
-			if (trap) return false;
-		}
-
-		return results[0].of.i32;
-	}
+	bool init();
 	
 	clap_plugin_factory nativePluginFactory;
 	std::unique_ptr<WclapTranslationScope<true>> pluginFactoryScope64;
@@ -203,21 +176,31 @@ private:
 		uint32_t getFactoryP;
 	};
 	
-	uint32_t copyStringConstantToWasm(const char *str) {
+	uint64_t copyStringConstantToWasm(const char *str) {
 		size_t bytes = std::strlen(str) + 1;
+		uint64_t wasmP;
 		
-		wasm_val_t args[1];
-		args[0].kind = WASM_I32;
-		args[0].of.i32 = bytes;
-		wasm_val_vec_t argsV{1, args};
-		wasm_val_t results[1];
-		wasm_val_vec_t resultsV{1, results};
+		wasmtime_val_t args[1];
+		wasmtime_val_t results[1];
+		if (wclap.wasm64) {
+			args[0].kind = WASMTIME_I64;
+			args[0].of.i64 = bytes;
+		} else {
+			args[0].kind = WASMTIME_I32;
+			args[0].of.i32 = bytes;
+		}
 		
-		auto *trap = wasm_func_call(malloc, &argsV, &resultsV);
+		wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
 		if (trap) return 0;
-		uint32_t wasmP = results[0].of.i32;
+		if (wclap.wasm64) {
+			if (results[0].kind != WASMTIME_I64) return 0;
+			wasmP = results[0].of.i32;
+		} else {
+			if (results[0].kind != WASMTIME_I32) return 0;
+			wasmP = results[0].of.i64;
+		}
 		
-		auto *wasmBytes = (char *)(wasm_memory_data(memory) + wasmP);
+		auto *wasmBytes = (char *)(wasmtime_memory_data(context, &memory) + wasmP);
 		for (size_t i = 0; i < bytes; ++i) {
 			wasmBytes[i] = str[i];
 		}

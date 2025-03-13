@@ -7,6 +7,12 @@
 
 #include "wclap-bridge.h"
 
+static std::string ensureTrailingSlash(const char *dirC) {
+	std::string dir = dirC;
+	if (dir.size() && dir.back() != '/') dir += "/";
+	return dir;
+}
+
 bool wclap_global_init() {
 	wasm_config_t *config = wasm_config_new();
 	if (!config) {
@@ -52,13 +58,7 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 		return nullptr;
 	}
 
-	auto *wclap = new Wclap();
-
-	wclap_error_message = wclap->setupWasiDirs(wclapDir, presetDir, cacheDir, varDir, true);
-	if (wclap_error_message) {
-		delete wclap;
-		return nullptr;
-	}
+	auto *wclap = new Wclap(wclapDir ? wclapDir : "", presetDir ? presetDir : "", cacheDir ? cacheDir : "", varDir ? varDir : "", true);
 
 	wclap_error_message = wclap->setupWasmBytes((uint8_t *)wasmBytes.data(), wasmBytes.size());
 	if (wclap_error_message) {

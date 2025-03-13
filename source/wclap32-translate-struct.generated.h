@@ -4,7 +4,7 @@ template<>
 struct Wclap32TranslateStruct<clap_plugin_descriptor_t> {
 	using WasmP = uint32_t;
 	// translate all the fields
-	static void assignWasmToNative(WclapTranslationScope *translate, WasmP wasmP, clap_plugin_descriptor_t &native) {
+	static void assignWasmToNative(WclapTranslationScope<false> *translate, WasmP wasmP, clap_plugin_descriptor_t &native) {
 		translate->assignWasmToNativeDirect<clap_version_t>(wasmP, native.clap_version);
 		translate->assignWasmToNative<const char *>(wasmP + 12, native.id);
 		translate->assignWasmToNative<const char *>(wasmP + 12, native.name);
@@ -17,7 +17,7 @@ struct Wclap32TranslateStruct<clap_plugin_descriptor_t> {
 		translate->assignWasmToNative_clap_plugin_descriptor_t_features(wasmP + 12, native.features);
 	}
 	// translate all the fields
-	static void assignNativeToWasm(WclapTranslationScope *translate, clap_plugin_descriptor_t const &native, WasmType wasmP) {
+	static void assignNativeToWasm(WclapTranslationScope<false> *translate, clap_plugin_descriptor_t const &native, WasmP wasmP) {
 		translate->assignNativeToWasmDirect<clap_version_t>(native.clap_version, wasmP);
 		translate->assignNativeToWasm<const char *>(native.id, wasmP + 12);
 		translate->assignNativeToWasm<const char *>(native.name, wasmP + 12);
@@ -34,15 +34,15 @@ template<>
 struct Wclap32TranslateStruct<clap_plugin_factory_t> {
 	using WasmP = uint32_t;
 	// translate all the fields
-	static void assignWasmToNative(WclapTranslationScope *translate, WasmP wasmP, clap_plugin_factory_t &native) {
-		translate->assignWasmToNative_ii(wasmP, native.get_plugin_count); // uint32_t get_plugin_count(clap_plugin_factory_t *)
-		translate->assignWasmToNative_iii(wasmP + 4, native.get_plugin_descriptor); // clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
-		translate->assignWasmToNative_iiii(wasmP + 8, native.create_plugin); // clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
+	static void assignWasmToNative(WclapTranslationScope<false> *translate, WasmP wasmP, clap_plugin_factory_t &native) {
+		translate->assignWasmToNative_II(wasmP, native.get_plugin_count); // uint32_t get_plugin_count(clap_plugin_factory_t *)
+		translate->assignWasmToNative_III(wasmP + 4, native.get_plugin_descriptor); // clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
+		translate->assignWasmToNative_IIII(wasmP + 8, native.create_plugin); // clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
 	}
 	// translate all the fields
-	static void assignNativeToWasm(WclapTranslationScope *translate, clap_plugin_factory_t const &native, WasmType wasmP) {
-		translate->assignNativeToWasm_ii(native.get_plugin_count, wasmP); // uint32_t get_plugin_count(clap_plugin_factory_t *)
-		translate->assignNativeToWasm_iii(native.get_plugin_descriptor, wasmP + 4); // clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
-		translate->assignNativeToWasm_iiii(native.create_plugin, wasmP + 8); // clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
+	static void assignNativeToWasm(WclapTranslationScope<false> *translate, clap_plugin_factory_t const &native, WasmP wasmP) {
+		translate->assignNativeToWasm_II(native.get_plugin_count, wasmP); // uint32_t get_plugin_count(clap_plugin_factory_t *)
+		translate->assignNativeToWasm_III(native.get_plugin_descriptor, wasmP + 4); // clap_plugin_descriptor_t * get_plugin_descriptor(clap_plugin_factory_t *,uint32_t)
+		translate->assignNativeToWasm_IIII(native.create_plugin, wasmP + 8); // clap_plugin_t * create_plugin(clap_plugin_factory_t *,clap_host_t *,const char *)
 	}
 };

@@ -13,9 +13,6 @@ struct Wclap32TranslateStruct;
 template<class NativeClapStruct>
 struct Wclap64TranslateStruct;
 
-// Auto-generated struct translation
-#include "./wclap-translate-struct.generated.h"
-
 template<bool use64>
 struct WclapTranslationScope {
 	using WasmP = typename std::conditional<use64, uint64_t, uint32_t>::type;
@@ -111,32 +108,59 @@ abort();
 	void assignNativeToWasm(const V &native, WasmP wasmP);
 	
 	template<class Return, class Arg1>
-	void assignWasmToNative_ii(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
+	void assignWasmToNative_II(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
 		fnPointer = nullptr;
 	}
 	template<class Return, class Arg1>
-	void assignNativeToWasm_ii(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
+	void assignNativeToWasm_II(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
+		valueInWasm<WasmP>(wasmP) = 0;
+	}
+	
+	template<class Return, class Arg1>
+	void assignWasmToNative_IL(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1>
+	void assignNativeToWasm_IL(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
 		valueInWasm<WasmP>(wasmP) = 0;
 	}
 
 	template<class Return, class Arg1, class Arg2>
-	void assignWasmToNative_iii(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
+	void assignWasmToNative_III(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
 		fnPointer = nullptr;
 	}
 	template<class Return, class Arg1, class Arg2>
-	void assignNativeToWasm_iii(Return(* const &fnPointer)(Arg1, Arg2), WasmP wasmP) {
+	void assignNativeToWasm_III(Return(* const &fnPointer)(Arg1, Arg2), WasmP wasmP) {
 		valueInWasm<WasmP>(wasmP) = 0;
 	}
-	
+
+	template<class Return, class Arg1, class Arg2>
+	void assignWasmToNative_LLI(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1, class Arg2>
+	void assignNativeToWasm_LLI(Return(* const &fnPointer)(Arg1, Arg2), WasmP wasmP) {
+		valueInWasm<WasmP>(wasmP) = 0;
+	}
+
 	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignWasmToNative_iiii(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
+	void assignWasmToNative_IIII(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
 		fnPointer = nullptr;
 	}
 	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignNativeToWasm_iiii(Return(* const &fnPointer)(Arg1, Arg2, Arg3), WasmP wasmP) {
+	void assignNativeToWasm_IIII(Return(* const &fnPointer)(Arg1, Arg2, Arg3), WasmP wasmP) {
 		valueInWasm<WasmP>(wasmP) = 0;
 	}
-	
+
+	template<class Return, class Arg1, class Arg2, class Arg3>
+	void assignWasmToNative_LLLL(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
+		fnPointer = nullptr;
+	}
+	template<class Return, class Arg1, class Arg2, class Arg3>
+	void assignNativeToWasm_LLLL(Return(* const &fnPointer)(Arg1, Arg2, Arg3), WasmP wasmP) {
+		valueInWasm<WasmP>(wasmP) = 0;
+	}
+
 	//---------- custom translators for specific types ----------//
 
 	void assignWasmToNative(WasmP wasmP, const char * &native) {
@@ -148,7 +172,7 @@ abort();
 			native = (const char *)nativeInWasm(wasmString);
 		}
 	}
-	assignNativeToWasm(const char * const &native, WasmP wasmP) {
+	void assignNativeToWasm(const char * const &native, WasmP wasmP) {
 		auto &wasmString = *(WasmP *)nativeInWasm(wasmP);
 		
 		if (!native) {
@@ -167,7 +191,7 @@ abort();
 
 	//---------- custom translators for individual fields ----------//
 
-	void assignWasmToNative_clap_plugin_descriptor_t_features(WasmP wasmP, const char * const * &features) {
+	void assignWasmToNative_clap_plugin_descriptor_t_features(WasmP wasmP, const char * const * &constFeatures) {
 		// This is our object - the constness is for the host using this value
 		auto features = (const char**)constFeatures;
 		if (!wasmP) {
@@ -219,3 +243,6 @@ private:
 	bool _wasmReadyToDestroy = false;
 };
 
+// Auto-generated struct translation
+#include "./wclap32-translate-struct.generated.h"
+#include "./wclap64-translate-struct.generated.h"

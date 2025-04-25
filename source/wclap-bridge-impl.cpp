@@ -5,8 +5,15 @@
 
 #include "./wclap-bridge-impl.h"
 
-wasm_engine_t *global_wasm_engine = nullptr;
-const char *wclap_error_message = nullptr;
+std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
+	for (size_t i = 0; i < bytes.size; ++i) {
+		s << bytes.data[i];
+	}
+	return s;
+}
+
+wasm_engine_t *global_wasm_engine;
+const char *wclap_error_message;
 
 std::string wclap_error_message_string;
 
@@ -41,35 +48,74 @@ const char * Wclap::setupWasmBytes(const uint8_t *bytes, size_t size) {
 	error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
 	if (error) return "Failed to compile module";
 	
-	wasm_exporttype_vec_t exportTypes;
-	wasmtime_module_exports(module, &exportTypes);
-	// Find `clap_entry`, which is a memory-address pointer, so the type of it tells us if it's 64-bit
-	for (size_t i = 0; i < exportTypes.size; ++i) {
-		auto *exportType = exportTypes.data[i];
-		auto *name = wasm_exporttype_name(type);
-		if (!nameEquals(name, "clap_entry")) continue;
-		auto *externType = wasm_exportType_type(type);
-		auto *globalType = wasm_externtype_as_globaltype_const(externType);
-		if (!globalType) return "clap_entry is not a global (value) export";
-		auto *valType = wasm_globaltype_content(globalType);
-		auto kind = wasm_valtype_kind(valType);
+	bool foundClapEntry = false;
+	{ // Find `clap_entry`, which is a memory-address pointer, so the type of it tells us if it's 64-bit
+		wasm_exporttype_vec_t exportTypes;
+		wasmtime_module_exports(module, &exportTypes);
 		
-		LOG_EXPR(kind);
-		
-		if (kind == WASMTIME_I64) {
-			wasm64 = true;
-			break;
-		} else if (kind != WASMTIME_I32) {
-			return "clap_entry must be 32-bit or 64-bit memory address";
+		for (size_t i = 0; i < exportTypes.size; ++i) {
+			auto *exportType = exportTypes.data[i];
+			auto *name = wasm_exporttype_name(exportType);
+			if (!nameEquals(name, "clap_entry")) continue;
+			foundClapEntry = true;
+			auto *externType = wasm_exporttype_type(exportType);
+			auto *globalType = wasm_externtype_as_globaltype_const(externType);
+			if (!globalType) return "clap_entry is not a global (value) export";
+			auto *valType = wasm_globaltype_content(globalType);
+			auto kind = wasm_valtype_kind(valType);
+			
+			if (kind == WASMTIME_I64) {
+				wasm64 = true;
+				break;
+			} else if (kind != WASMTIME_I32) {
+				return "clap_entry must be 32-bit or 64-bit memory address";
+			}
 		}
+		wasm_exporttype_vec_delete(&exportTypes);
 	}
-	wasm_exporttype_vec_delete(&exportTypes);
+	if (!foundClapEntry) return "clap_entry not found";
+
+	{ // Check for a shared-memory import - otherwise it's single-threaded
+		wasm_importtype_vec_t importTypes;
+		wasmtime_module_imports(module, &importTypes);
+		for (size_t i = 0; i < importTypes.size; ++i) {
+			auto *importType = importTypes.data[i];
+			auto *module = wasm_importtype_module(importType);
+			auto *name = wasm_importtype_name(importType);
+			auto *externType = wasm_importtype_type(importType);
+
+			auto *asMemory = wasm_externtype_as_memorytype_const(externType);
+			if (!asMemory) continue;
+
+			if (!wasmtime_memorytype_isshared(asMemory)) {
+				return "imports non-shared memory";
+			}
+			bool mem64 = wasmtime_memorytype_is64(asMemory);
+			if (mem64 != wasm64) {
+				return mem64 ? "64-bit memory but 32-bit clap_entry" : "32-bit memory but 64-bit clap_entry";
+			}
+			if (sharedMemory) return "multiple memory imports";
+
+			error = wasmtime_sharedmemory_new (global_wasm_engine, asMemory, &sharedMemory);
+			if (error || !sharedMemory) return "failed to create shared memory";
+		}
+		wasm_importtype_vec_delete(&importTypes);
+	}
 	
-	return "Not implemented - is it single-threaded?";
+	LOG_EXPR(wasm64);
+	if (!sharedMemory) {
+		auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
+		auto lock = writeLock();
+		wclapThread->startInstance();
+		singleThread = std::unique_ptr<WclapThread>(wclapThread);
+	}
+	LOG_EXPR(sharedMemory);
+	LOG_EXPR(singleThread);
+	
 	return nullptr;
 }
 
-ScopedThread Wclap::getThread() {
+Wclap::ScopedThread Wclap::getThread() {
 	if (singleThread) {
 		// If the WCLAP didn't import shared memory, it's single-threaded
 		mutex.lock_shared();
@@ -86,17 +132,19 @@ ScopedThread Wclap::getThread() {
 	// The thread will remove us from this list when it gets destroyed
 	wclapThreadContext.addWclap(this);
 
+	auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
 	auto lock = writeLock();
-	auto *wclapThread = new WclapThread(*this, wclapThreadContext);
+	wclapThread->startInstance();
 	threadMap[std::this_thread::get_id()] = std::unique_ptr<WclapThread>{wclapThread};
 	return {*wclapThread};
 }
-	
+
 void Wclap::removeThread() {
 	auto lock = writeLock();
 
 	auto iter = threadMap.find(std::this_thread::get_id());
 	if (iter == threadMap.end()) {
+		LOG_EXPR(iter == threadMap.end());
 		abort(); // This shouldn't be called unless we had a WclapThread for this thread
 	}
 	threadMap.erase(iter);
@@ -104,7 +152,9 @@ void Wclap::removeThread() {
 
 //---------- Wclap Thread ----------//
 
-const char * WclapThread::startInstance(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir, bool mustLinkDirs) {
+const char * WclapThread::startInstance() {
+	if (wasiConfig) return "startInstance() called twice";
+	
 	wasiConfig = wasi_config_new();
 	if (!wasiConfig) return "Failed to create WASI config";
 
@@ -138,7 +188,7 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 	if (!store)  return "Failed to create store";
 	context = wasmtime_store_context(store);
 	if (!context) return "Failed to create context";
-
+	
 	// Create a linker with WASI functions defined
 	linker = wasmtime_linker_new(global_wasm_engine);
 	if (!linker) return "error creating linker";
@@ -150,7 +200,7 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 	wasiConfig = nullptr;
 
 	// This includes calling the WASI _start() or _initialize() methods
-	error = wasmtime_linker_instantiate(linker, context, module, &instance, &trap);
+	error = wasmtime_linker_instantiate(linker, context, wclap.module, &instance, &trap);
 	if (error) return "failed to create instance";
 	if (trap) return "failed to start instance";
 
@@ -167,7 +217,7 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 		memory = item.of.memory; // Shared memory is (in Wasmtime) a type of memory
 	} else {
 		wasmtime_extern_delete(&item);
-		return "memory isn't a (Shared)Memory";
+		return "exported memory isn't a (Shared)Memory";
 	}
 	wasmtime_extern_delete(&item);
 
@@ -178,7 +228,7 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 		wasmtime_val_t v;
 		wasmtime_global_get(context, &item.of.global, &v);
 		if (v.kind != WASM_I32) return "clap_entry is not a 32-bit pointer";
-		clapEntryP = v.of.i32;
+		clapEntryP64 = v.of.i32; // We store it as 64 bits, even though we know it's a 32-bit one
 	} else {
 		wasmtime_extern_delete(&item);
 		return "clap_entry isn't a Global";
@@ -234,6 +284,7 @@ const char * WclapThread::startInstance(const char *wclapDir, const char *preset
 bool WclapThread::init() {
 	wasmtime_func_t initFunc;
 	if (wclap.wasm64) {
+		LOG_EXPR(wclap.wasm64);
 		assert(false); // WCLAP-64 not implemented yet
 		abort();
 	} else {
@@ -289,7 +340,6 @@ WclapThread::~WclapThread() {
 
 		wasmtime_error_delete(error);
 	}
-	if (module) wasmtime_module_delete(module);
 	if (linker) wasmtime_linker_delete(linker);
 	if (store) wasmtime_store_delete(store);
 }

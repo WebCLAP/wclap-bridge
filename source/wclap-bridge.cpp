@@ -66,12 +66,6 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 		return nullptr;
 	}
 
-	wclap_error_message = wclap->findExports();
-	if (wclap_error_message) {
-		delete wclap;
-		return nullptr;
-	}
-
 	return wclap;
 }
 void * wclap_open(const char *wclapDir) {
@@ -90,13 +84,15 @@ const clap_version_t * wclap_version(void *wclap) {
 		wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	return &((Wclap *)wclap)->clapVersion;
+	auto scoped = ((Wclap *)wclap)->getThread();
+	return &scoped.thread.clapVersion;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {
 		wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	return ((Wclap *)wclap)->getFactory(factory_id);
+	auto scoped = ((Wclap *)wclap)->getThread();
+	return scoped.thread.getFactory(factory_id);
 }
 

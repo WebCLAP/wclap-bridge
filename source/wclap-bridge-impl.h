@@ -9,11 +9,19 @@
 #include <unordered_map>
 #include <unordered_set>
 
-wasm_engine_t *global_wasm_engine;
-const char *wclap_error_message;
+extern wasm_engine_t *global_wasm_engine;
+extern const char *wclap_error_message;
 
 struct Wclap;
 struct WclapThread;
+
+static bool nameEquals(const wasm_name_t *name, const char *cName) {
+	if (name->size != std::strlen(cName)) return false;
+	for (size_t i = 0; i < name->size; ++i) {
+		if (name->data[i] != cName[i]) return false;
+	}
+	return true;
+}
 
 struct WclapThreadContext {
 	WclapThreadContext() {}
@@ -34,7 +42,7 @@ struct Wclap {
 	wasmtime_module_t *module = nullptr;
 	wasmtime_error_t *error = nullptr;
 	bool wasm64 = false;
-//	wasmtime_memory_t *sharedMemory = nullptr;
+	wasmtime_sharedmemory_t *sharedMemory = nullptr;
 
 	std::string wclapDir, presetDir, cacheDir, varDir;
 	bool mustLinkDirs = false;
@@ -44,6 +52,11 @@ struct Wclap {
 		{ // Lock while we clear all the threads
 			auto lock = writeLock();
 			threadMap.clear();
+			if (singleThread) singleThread = nullptr;
+		}
+
+		if (sharedMemory) {
+			wasmtime_sharedmemory_delete(sharedMemory);
 		}
 		
 		if (error) wasmtime_error_delete(error);
@@ -75,6 +88,15 @@ struct Wclap {
 	
 	// The current native thread is shutting down - remove it from our map
 	void removeThread();
+	
+	// These translation scopes never get destroyed, and should only be used for factories
+	std::unique_ptr<WclapTranslationScope<false>> factoryTranslationScope32;
+	std::unique_ptr<WclapTranslationScope<true>> factoryTranslationScope64;
+	
+	template<bool use64>
+	std::unique_ptr<WclapTranslationScope<use64>> createTranslationScope() {
+		
+	}
 	
 private:
 	mutable std::shared_mutex mutex;
@@ -109,12 +131,14 @@ struct WclapThread {
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry
 	wasmtime_instance_t instance;
 	
-	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {}
+	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {
+	
+	}
 
 	// destructor is the only method allowed to be called from outside the assigned thread
 	~WclapThread();
 	
-	const char * startInstance(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir, bool mustLinkDirs);
+	const char * startInstance();
 	
 	static char typeCode(wasm_valkind_t k) {
 		if (k < 4) {
@@ -133,22 +157,16 @@ struct WclapThread {
 	bool init();
 	
 	clap_plugin_factory nativePluginFactory;
-	std::unique_ptr<WclapTranslationScope<true>> pluginFactoryScope64;
-	std::unique_ptr<WclapTranslationScope<false>> pluginFactoryScope32;
 	
 	const void * getFactory(const char *factory_id) {
 		if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
 			if (wclap.wasm64) {
+				LOG_EXPR(wclap.wasm64);
 				assert(false); // WCLAP-64 not implemented yet
 				abort();
 			} else {
-				if (!pluginFactoryScope32) {
-					pluginFactoryScope32 = std::unique_ptr<WclapTranslationScope<false>>{
-						
-					};
-					assert(false); // native factory not created
-					abort();
-				}
+				uint32_t wasmP = ...;
+				wclap.factoryTranslationScope32->assignWasmToNative(wasmP, nativePluginFactory);
 			}
 			return &nativePluginFactory;
 		}
@@ -156,18 +174,10 @@ struct WclapThread {
 		return nullptr;
 	}
 	
-	clap_version clapVersion;
+	clap_version clapVersion = CLAP_VERSION;
 
 private:
 
-	static bool nameEquals(const wasm_name_t *name, const char *cName) {
-		if (name->size != std::strlen(cName)) return false;
-		for (size_t i = 0; i < name->size; ++i) {
-			if (name->data[i] != cName[i]) return false;
-		}
-		return true;
-	}
-	
 	// clap_entry as it will appear in a 32-bit WCLAP
 	struct Wasm32PluginEntry {
 		clap_version_t clap_version;

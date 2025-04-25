@@ -8,6 +8,8 @@
 
 #include <type_traits>
 
+struct Wclap;
+
 template<class NativeClapStruct>
 struct Wclap32TranslateStruct;
 template<class NativeClapStruct>
@@ -22,13 +24,14 @@ struct WclapTranslationScope {
 
 	static constexpr size_t arenaBytes = 65536;
 
-	wasm_instance_t *instance;
+	Wclap &wclap;
 	wasm_memory_t *memory;
 	WasmP wasmObjectP; // WASM object whose lifetime this scope is tied to
 	WasmP wasmPointerToThis; // If we point WASM context fields to here, we can find this
 
-	WclapTranslationScope(wasm_instance_t *instance, wasm_memory_t *memory, WasmP wasmObjectP) : instance(instance), memory(memory), wasmObjectP(wasmObjectP) {
+	WclapTranslationScope(Wclap &wclap, wasm_memory_t *memory, WasmP wasmObjectP) : wclap(wclap), memory(memory), wasmObjectP(wasmObjectP) {
 		nativeArena = nativeTmpStartP = nativeTmpP = (unsigned char *)malloc(arenaBytes);
+LOG_EXPR(nativeArena);
 //		wasmArena = wasmTmpStartP = wasmTmpP = wasm_malloc(arenaBytes);
 wasmArena = wasmTmpStartP = wasmTmpP = 0;
 abort();
@@ -43,7 +46,10 @@ abort();
 		_wasmReadyToDestroy = true;
 	}
 	~WclapTranslationScope() {
-		assert(_wasmReadyToDestroy);
+		if (!_wasmReadyToDestroy) {
+			LOG_EXPR(_wasmReadyToDestroy);
+			abort();
+		}
 		free(nativeArena);
 	}
 	

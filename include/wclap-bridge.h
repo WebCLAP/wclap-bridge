@@ -11,7 +11,7 @@ void * wclap_open(const char *wclapDir);
 // Opens a WCLAP with read-only directory `/plugin/` and optional read-write directories `/presets/`, `/cache/` and `/var/`
 void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir);
 
-// Closes a WCLAP using its opaque identifier
+// Closes a WCLAP using its opaque identifier.  Unlike clap_entry::deinit(), this MUST be called exactly once after the corresponding wclap_open.
 bool wclap_close(void *);
 
 // Returns a pointer to the opened WCLAP's CLAP API version

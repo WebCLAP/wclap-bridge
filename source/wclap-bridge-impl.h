@@ -1,5 +1,5 @@
-#include "wclap-translation-scope.h"
-#include "wasi.h"
+#include "wasmtime.h"
+#include "clap/all.h"
 
 #include <fstream>
 #include <vector>
@@ -14,6 +14,9 @@ extern const char *wclap_error_message;
 
 struct Wclap;
 struct WclapThread;
+
+template<bool use64>
+struct WclapTranslationScope;
 
 static bool nameEquals(const wasm_name_t *name, const char *cName) {
 	if (name->size != std::strlen(cName)) return false;
@@ -39,31 +42,24 @@ private:
 };
 
 struct Wclap {
+	clap_version clapVersion;
+
 	wasmtime_module_t *module = nullptr;
 	wasmtime_error_t *error = nullptr;
 	bool wasm64 = false;
 	wasmtime_sharedmemory_t *sharedMemory = nullptr;
+	
+	uint8_t * wasmMemory(uint32_t wasmP);
+	uint8_t * wasmMemory(uint64_t wasmP);
 
 	std::string wclapDir, presetDir, cacheDir, varDir;
 	bool mustLinkDirs = false;
 
-	Wclap(const std::string &wclapDir, const std::string &presetDir, const std::string &cacheDir, const std::string &varDir, bool mustLinkDirs) : wclapDir(wclapDir), presetDir(presetDir), cacheDir(cacheDir), varDir(varDir), mustLinkDirs(mustLinkDirs) {}
-	~Wclap() {
-		{ // Lock while we clear all the threads
-			auto lock = writeLock();
-			threadMap.clear();
-			if (singleThread) singleThread = nullptr;
-		}
+	Wclap(const std::string &wclapDir, const std::string &presetDir, const std::string &cacheDir, const std::string &varDir, bool mustLinkDirs);
+	~Wclap();
 
-		if (sharedMemory) {
-			wasmtime_sharedmemory_delete(sharedMemory);
-		}
-		
-		if (error) wasmtime_error_delete(error);
-		if (module) wasmtime_module_delete(module);
-	}
-
-	const char * setupWasmBytes(const uint8_t *bytes, size_t size);
+	const char * initWasmBytes(const uint8_t *bytes, size_t size);
+	const char * deinit();
 	
 	std::unique_ptr<WclapThread> singleThread;
 	struct ScopedThread {
@@ -88,17 +84,18 @@ struct Wclap {
 	
 	// The current native thread is shutting down - remove it from our map
 	void removeThread();
-	
-	// These translation scopes never get destroyed, and should only be used for factories
-	std::unique_ptr<WclapTranslationScope<false>> factoryTranslationScope32;
-	std::unique_ptr<WclapTranslationScope<true>> factoryTranslationScope64;
-	
-	template<bool use64>
-	std::unique_ptr<WclapTranslationScope<use64>> createTranslationScope() {
-		
-	}
-	
+
+	bool initSuccess = false;
+	clap_plugin_entry translatedEntry;
+
+	const void * getFactory(const char *factory_id);
+
 private:
+	bool hasPluginFactory = false;
+	clap_plugin_factory nativePluginFactory;
+	std::unique_ptr<WclapTranslationScope<false>> entryTranslationScope32;
+	std::unique_ptr<WclapTranslationScope<true>> entryTranslationScope64;
+
 	mutable std::shared_mutex mutex;
 	// Scoped lock suitable for reading the thread map
 	std::shared_lock<std::shared_mutex> readLock() const {
@@ -128,7 +125,7 @@ struct WclapThread {
 	wasmtime_table_t functionTable;
 	wasmtime_func_t mallocFunc;
 
-	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry
+	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	wasmtime_instance_t instance;
 	
 	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {
@@ -154,38 +151,7 @@ struct WclapThread {
 		return typeCode(wasm_valtype_kind(t));
 	}
 	
-	bool init();
-	
-	clap_plugin_factory nativePluginFactory;
-	
-	const void * getFactory(const char *factory_id) {
-		if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
-			if (wclap.wasm64) {
-				LOG_EXPR(wclap.wasm64);
-				assert(false); // WCLAP-64 not implemented yet
-				abort();
-			} else {
-				uint32_t wasmP = ...;
-				wclap.factoryTranslationScope32->assignWasmToNative(wasmP, nativePluginFactory);
-			}
-			return &nativePluginFactory;
-		}
-		LOG_EXPR(factory_id);
-		return nullptr;
-	}
-	
-	clap_version clapVersion = CLAP_VERSION;
-
 private:
-
-	// clap_entry as it will appear in a 32-bit WCLAP
-	struct Wasm32PluginEntry {
-		clap_version_t clap_version;
-		uint32_t initP;
-		uint32_t deinitP;
-		uint32_t getFactoryP;
-	};
-	
 	uint64_t copyStringConstantToWasm(const char *str) {
 		size_t bytes = std::strlen(str) + 1;
 		uint64_t wasmP;
@@ -210,7 +176,7 @@ private:
 			wasmP = results[0].of.i64;
 		}
 		
-		auto *wasmBytes = (char *)(wasmtime_memory_data(context, &memory) + wasmP);
+		auto *wasmBytes = (char *)(wclap.wasmMemory(wasmP));
 		for (size_t i = 0; i < bytes; ++i) {
 			wasmBytes[i] = str[i];
 		}

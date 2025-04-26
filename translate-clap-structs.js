@@ -313,6 +313,9 @@ ${arrayIndent}		translate->assignNativeToWasm<${field.type}>(native.${field.name
 		});
 	}
 
+	// (void *) in WASM gets mapped to (WasmPointerUnknown *) disguised as (void *)
+	addCustomDirect("const void *", false, wasmPointerSize);
+
 	addDirect("uint8_t", 1);
 	addDirect("uint16_t", 2);
 	addDirect("uint32_t", 4);
@@ -328,11 +331,7 @@ ${arrayIndent}		translate->assignNativeToWasm<${field.type}>(native.${field.name
 	addDirect("char", 1); // will be aliased, but we specifically want to catch `const char *` later
 	// Custom translation for this, because *we* know they're secretly strings
 	addCustomDirect("const char *", false, wasmPointerSize);
-
-	// We don't translate entry.h, because it contains .get_factory(), the one function which doesn't act as a method
-	// entry.h
-
-	addObjectType("clap_host_t", "host_data");
+	
 	addCustomField("clap_host_t", "get_extension");
 	addObjectType("clap_istream_t", "ctx", null);
 	addCustomField("clap_istream_t", "read");
@@ -372,6 +371,7 @@ ${arrayIndent}		translate->assignNativeToWasm<${field.type}>(native.${field.name
 	addCustomDirect("clap_host_t");
 	addCustomDirect("clap_plugin_t");
 	addFile("version.h");
+	addFile("entry.h");
 	addFile("plugin.h");
 	addFile("factory/plugin-factory.h");
 

@@ -60,7 +60,7 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 
 	auto *wclap = new Wclap(wclapDir ? wclapDir : "", presetDir ? presetDir : "", cacheDir ? cacheDir : "", varDir ? varDir : "", true);
 
-	wclap_error_message = wclap->setupWasmBytes((uint8_t *)wasmBytes.data(), wasmBytes.size());
+	wclap_error_message = wclap->initWasmBytes((uint8_t *)wasmBytes.data(), wasmBytes.size());
 	if (wclap_error_message) {
 		delete wclap;
 		return nullptr;
@@ -84,15 +84,13 @@ const clap_version_t * wclap_version(void *wclap) {
 		wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	auto scoped = ((Wclap *)wclap)->getThread();
-	return &scoped.thread.clapVersion;
+	return &((Wclap *)wclap)->translatedEntry.clap_version;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {
 		wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	auto scoped = ((Wclap *)wclap)->getThread();
-	return scoped.thread.getFactory(factory_id);
+	return ((Wclap *)wclap)->getFactory(factory_id);
 }
 

@@ -135,6 +135,7 @@ struct WclapTranslationScope {
 		*nativeWasmP = native;
 	}
 	
+	// For everything else, we use the translator templates
 	template<class V>
 	void assignWasmToNative(WasmP wasmP, V &native) {
 		TranslateStruct<V>::assignWasmToNative(this, wasmP, native);
@@ -219,6 +220,7 @@ struct WclapTranslationScope {
 	//---------- custom translators for specific types ----------//
 
 	void assignWasmToNative_t(WasmP wasmP, const void * &native) {
+		LOG_EXPR("assignWasmToNative_t: const void *");
 		auto *nativeUnknown = (WasmPointerUnknown *)temporaryNativeBytes(sizeof(WasmPointerUnknown), alignof(WasmPointerUnknown));
 		nativeUnknown->wasmP = wasmP;
 		native = nativeUnknown;

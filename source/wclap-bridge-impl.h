@@ -95,6 +95,11 @@ private:
 	clap_plugin_factory nativePluginFactory;
 	std::unique_ptr<WclapTranslationScope<false>> entryTranslationScope32;
 	std::unique_ptr<WclapTranslationScope<true>> entryTranslationScope64;
+	std::vector<std::unique_ptr<WclapTranslationScope<false>>> poolTranslationScope32;
+	std::vector<std::unique_ptr<WclapTranslationScope<true>>> poolTranslationScope64;
+	
+	void returnToPool(std::unique_ptr<WclapTranslationScope<false>> &ptr);
+	void returnToPool(std::unique_ptr<WclapTranslationScope<true>> &ptr);
 
 	mutable std::shared_mutex mutex;
 	// Scoped lock suitable for reading the thread map

@@ -156,14 +156,19 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		auto wasmP = scoped.thread.clapEntryP64;
 		if (wasm64) {
 			entryTranslationScope64 = std::unique_ptr<WclapTranslationScope<true>>{
-				new WclapTranslationScope<true>(*this, 0)
+				new WclapTranslationScope<true>(*this, scoped.thread)
 			};
+			LOG_EXPR(entryTranslationScope64);
 			entryTranslationScope64->assignWasmToNative(wasmP, translatedEntry);
 		} else {
 			entryTranslationScope32 = std::unique_ptr<WclapTranslationScope<false>>{
-				new WclapTranslationScope<false>(*this, 0)
+				new WclapTranslationScope<false>(*this, scoped.thread)
 			};
+			LOG_EXPR(entryTranslationScope32);
 			entryTranslationScope32->assignWasmToNative((uint32_t)wasmP, translatedEntry);
+			LOG_EXPR(translatedEntry.clap_version.major);
+			LOG_EXPR(translatedEntry.clap_version.minor);
+			LOG_EXPR(translatedEntry.clap_version.revision);
 		}
 		
 		// TODO: check version compatibility, use minimum of plugin/bridge version

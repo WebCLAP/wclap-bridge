@@ -10,6 +10,9 @@
 
 struct Wclap;
 
+template<bool use64>
+struct WclapTranslationScope;
+
 template<class NativeClapStruct>
 struct Wclap32TranslateStruct;
 template<class NativeClapStruct>
@@ -30,26 +33,12 @@ struct WclapTranslationScope {
 	static constexpr size_t arenaBytes = 65536;
 
 	Wclap &wclap;
-	WasmP wasmObjectP; // WASM object whose lifetime this scope is tied to
-	WasmP wasmPointerToThis; // If we point WASM context fields to here, we can find this
 	
-	WclapTranslationScope(Wclap &wclap, WasmP wasmObjectP) : wclap(wclap), wasmObjectP(wasmObjectP) {
+	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
 		nativeArena = nativeTmpStartP = nativeTmpP = (unsigned char *)malloc(arenaBytes);
-LOG_EXPR(nativeArena);
-//		wasmArena = wasmTmpStartP = wasmTmpP = wasm_malloc(arenaBytes);
-wasmArena = wasmTmpStartP = wasmTmpP = 0;
-abort();
-
-		if (wasmObjectP) {
-			wasmPointerToThis = temporaryWasmBytes(sizeof(this), alignof(decltype(this)));
-			*(WclapTranslationScope **)nativeInWasm(wasmPointerToThis) = this;
-			commitWasm();
-		}
-	}
-	
-	// Should only happen when the WASM instance is destroyed - otherwise it should be returned to a pool (since we can't free the arena memory)
-	void wasmReadyToDestroy() {
-		_wasmReadyToDestroy = true;
+		wasmArena = wasmTmpStartP = wasmTmpP = currentThread.wasmMalloc(arenaBytes);
+		LOG_EXPR(nativeArena);
+		LOG_EXPR(wasmArena);
 	}
 	~WclapTranslationScope() {
 		if (!_wasmReadyToDestroy) {
@@ -57,6 +46,34 @@ abort();
 			abort();
 		}
 		free(nativeArena);
+	}
+	
+	void * nativeObject = nullptr; // Native object
+	WasmP wasmObjectP = 0; // WASM object whose lifetime this scope is tied to
+	WasmP wasmPointerToThis = 0; // If we point WASM context fields to here, we can find this
+
+	template<class NativeStruct>
+	NativeStruct * bindToWasmObject(WasmP wasmP) {
+		wasmObjectP = wasmP;
+
+		wasmPointerToThis = temporaryWasmBytes(sizeof(this), alignof(decltype(this)));
+		*(WclapTranslationScope **)nativeInWasm(wasmPointerToThis) = this;
+		commitWasm();
+		
+		nativeObject = temporaryNativeBytes(sizeof(NativeStruct), alignof(NativeStruct));
+		return (NativeStruct *)nativeObject;
+	}
+
+	void unbindAndReset() {
+		nativeObject = nullptr;
+		wasmObjectP = wasmPointerToThis = 0;
+		nativeTmpP = nativeTmpStartP = nativeArena;
+		wasmTmpP = wasmTmpStartP = wasmArena;
+	}
+
+	// Should only happen when the WASM instance is destroyed - otherwise it should be returned to a pool (since we can't free the arena memory)
+	void wasmReadyToDestroy() {
+		_wasmReadyToDestroy = true;
 	}
 	
 	void * nativeInWasm(WasmP wasmP) {
@@ -77,6 +94,8 @@ abort();
 		void *result = nativeTmpP;
 		nativeTmpP += size;
 		if (nativeTmpP > nativeTmpStartP + arenaBytes) {
+			LOG_EXPR(nativeTmpStartP + arenaBytes);
+			LOG_EXPR(nativeTmpP);
 			abort(); // TODO: grow list of arenas
 		}
 		return result;
@@ -102,6 +121,8 @@ abort();
 		wasmTmpStartP = wasmTmpP;
 	}
 
+	//---------- The main two categories of translators: simple or generated ----------//
+
 	// These get called for types which map directly between WASM/native
 	template<class V>
 	void assignWasmToNativeDirect(WasmP wasmP, V &native) {
@@ -115,9 +136,13 @@ abort();
 	}
 	
 	template<class V>
-	void assignWasmToNative(WasmP wasmP, V &native);
+	void assignWasmToNative(WasmP wasmP, V &native) {
+		TranslateStruct<V>::assignWasmToNative(this, wasmP, native);
+	}
 	template<class V>
-	void assignNativeToWasm(const V &native, WasmP wasmP);
+	void assignNativeToWasm(const V &native, WasmP wasmP) {
+		TranslateStruct<V>::assignNativeToWasm(this, native, wasmP);
+	}
 
 	//---------- translators for function types ----------//
 
@@ -193,18 +218,18 @@ abort();
 
 	//---------- custom translators for specific types ----------//
 
-	void assignWasmToNative(WasmP wasmP, const void * &native) {
+	void assignWasmToNative_t(WasmP wasmP, const void * &native) {
 		auto *nativeUnknown = (WasmPointerUnknown *)temporaryNativeBytes(sizeof(WasmPointerUnknown), alignof(WasmPointerUnknown));
 		nativeUnknown->wasmP = wasmP;
 		native = nativeUnknown;
 	}
-	void assignNativeToWasm(const void * const &native, WasmP wasmP) {
+	void assignNativeToWasm_t(const void * const &native, WasmP wasmP) {
 		auto *nativeUnknown = (WasmPointerUnknown *)native;
 		auto &wasmVoidPointer = *(WasmP *)nativeInWasm(wasmP);
 		wasmVoidPointer = (WasmP)nativeUnknown->wasmP; // WasmPointerUnknown always holds 64-bit, but it could be only 32
 	}
 
-	void assignWasmToNative(WasmP wasmP, const char * &native) {
+	void assignWasmToNative_t(WasmP wasmP, const char * &native) {
 		auto wasmString = *(WasmP *)nativeInWasm(wasmP);
 		
 		if (!wasmString) {
@@ -213,7 +238,7 @@ abort();
 			native = (const char *)nativeInWasm(wasmString);
 		}
 	}
-	void assignNativeToWasm(const char * const &native, WasmP wasmP) {
+	void assignNativeToWasm_t(const char * const &native, WasmP wasmP) {
 		auto &wasmString = *(WasmP *)nativeInWasm(wasmP);
 		
 		if (!native) {
@@ -282,6 +307,28 @@ abort();
 	}
 private:
 	bool _wasmReadyToDestroy = false;
+};
+
+// Default translator bounces back to `WclapTranslationScope::assign???_t()` for explicit custom translation
+template<class NativeClapStruct>
+struct Wclap32TranslateStruct {
+	using WasmP = uint32_t;
+	static void assignWasmToNative(WclapTranslationScope<false> *translate, WasmP wasmP, NativeClapStruct &native) {
+		translate->assignWasmToNative_t(wasmP, native);
+	}
+	static void assignNativeToWasm(WclapTranslationScope<false> *translate, NativeClapStruct const &native, WasmP wasmP) {
+		translate->assignNativeToWasm_t(native, wasmP);
+	}
+};
+template<class NativeClapStruct>
+struct Wclap64TranslateStruct {
+	using WasmP = uint64_t;
+	static void assignWasmToNative(WclapTranslationScope<true> *translate, WasmP wasmP, NativeClapStruct &native) {
+		translate->assignWasmToNative_t(wasmP, native);
+	}
+	static void assignNativeToWasm(WclapTranslationScope<true> *translate, NativeClapStruct const &native, WasmP wasmP) {
+		translate->assignNativeToWasm_t(native, wasmP);
+	}
 };
 
 // Auto-generated struct translation

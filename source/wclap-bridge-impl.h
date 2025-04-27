@@ -150,10 +150,8 @@ struct WclapThread {
 	static char typeCode(const wasm_valtype_t *t) {
 		return typeCode(wasm_valtype_kind(t));
 	}
-	
-private:
-	uint64_t copyStringConstantToWasm(const char *str) {
-		size_t bytes = std::strlen(str) + 1;
+
+	uint64_t wasmMalloc(size_t bytes) {
 		uint64_t wasmP;
 		
 		wasmtime_val_t args[1];
@@ -170,12 +168,19 @@ private:
 		if (trap) return 0;
 		if (wclap.wasm64) {
 			if (results[0].kind != WASMTIME_I64) return 0;
-			wasmP = results[0].of.i32;
+			return results[0].of.i32;
 		} else {
 			if (results[0].kind != WASMTIME_I32) return 0;
-			wasmP = results[0].of.i64;
+			return results[0].of.i64;
 		}
-		
+	}
+	
+private:
+	uint64_t copyStringConstantToWasm(const char *str) {
+		size_t bytes = std::strlen(str) + 1;
+		uint64_t wasmP = wasmMalloc(bytes);
+		if (!wasmP) return wasmP;
+
 		auto *wasmBytes = (char *)(wclap.wasmMemory(wasmP));
 		for (size_t i = 0; i < bytes; ++i) {
 			wasmBytes[i] = str[i];

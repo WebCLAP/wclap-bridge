@@ -85,12 +85,11 @@ struct Wclap {
 	// The current native thread is shutting down - remove it from our map
 	void removeThread();
 
-	bool initSuccess = false;
-	clap_plugin_entry translatedEntry;
-
 	const void * getFactory(const char *factory_id);
-
+	
 private:
+	bool initSuccess = false;
+
 	bool hasPluginFactory = false;
 	clap_plugin_factory nativePluginFactory;
 	std::unique_ptr<WclapTranslationScope<false>> entryTranslationScope32;
@@ -128,7 +127,7 @@ struct WclapThread {
 	wasm_trap_t *trap = nullptr;
 	wasmtime_memory_t memory;
 	wasmtime_table_t functionTable;
-	wasmtime_func_t mallocFunc;
+	wasmtime_func_t mallocFunc; // direct export
 
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	wasmtime_instance_t instance;
@@ -166,26 +165,130 @@ struct WclapThread {
 			args[0].of.i64 = bytes;
 		} else {
 			args[0].kind = WASMTIME_I32;
-			args[0].of.i32 = bytes;
+			args[0].of.i32 = (uint32_t)bytes;
 		}
 		
-		wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
+		error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
+		if (error) return 0;
 		if (trap) return 0;
 		if (wclap.wasm64) {
 			if (results[0].kind != WASMTIME_I64) return 0;
-			return results[0].of.i32;
+			return results[0].of.i64;
 		} else {
 			if (results[0].kind != WASMTIME_I32) return 0;
-			return results[0].of.i64;
+			return results[0].of.i32;
 		}
 	}
-	
+
+	const char * entryInit() {
+		uint64_t funcIndex;
+		if (wclap.wasm64) {
+			auto *wasmEntry = (WasmClapEntry64 *)wclap.wasmMemory(clapEntryP64);
+			wclap.clapVersion = wasmEntry->clap_version;
+			funcIndex = wasmEntry->init;
+		} else {
+			auto *wasmEntry = (WasmClapEntry32 *)wclap.wasmMemory(clapEntryP64);
+			wclap.clapVersion = wasmEntry->clap_version;
+			funcIndex = wasmEntry->init;
+		}
+
+		LOG_EXPR(funcIndex);
+
+		wasmtime_val_t funcVal;
+		if (!wasmtime_table_get(context, &functionTable, funcIndex, &funcVal)) return "clap_entry.init doesn't resolve";
+		if (funcVal.kind != WASMTIME_FUNCREF) return "wtf"; // should never happen, since we checked the function table type
+
+		uint64_t pluginPath = copyStringConstantToWasm("/plugin/");
+		if (!pluginPath) return "failed to copy string into WASM";
+
+		wasmtime_val_t args[1], results[1];
+		if (wclap.wasm64) {
+			args[0].kind = WASMTIME_I64;
+			args[0].of.i64 = pluginPath;
+		} else {
+			args[0].kind = WASMTIME_I32;
+			args[0].of.i32 = (uint32_t)pluginPath;
+		}
+
+		LOG_EXPR((int)funcVal.kind);
+		wasmtime_func_call(context, &funcVal.of.funcref, args, 1, results, 1, &trap);
+		LOG_EXPR(trap);
+		if (trap) return "init() threw (trapped)";
+		if (!results[0].of.i32) { // bool, regardless of 32/64 bits
+			return "init() returned false";
+		}
+		return nullptr;
+	}
+
+	void entryDeinit() {
+		uint64_t funcIndex;
+		if (wclap.wasm64) {
+			auto *wasmEntry = (WasmClapEntry64 *)wclap.wasmMemory(clapEntryP64);
+			funcIndex = wasmEntry->deinit;
+		} else {
+			auto *wasmEntry = (WasmClapEntry32 *)wclap.wasmMemory(clapEntryP64);
+			funcIndex = wasmEntry->deinit;
+		}
+
+		wasmtime_val_t funcVal;
+		if (!wasmtime_table_get(context, &functionTable, funcIndex, &funcVal)) return;
+		if (funcVal.kind != WASMTIME_FUNCREF) return;
+
+		// We completely ignore this result
+		wasmtime_func_call(context, &funcVal.of.funcref, nullptr, 0, nullptr, 0, &trap);
+	}
+
+	uint64_t entryGetFactory(const char *factoryId) {
+		uint64_t funcIndex;
+		if (wclap.wasm64) {
+			auto *wasmEntry = (WasmClapEntry64 *)wclap.wasmMemory(clapEntryP64);
+			funcIndex = wasmEntry->get_factory;
+		} else {
+			auto *wasmEntry = (WasmClapEntry32 *)wclap.wasmMemory(clapEntryP64);
+			funcIndex = wasmEntry->get_factory;
+		}
+
+		wasmtime_val_t funcVal;
+		if (!wasmtime_table_get(context, &functionTable, funcIndex, &funcVal)) return 0;//"clap_entry.get_factory doesn't resolve";
+		if (funcVal.kind != WASMTIME_FUNCREF) return 0; // should never happen, since we checked the function table type
+
+		uint64_t wasmStr = copyStringConstantToWasm(factoryId);
+		if (!wasmStr) return 0;
+
+		wasmtime_val_t args[1], results[1];
+		if (wclap.wasm64) {
+			args[0].kind = WASMTIME_I64;
+			args[0].of.i64 = wasmStr;
+		} else {
+			args[0].kind = WASMTIME_I32;
+			args[0].of.i32 = (uint32_t)wasmStr;
+		}
+
+		error = wasmtime_func_call(context, &funcVal.of.funcref, args, 1, results, 1, &trap);
+		if (error) return 0;
+		if (trap) return 0; // "get_factory() threw (trapped)";
+		return (results[0].kind == WASMTIME_I64) ? results[0].of.i64 : results[0].of.i32;
+	}
+
 private:
+	struct WasmClapEntry64 {
+		clap_version_t clap_version;
+		uint64_t init;
+		uint64_t deinit;
+		uint64_t get_factory;
+	};
+	struct WasmClapEntry32 {
+		clap_version_t clap_version;
+		uint32_t init;
+		uint32_t deinit;
+		uint32_t get_factory;
+	};
+
 	uint64_t copyStringConstantToWasm(const char *str) {
 		size_t bytes = std::strlen(str) + 1;
 		uint64_t wasmP = wasmMalloc(bytes);
 		if (!wasmP) return wasmP;
-
+		
 		auto *wasmBytes = (char *)(wclap.wasmMemory(wasmP));
 		for (size_t i = 0; i < bytes; ++i) {
 			wasmBytes[i] = str[i];

@@ -37,7 +37,7 @@ struct WclapTranslationScope {
 	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
 		nativeArena = nativeTmpStartP = nativeTmpP = (unsigned char *)malloc(arenaBytes);
 		wasmArena = wasmTmpStartP = wasmTmpP = currentThread.wasmMalloc(arenaBytes);
-		LOG_EXPR(nativeArena);
+		LOG_EXPR((void *)nativeArena);
 		LOG_EXPR(wasmArena);
 	}
 	~WclapTranslationScope() {

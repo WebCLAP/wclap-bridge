@@ -371,9 +371,11 @@ ${arrayIndent}		translate->assignNativeToWasm<${field.type}>(native.${field.name
 	addCustomDirect("clap_host_t");
 	addCustomDirect("clap_plugin_t");
 	addFile("version.h");
-	addFile("entry.h");
 	addFile("plugin.h");
 	addFile("factory/plugin-factory.h");
+
+	// ENTRY.H
+	// We specifically *don't* translate clap_entry, because get_factory() it contains the only functions which don't act as methods (taking an object pointer as first argument)
 
 	/*
 	addFile("fixedpoint.h");

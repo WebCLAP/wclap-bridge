@@ -49,7 +49,8 @@ Wclap::Wclap(const std::string &wclapDir, const std::string &presetDir, const st
 
 Wclap::~Wclap() {
 	if (initSuccess) {
-		if (translatedEntry.deinit) translatedEntry.deinit();
+		auto scoped = getThread();
+		scoped.thread.entryDeinit();
 	}
 
 	{ // Lock while we clear all the threads
@@ -160,24 +161,22 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	
 	{
 		auto scoped = getThread();
-		auto wasmP = scoped.thread.clapEntryP64;
+
 		if (wasm64) {
 			entryTranslationScope64 = std::unique_ptr<WclapTranslationScope<true>>{
 				new WclapTranslationScope<true>(*this, scoped.thread)
 			};
-			entryTranslationScope64->assignWasmToNative(wasmP, translatedEntry);
 		} else {
 			entryTranslationScope32 = std::unique_ptr<WclapTranslationScope<false>>{
 				new WclapTranslationScope<false>(*this, scoped.thread)
 			};
-			entryTranslationScope32->assignWasmToNative((uint32_t)wasmP, translatedEntry);
 		}
 		
 		// TODO: check version compatibility, use minimum of plugin/bridge version
-
-		if (!translatedEntry.init) return "clap_entry.init = 0";
-		initSuccess = translatedEntry.init("/plugin/");
-		if (!initSuccess) return "init() failed";
+		
+		const char *errorMessage = scoped.thread.entryInit();
+		initSuccess = !errorMessage;
+		return errorMessage;
 	}
 
 	return nullptr;
@@ -223,21 +222,17 @@ void Wclap::removeThread() {
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
-	if (!translatedEntry.get_factory) return "clap_entry.get_factory = 0";
 	if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
 		LOG_EXPR(hasPluginFactory);
 		if (!hasPluginFactory) {
-			// Since it's an unknown void (and we have to know what to cast it to), it's translated to this wrapper object
-			auto *unknown = (WasmPointerUnknown *)translatedEntry.get_factory(factory_id);
-			
-			LOG_EXPR(factory_id);
-			LOG_EXPR(unknown);
-			LOG_EXPR(unknown->wasmP);
+			auto scoped = getThread();
+			auto wasmP = scoped.thread.entryGetFactory(factory_id);
+			if (!wasmP) return nullptr;
 			if (wasm64) {
-				entryTranslationScope64->assignWasmToNative(unknown->wasmP, nativePluginFactory);
+				entryTranslationScope64->assignWasmToNative(wasmP, nativePluginFactory);
 				entryTranslationScope64->commitNative(); // assigned object needs to be persistent
 			} else {
-				entryTranslationScope32->assignWasmToNative((uint32_t)unknown->wasmP, nativePluginFactory);
+				entryTranslationScope32->assignWasmToNative((uint32_t)wasmP, nativePluginFactory);
 				entryTranslationScope32->commitNative(); // assigned object needs to be persistent
 			}
 			hasPluginFactory = true;

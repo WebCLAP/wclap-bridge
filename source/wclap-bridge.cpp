@@ -84,7 +84,7 @@ const clap_version_t * wclap_version(void *wclap) {
 		wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	return &((Wclap *)wclap)->translatedEntry.clap_version;
+	return &((Wclap *)wclap)->clapVersion;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {

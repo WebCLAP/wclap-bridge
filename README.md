@@ -74,12 +74,8 @@ When making a WASM proxy for a native struct, we fill that pointer to a support 
 
 * a (native) pointer to the equivalent native struct
 
-When translating any function 
+All possible API functions are bound to the WASM instance directly after initialisation, and the indices are checked (to be the same across thread instances).
 
-### Sandboxed WASI
+## Known issues
 
-This repo includes an extremely incomplete `wasi_snapshot_preview1` implementation, and functions are only being added when one of our WCLAPs needs them.
-
-**⚠️ I am not an infosec professional, so don't use this with untrusted code without a proper review by someone more qualified.  I have based it on Wasmtime's `preview1.rs` implementation where possible.**
-
-Although a generic sandboxed WASI implementation seems like a sensible thing to exist, the existing sandboxed implementations (Wasmer/Wasmtime) are tightly coupled to their WASM engines, and the others I've found (uvwasi, Wasm3's `m3_api_wasi.c`) aren't sandboxed. 
+There are a few `abort()` calls, some of which get called if the WASM instance throws an error.  These should instead put the `Wclap` in some failure state so no further calls are attempted but cleanup still works.

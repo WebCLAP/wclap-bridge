@@ -17,6 +17,8 @@ struct WclapThread;
 
 template<bool use64>
 struct WclapTranslationScope;
+template<bool use64>
+struct WclapTranslator;
 
 static bool nameEquals(const wasm_name_t *name, const char *cName) {
 	if (name->size != std::strlen(cName)) return false;
@@ -87,11 +89,16 @@ struct Wclap {
 
 	const void * getFactory(const char *factory_id);
 	
+	template<bool use64>
+	WclapTranslator<use64> & translator();
 private:
 	bool initSuccess = false;
 
 	bool hasPluginFactory = false;
 	clap_plugin_factory nativePluginFactory;
+	
+	std::unique_ptr<WclapTranslator<false>> translator32;
+	std::unique_ptr<WclapTranslator<true>> translator64;
 	std::unique_ptr<WclapTranslationScope<false>> entryTranslationScope32;
 	std::unique_ptr<WclapTranslationScope<true>> entryTranslationScope64;
 	std::vector<std::unique_ptr<WclapTranslationScope<false>>> poolTranslationScope32;

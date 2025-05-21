@@ -7,21 +7,32 @@
 #include "wasmtime.h"
 
 #include <type_traits>
+#include <unordered_map>
 
 struct Wclap;
 
 template<bool use64>
 struct WclapTranslationScope;
 
+template<class T>
+struct WclapLifetimeStruct : public T {
+	using T::T;
+
+	void *wclapTranslationScope = nullptr;
+};
+
 template<class NativeClapStruct>
 struct Wclap32TranslateStruct;
 template<class NativeClapStruct>
 struct Wclap64TranslateStruct;
 
-// A WASM pointer to an unknown type - this is what (void *) should map to
+// A WASM pointer to an unknown type - this is what (void *) should map to when querying extensions or storing parameter cookies
 struct WasmPointerUnknown {
 	uint64_t wasmP;
 };
+
+template<bool use64>
+struct WclapTranslator;
 
 template<bool use64>
 struct WclapTranslationScope {
@@ -135,86 +146,14 @@ struct WclapTranslationScope {
 		*nativeWasmP = native;
 	}
 	
-	// For everything else, we use the translator templates
+	// For everything else, we use the struct translators
 	template<class V>
 	void assignWasmToNative(WasmP wasmP, V &native) {
-		TranslateStruct<V>::assignWasmToNative(this, wasmP, native);
+		wclap.translator<use64>().assignWasmToNative(this, wasmP, native);
 	}
 	template<class V>
 	void assignNativeToWasm(const V &native, WasmP wasmP) {
-		TranslateStruct<V>::assignNativeToWasm(this, native, wasmP);
-	}
-
-	//---------- translators for function types ----------//
-
-	void assignWasmToNative_v(WasmP wasmP, void(*&fnPointer)()) {
-		fnPointer = nullptr;
-	}
-	void assignNativeToWasm_v(void(* const &fnPointer)(), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1>
-	void assignWasmToNative_II(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1>
-	void assignNativeToWasm_II(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-	
-	template<class Return, class Arg1>
-	void assignWasmToNative_IL(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1>
-	void assignNativeToWasm_IL(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1>
-	void assignWasmToNative_LL(WasmP wasmP, Return(*&fnPointer)(Arg1)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1>
-	void assignNativeToWasm_LL(Return(* const &fnPointer)(Arg1), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1, class Arg2>
-	void assignWasmToNative_III(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1, class Arg2>
-	void assignNativeToWasm_III(Return(* const &fnPointer)(Arg1, Arg2), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1, class Arg2>
-	void assignWasmToNative_LLI(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1, class Arg2>
-	void assignNativeToWasm_LLI(Return(* const &fnPointer)(Arg1, Arg2), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignWasmToNative_IIII(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignNativeToWasm_IIII(Return(* const &fnPointer)(Arg1, Arg2, Arg3), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
-	}
-
-	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignWasmToNative_LLLL(WasmP wasmP, Return(*&fnPointer)(Arg1, Arg2, Arg3)) {
-		fnPointer = nullptr;
-	}
-	template<class Return, class Arg1, class Arg2, class Arg3>
-	void assignNativeToWasm_LLLL(Return(* const &fnPointer)(Arg1, Arg2, Arg3), WasmP wasmP) {
-		valueInWasm<WasmP>(wasmP) = 0;
+		wclap.translator<use64>().assignNativeToWasm(this, native, wasmP);
 	}
 
 	//---------- custom translators for specific types ----------//
@@ -226,6 +165,7 @@ struct WclapTranslationScope {
 		native = nativeUnknown;
 	}
 	void assignNativeToWasm_t(const void * const &native, WasmP wasmP) {
+		LOG_EXPR("assignNativeToWasm_t: const void *");
 		auto *nativeUnknown = (WasmPointerUnknown *)native;
 		auto &wasmVoidPointer = *(WasmP *)nativeInWasm(wasmP);
 		wasmVoidPointer = (WasmP)nativeUnknown->wasmP; // WasmPointerUnknown always holds 64-bit, but it could be only 32

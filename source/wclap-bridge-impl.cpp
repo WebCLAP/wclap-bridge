@@ -207,6 +207,18 @@ Wclap::ScopedThread Wclap::getThread() {
 		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
 	}
 	threadMap[std::this_thread::get_id()] = std::unique_ptr<WclapThread>{wclapThread};
+	
+	// Register all methods
+	if (wclapThread->wclap.use64) {
+		errorMessage = wclapThread->registerMethods<true>();
+	} else {
+		errorMessage = wclapThread->registerMethods<false>();
+	}
+	if (errorMessage) {
+		LOG_EXPR(errorMessage);
+		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
+	}
+	
 	return {*wclapThread};
 }
 
@@ -241,6 +253,22 @@ const void * Wclap::getFactory(const char *factory_id) {
 	}
 	LOG_EXPR(factory_id);
 	return nullptr;
+}
+
+template<>
+Wclap::WclapTranslator<false> & translator() {
+	if (!translator32) {
+		translator32 = std::unique_ptr(new WclapTranslator<false>());
+	}
+	return *translator32;
+}
+
+template<>
+Wclap::WclapTranslator<true> & translator<true>() {
+	if (!translator64) {
+		translator64 = std::unique_ptr(new WclapTranslator<true>());
+	}
+	return *translator64;
 }
 
 void Wclap::returnToPool(std::unique_ptr<WclapTranslationScope<false>> &ptr) {

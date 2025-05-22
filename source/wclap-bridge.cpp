@@ -3,9 +3,9 @@
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 #endif
 
-#include "./wclap-bridge-impl.h"
-
 #include "wclap-bridge.h"
+
+#include "./wclap.h"
 
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;

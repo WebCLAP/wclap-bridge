@@ -9,16 +9,13 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "./wclap-translation-scope.h"
+
 extern wasm_engine_t *global_wasm_engine;
 extern const char *wclap_error_message;
 
 struct Wclap;
 struct WclapThread;
-
-template<bool use64>
-struct WclapTranslationScope;
-template<bool use64>
-struct WclapTranslator;
 
 static bool nameEquals(const wasm_name_t *name, const char *cName) {
 	if (name->size != std::strlen(cName)) return false;
@@ -28,6 +25,7 @@ static bool nameEquals(const wasm_name_t *name, const char *cName) {
 	return true;
 }
 
+// This is bound to a particular thread, and tracks every currently-instantiated Wclap which has ever used that thread
 struct WclapThreadContext {
 	WclapThreadContext() {}
 	WclapThreadContext(const WclapThreadContext &other) = delete;
@@ -88,24 +86,17 @@ struct Wclap {
 	void removeThread();
 
 	const void * getFactory(const char *factory_id);
-	
-	template<bool use64>
-	WclapTranslator<use64> & translator();
 private:
 	bool initSuccess = false;
 
 	bool hasPluginFactory = false;
 	clap_plugin_factory nativePluginFactory;
 	
-	std::unique_ptr<WclapTranslator<false>> translator32;
-	std::unique_ptr<WclapTranslator<true>> translator64;
-	std::unique_ptr<WclapTranslationScope<false>> entryTranslationScope32;
-	std::unique_ptr<WclapTranslationScope<true>> entryTranslationScope64;
-	std::vector<std::unique_ptr<WclapTranslationScope<false>>> poolTranslationScope32;
-	std::vector<std::unique_ptr<WclapTranslationScope<true>>> poolTranslationScope64;
+	std::unique_ptr<wclap::WclapMethods> methods32;
+	std::unique_ptr<wclap::WclapTranslationScope> entryTranslationScope32;
+	std::vector<std::unique_ptr<wclap::WclapTranslationScope>> poolTranslationScope32;
 	
-	void returnToPool(std::unique_ptr<WclapTranslationScope<false>> &ptr);
-	void returnToPool(std::unique_ptr<WclapTranslationScope<true>> &ptr);
+	void returnToPool(std::unique_ptr<wclap::WclapTranslationScope> &ptr);
 
 	mutable std::shared_mutex mutex;
 	// Scoped lock suitable for reading the thread map
@@ -119,6 +110,8 @@ private:
 	std::unordered_map<std::thread::id, std::unique_ptr<WclapThread>> threadMap;
 };
 
+// Since WASM is single-threaded, we currently give the Wclap an instance on each thread, but sharing the same memory.
+// TODO: there are *some* guarantees from CLAP, like not being simultaneously called by two audio threads, so perhaps we could have one dedicated audio-thread instance, and then a pool (which we try_lock() until we succeed or create a new one) used from any other (blockable) threads.  This would be simpler (and mean fewer threads overall) but it's something to look at once we've implemented the "thread-check" extension.
 struct WclapThread {
 	Wclap &wclap;
 	WclapThreadContext *threadContext;
@@ -139,14 +132,12 @@ struct WclapThread {
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	wasmtime_instance_t instance;
 	
-	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {
-	
-	}
+	WclapThread(Wclap &wclap, WclapThreadContext *threadContext) : wclap(wclap), threadContext(threadContext) {}
 
 	// destructor is the only method allowed to be called from outside the assigned thread
 	~WclapThread();
 	
-	const char * startInstance();
+	const char * startInstance(wasm::wasm32::WclapMethods &);
 	
 	static char typeCode(wasm_valkind_t k) {
 		if (k < 4) {

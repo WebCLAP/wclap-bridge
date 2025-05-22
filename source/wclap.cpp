@@ -3,7 +3,7 @@
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 #endif
 
-#include "./wclap-bridge-impl.h"
+#include "./wclap.h"
 #include "./wclap-translation-scope.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
@@ -61,9 +61,7 @@ Wclap::~Wclap() {
 	
 	// As a sanity-check, the translation scopes will abort() if they aren't told that the WCLAP is closing
 	if (entryTranslationScope32) entryTranslationScope32->wasmReadyToDestroy();
-	if (entryTranslationScope64) entryTranslationScope64->wasmReadyToDestroy();
 	for (auto &t : poolTranslationScope32) t->wasmReadyToDestroy();
-	for (auto &t : poolTranslationScope64) t->wasmReadyToDestroy();
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -148,11 +146,19 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		wasm_importtype_vec_delete(&importTypes);
 	}
 	
+	if (wasm64) {
+		return "64-bit WASM not currently supported";
+	} else {
+		methods32 = std::unique_ptr<wasm::wasm32::WclapMethods>{
+			new wasm::wasm32::WclapMethods()
+		};
+	}
+	
 	LOG_EXPR(wasm64);
 	if (!sharedMemory) {
 		auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
 		auto lock = writeLock();
-		auto *errorMessage = wclapThread->startInstance();
+		auto *errorMessage = wclapThread->startInstance(*methods32);
 		if (errorMessage) return errorMessage;
 		singleThread = std::unique_ptr<WclapThread>(wclapThread);
 	}
@@ -163,12 +169,10 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		auto scoped = getThread();
 
 		if (wasm64) {
-			entryTranslationScope64 = std::unique_ptr<WclapTranslationScope<true>>{
-				new WclapTranslationScope<true>(*this, scoped.thread)
-			};
+			return "64-bit WASM not currently supported";
 		} else {
-			entryTranslationScope32 = std::unique_ptr<WclapTranslationScope<false>>{
-				new WclapTranslationScope<false>(*this, scoped.thread)
+			entryTranslationScope32 = std::unique_ptr<wasm::wasm32::WclapTranslationScope>{
+				new wasm::wasm32::WclapTranslationScope(*this, scoped.thread)
 			};
 		}
 		
@@ -201,7 +205,12 @@ Wclap::ScopedThread Wclap::getThread() {
 
 	auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
 	auto lock = writeLock();
-	auto *errorMessage = wclapThread->startInstance();
+	const char *errorMessage;
+	if (wasm64) {
+		errorMessage = "64-bit not supported (yet)";
+	} else {
+		errorMessage = wclapThread->startInstance(*methods32);
+	}
 	if (errorMessage) {
 		LOG_EXPR(errorMessage);
 		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
@@ -255,34 +264,15 @@ const void * Wclap::getFactory(const char *factory_id) {
 	return nullptr;
 }
 
-template<>
-Wclap::WclapTranslator<false> & translator() {
-	if (!translator32) {
-		translator32 = std::unique_ptr(new WclapTranslator<false>());
-	}
-	return *translator32;
-}
-
-template<>
-Wclap::WclapTranslator<true> & translator<true>() {
-	if (!translator64) {
-		translator64 = std::unique_ptr(new WclapTranslator<true>());
-	}
-	return *translator64;
-}
-
-void Wclap::returnToPool(std::unique_ptr<WclapTranslationScope<false>> &ptr) {
+void Wclap::returnToPool(std::unique_ptr<wclap32::WclapTranslationScope> &ptr) {
 	ptr->unbindAndReset();
+	auto lock = writeLock();
 	poolTranslationScope32.emplace_back(std::move(ptr));
-}
-void Wclap::returnToPool(std::unique_ptr<WclapTranslationScope<true>> &ptr) {
-	ptr->unbindAndReset();
-	poolTranslationScope64.emplace_back(std::move(ptr));
 }
 
 //---------- Wclap Thread ----------//
 
-const char * WclapThread::startInstance() {
+const char * WclapThread::startInstance(wasm::wasm32::WclapMethods &methods) {
 	if (wasiConfig) return "startInstance() called twice";
 	
 	wasiConfig = wasi_config_new();
@@ -413,6 +403,8 @@ const char * WclapThread::startInstance() {
 		wasmtime_extern_delete(&item);
 		++exportIndex;
 	}
+	
+	methods.bind(
 
 	// Call the WASI entry-point `_initialize()` if it exists
 	if (wasmtime_instance_export_get(context, &instance, "_initialize", 11, &item)) {

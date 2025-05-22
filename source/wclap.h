@@ -92,11 +92,11 @@ private:
 	bool hasPluginFactory = false;
 	clap_plugin_factory nativePluginFactory;
 	
-	std::unique_ptr<wclap::WclapMethods> methods32;
-	std::unique_ptr<wclap::WclapTranslationScope> entryTranslationScope32;
-	std::vector<std::unique_ptr<wclap::WclapTranslationScope>> poolTranslationScope32;
+	std::unique_ptr<wclap::wclap32::WclapMethods> methods32;
+	std::unique_ptr<wclap::wclap32::WclapTranslationScope> entryTranslationScope32;
+	std::vector<std::unique_ptr<wclap::wclap32::WclapTranslationScope>> poolTranslationScope32;
 	
-	void returnToPool(std::unique_ptr<wclap::WclapTranslationScope> &ptr);
+	void returnToPool(std::unique_ptr<wclap::wclap32::WclapTranslationScope> &ptr);
 
 	mutable std::shared_mutex mutex;
 	// Scoped lock suitable for reading the thread map
@@ -137,7 +137,7 @@ struct WclapThread {
 	// destructor is the only method allowed to be called from outside the assigned thread
 	~WclapThread();
 	
-	const char * startInstance(wasm::wasm32::WclapMethods &);
+	const char * startInstance(wclap::wclap32::WclapMethods &);
 	
 	static char typeCode(wasm_valkind_t k) {
 		if (k < 4) {

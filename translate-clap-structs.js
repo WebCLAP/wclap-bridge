@@ -173,11 +173,13 @@ using WasmP = uint${bits}_t;`;
 					structType.compatible = false;
 				}
 			});
+			
+			let wclapClass = `w${name}`.replace(/_t$/, '');
 
 			if (structType.compatible) {
 				code += `
 
-using Wclap_${name} = ${name};`;
+using ${wclapClass} = ${name};`;
 
 			} else {
 				let nativeType = `${name}`;
@@ -186,12 +188,9 @@ using Wclap_${name} = ${name};`;
 				}
 				code += `
 
-class Wclap_${name} {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_${name}(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	`;
+struct ${wclapClass} : public WclapStructView {
+	using WclapStructView::WclapStructView;
+`;
 				structFields.forEach(field => {
 					let fieldType = getType(field.type);
 

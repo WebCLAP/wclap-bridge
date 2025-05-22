@@ -149,8 +149,8 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	if (wasm64) {
 		return "64-bit WASM not currently supported";
 	} else {
-		methods32 = std::unique_ptr<wasm::wasm32::WclapMethods>{
-			new wasm::wasm32::WclapMethods()
+		methods32 = std::unique_ptr<wclap::wclap32::WclapMethods>{
+			new wclap::wclap32::WclapMethods()
 		};
 	}
 	
@@ -171,8 +171,8 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		if (wasm64) {
 			return "64-bit WASM not currently supported";
 		} else {
-			entryTranslationScope32 = std::unique_ptr<wasm::wasm32::WclapTranslationScope>{
-				new wasm::wasm32::WclapTranslationScope(*this, scoped.thread)
+			entryTranslationScope32 = std::unique_ptr<wclap::wclap32::WclapTranslationScope>{
+				new wclap::wclap32::WclapTranslationScope(*this, scoped.thread, *methods32)
 			};
 		}
 		
@@ -217,12 +217,6 @@ Wclap::ScopedThread Wclap::getThread() {
 	}
 	threadMap[std::this_thread::get_id()] = std::unique_ptr<WclapThread>{wclapThread};
 	
-	// Register all methods
-	if (wclapThread->wclap.use64) {
-		errorMessage = wclapThread->registerMethods<true>();
-	} else {
-		errorMessage = wclapThread->registerMethods<false>();
-	}
 	if (errorMessage) {
 		LOG_EXPR(errorMessage);
 		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
@@ -243,6 +237,7 @@ void Wclap::removeThread() {
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
+	LOG_EXPR(factory_id);
 	if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
 		LOG_EXPR(hasPluginFactory);
 		if (!hasPluginFactory) {
@@ -250,8 +245,7 @@ const void * Wclap::getFactory(const char *factory_id) {
 			auto wasmP = scoped.thread.entryGetFactory(factory_id);
 			if (!wasmP) return nullptr;
 			if (wasm64) {
-				entryTranslationScope64->assignWasmToNative(wasmP, nativePluginFactory);
-				entryTranslationScope64->commitNative(); // assigned object needs to be persistent
+				return "64-bit not supported";
 			} else {
 				entryTranslationScope32->assignWasmToNative((uint32_t)wasmP, nativePluginFactory);
 				entryTranslationScope32->commitNative(); // assigned object needs to be persistent
@@ -260,11 +254,10 @@ const void * Wclap::getFactory(const char *factory_id) {
 		}
 		return &nativePluginFactory;
 	}
-	LOG_EXPR(factory_id);
 	return nullptr;
 }
 
-void Wclap::returnToPool(std::unique_ptr<wclap32::WclapTranslationScope> &ptr) {
+void Wclap::returnToPool(std::unique_ptr<wclap::wclap32::WclapTranslationScope> &ptr) {
 	ptr->unbindAndReset();
 	auto lock = writeLock();
 	poolTranslationScope32.emplace_back(std::move(ptr));
@@ -272,7 +265,7 @@ void Wclap::returnToPool(std::unique_ptr<wclap32::WclapTranslationScope> &ptr) {
 
 //---------- Wclap Thread ----------//
 
-const char * WclapThread::startInstance(wasm::wasm32::WclapMethods &methods) {
+const char * WclapThread::startInstance(wclap::wclap32::WclapMethods &methods) {
 	if (wasiConfig) return "startInstance() called twice";
 	
 	wasiConfig = wasi_config_new();
@@ -404,7 +397,7 @@ const char * WclapThread::startInstance(wasm::wasm32::WclapMethods &methods) {
 		++exportIndex;
 	}
 	
-	methods.bind(
+	//methods.bind([&](
 
 	// Call the WASI entry-point `_initialize()` if it exists
 	if (wasmtime_instance_export_get(context, &instance, "_initialize", 11, &item)) {

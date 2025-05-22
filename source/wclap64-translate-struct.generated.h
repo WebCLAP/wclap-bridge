@@ -3,14 +3,11 @@ namespace wclap { namespace wclap64 {
 
 using WasmP = uint64_t;
 
-using Wclap_clap_version_t = clap_version_t;
+using wclap_version = clap_version_t;
 
-class Wclap_clap_process_t {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_clap_process_t(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	
+struct wclap_process : public WclapStructView {
+	using WclapStructView::WclapStructView;
+
 	int64_t & steady_time() {
 		return *(int64_t *)pointerInWasm;
 	}
@@ -40,12 +37,9 @@ public:
 	}
 };
 
-class Wclap_clap_plugin_descriptor_t {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_clap_plugin_descriptor_t(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	
+struct wclap_plugin_descriptor : public WclapStructView {
+	using WclapStructView::WclapStructView;
+
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;
 	}
@@ -78,12 +72,9 @@ public:
 	}
 };
 
-class Wclap_clap_plugin_t {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_clap_plugin_t(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	
+struct wclap_plugin : public WclapStructView {
+	using WclapStructView::WclapStructView;
+
 	WasmP & desc() {
 		return *(WasmP *)pointerInWasm;
 	}
@@ -122,12 +113,9 @@ public:
 	}
 };
 
-class Wclap_clap_plugin_factory_t {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_clap_plugin_factory_t(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	
+struct wclap_plugin_factory : public WclapStructView {
+	using WclapStructView::WclapStructView;
+
 	WasmP & get_plugin_count() {
 		return *(WasmP *)pointerInWasm;
 	}
@@ -139,12 +127,9 @@ public:
 	}
 };
 
-class Wclap_clap_plugin_entry_t {
-	unsigned char *pointerInWasm;
-	WclapTranslationScope &translationScope;
-public:
-	Wclap_clap_plugin_entry_t(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
-	
+struct wclap_plugin_entry : public WclapStructView {
+	using WclapStructView::WclapStructView;
+
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;
 	}

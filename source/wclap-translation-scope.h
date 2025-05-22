@@ -8,6 +8,15 @@
 // 32-bit only (for now)
 namespace wclap { namespace wclap32 {
 	struct WclapTranslationScope;
+	
+	class WclapStructView {
+	protected:
+		unsigned char *pointerInWasm;
+		WclapTranslationScope &translationScope;
+	public:
+		WclapStructView(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
+	};
+
 }}
 #include "clap/all.h"
 #include "./wclap32-translate-struct.generated.h"
@@ -20,11 +29,23 @@ struct WclapThread;
 
 namespace wclap {namespace wclap32 {
 
-struct WasmPointerUnknown {
-	WasmP wasmP;
+struct WclapContext {
+	WasmP wasmP = 0;
+	Wclap *wclap = nullptr;
+};
+
+template<class ClapStruct>
+struct ClapStructWithContext : public ClapStruct {
+	using ClapStruct::ClapStruct;
+	WclapContext wclapContext;
 };
 
 struct WclapMethods {
+	struct {
+		static uint32_t get_plugin_count(const struct clap_plugin_factory *factory) {
+			
+		}
+	} plugin_factory;
 };
 
 /* Manages function calls and translating values across the boundary.
@@ -37,8 +58,9 @@ struct WclapTranslationScope {
 	static constexpr size_t arenaBytes = 65536;
 
 	Wclap &wclap;
+	WclapMethods &methods;
 	
-	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread);
+	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread, WclapMethods &methods);
 	~WclapTranslationScope();
 	
 	void * nativeObject = nullptr; // Native object
@@ -68,8 +90,6 @@ struct WclapTranslationScope {
 	void wasmReadyToDestroy() {
 		_wasmReadyToDestroy = true;
 	}
-	
-	void * nativeInWasm(WasmP wasmP);
 	
 	unsigned char *nativeArena, *nativeTmpStartP, *nativeTmpP;
 	void clearTemporaryNative() {
@@ -106,7 +126,25 @@ struct WclapTranslationScope {
 	void commitWasm() {
 		wasmTmpStartP = wasmTmpP;
 	}
+	
+	template<class AutoTranslatedStruct>
+	AutoTranslatedStruct get(WasmP wasmP) {
+		return WclapStruct(nativeInWasm(wasmP), *this);
+	}
 
+	void assignWasmToNative(WasmP wasmP, ClapStructWithContext<clap_plugin_factory> &native) {
+		LOG_EXPR("assignWasmToNative: clap_plugin_factory");
+
+		// extra info so we can find ourselves again - usually this would be in a struct pointed to by the `void *` context pointer
+		native.wclapContext = {wasmP, &wclap};
+		
+		//auto wasmFactory = get<wclap_plugin_factory>(wasmP);
+		native.get_plugin_count = methods.plugin_factory.get_plugin_count;
+		native.get_plugin_descriptor = methods.plugin_factory.get_plugin_descriptor;
+		native.create_plugin = methods.plugin_factory.create_plugin;
+	}
+
+	/*
 	//---------- The main two categories of translators: simple or generated ----------//
 
 	template<class T>
@@ -192,7 +230,10 @@ struct WclapTranslationScope {
 		features[featureCount] = nullptr;
 		commitNative();
 	}
+	*/
 private:
+	unsigned char * nativeInWasm(WasmP wasmP);
+	
 	bool _wasmReadyToDestroy = false;
 };
 

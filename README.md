@@ -1,24 +1,47 @@
-# WCLAP C-API bridge
+# WCLAP Bridge
 
 This provides a bridge which loads a WCLAP (CLAP API compiled to `.wasm`) and provides a native CLAP interface, starting from `get_factory()`.
 
-It can be linked against any WASM engine which implements the [C API](https://github.com/WebAssembly/wasm-c-api).
+It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://docs.wasmtime.dev/c-api/index.html).  Alternative runtimes (for different speed/binary-size tradeoffs) and `wasm64` support are on the wishlist.
 
-## How to use it
+## What is a WCLAP
+
+A WCLAP is a CLAP plugin compiled to the `wasm32` architecture.  CLAP plugins are normally dynamic libraries (to be loaded into the host's address space), but WASM doesn't support that.  WCLAPs are therefore standalone, and must have the following imports:
+
+* export `clap_entry` - memory address for the entry struct.
+* at least one of:
+	* import `env`:`memory` - this must be shared memory (recommended, since it allows multi-threaded use)
+	* export `memory` - plugin will be single-threaded only (not recommended)
+* `malloc()` - accepts a size, returns a pointer
+
+The module is placed at the top level of the plugin folder, e.g. `my-plugin.wclap/module.wasm`.  The folder can also contain any other resources used by the plugin.  If made available HTTP, the plugin folder should be compressed as a `.tar.gz`, so that hosts have immediate (synchronous) access to all bundle resources.
+
+WCLAPs _may_ use WASI for sandboxed access to plugin resources.  From the plugin's perspective, it has the following paths (mapped through WASI to platform-appropriate storage):
+
+* `/plugin/` - the plugin folder, e.g. `my-plugin.wclap/`
+* `/presets/` - suitable for storing user presets, persistent and shared between instances of this WCLAP.  May be modified by the host to share/merge/reset the preset collection.
+* `/var/` - file storage for plugin use, persistent and shared between instances of this WCLAP.  Must not be modified by the host.
+* `/cache/` - temporary file storage for the plugin to avoid redundant work.  Ideally persistent (for performance) but may be deleted/emptied by the host while no instances of this WCLAP are active.
+
+## How to use the bridge
 
 It's only 7 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
 
 * `wclap_global_init()`: call only once, before any other API calls
 * `wclap_global_deinit()`: call at the end to clean up
-* `wclap_open()`: opens a WCLAP (including calling its `clap_entry->init()`), returning an opaque pointer
-* `wclap_open_with_dirs()`: opens a WCLAP, providing optional preset/cache/var directories
-* `wclap_close()`: closes a WCLAP (including calling its `clap_entry->deinit()`)
+* `wclap_open()`: opens a WCLAP (including calling its `clap_entry->init()`), returning an opaque pointer which is non-`NULL` on success
+* `wclap_open_with_dirs()`: opens a WCLAP, providing optional preset/cache/var directories for WASI
+* `wclap_close()`: closes a WCLAP (including calling its `clap_entry->deinit()`) which was _successfully_ opened using `wclap_open()`
 * `wclap_get_factory()`: returns a CLAP-compatible factory, if supported by the WCLAP and the bridge
 * `wclap_error()`: returns a `const char *` string for the latest API-call failure, or null pointer.
 
 The factories returned from `wclap_get_factory()` are equivalent to a native CLAP's `clap_entry.get_factory()`.
 
-The strings returned by `wclap_error()` are only valid until the next API call (including `wclap_error()`), so make a copy if you want to store it.  All errors are recoverable - for now, catastrophic errors will abort.
+## Errors
+
+The strings returned by `wclap_error()` are only valid until the next API call (including `wclap_error()`), so make a copy if you want to store it.
+
+Errors reported by `wclap_error()` are recoverable, but the WCLAP instance won't funct.  For now, catastrophic errors will abort.
 
 ## WCLAP overview
 

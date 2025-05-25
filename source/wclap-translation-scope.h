@@ -12,9 +12,8 @@ namespace wclap { namespace wclap32 {
 	class WclapStructView {
 	protected:
 		unsigned char *pointerInWasm;
-		WclapTranslationScope &translationScope;
 	public:
-		WclapStructView(unsigned char *p, WclapTranslationScope &scope) : pointerInWasm(p), translationScope(scope) {}
+		WclapStructView(unsigned char *p) : pointerInWasm(p) {}
 	};
 
 }}
@@ -24,8 +23,10 @@ namespace wclap { namespace wclap32 {
 #include <type_traits>
 #include <unordered_map>
 
+namespace wclap {
 struct Wclap;
 struct WclapThread;
+}
 
 namespace wclap {namespace wclap32 {
 
@@ -40,13 +41,10 @@ struct ClapStructWithContext : public ClapStruct {
 	WclapContext wclapContext;
 };
 
-struct WclapMethods {
-	struct {
-		static uint32_t get_plugin_count(const struct clap_plugin_factory *factory) {
-			
-		}
-	} plugin_factory;
-};
+struct WclapMethods;
+WclapMethods * createMethods();
+void destroyMethods(WclapMethods *methods);
+void registerMethods(WclapMethods *methods, WclapThread &thread);
 
 /* Manages function calls and translating values across the boundary.
 
@@ -55,18 +53,21 @@ struct WclapMethods {
 	Since free() isn't exposed, this object should be active until the WASM memory is destroyed.  When the bound object is destroyed, it should be returned to the Wclap's pool.
 */
 struct WclapTranslationScope {
-	static constexpr size_t arenaBytes = 65536;
+	const size_t arenaBytes = 65536;
 
 	Wclap &wclap;
 	WclapMethods &methods;
 	
-	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread, WclapMethods &methods);
+	WclapTranslationScope(Wclap &wclap, WclapMethods &methods) : wclap(wclap), methods(methods) {}
 	~WclapTranslationScope();
+	
+	void mallocIfNeeded(WclapThread &currentThread);
 	
 	void * nativeObject = nullptr; // Native object
 	WasmP wasmObjectP = 0; // WASM object whose lifetime this scope is tied to
 	WasmP wasmPointerToThis = 0; // If we point WASM context fields to here, we can find this
 
+	/*
 	template<class NativeStruct>
 	NativeStruct * bindToWasmObject(WasmP wasmP) {
 		wasmObjectP = wasmP;
@@ -85,13 +86,14 @@ struct WclapTranslationScope {
 		nativeTmpP = nativeTmpStartP = nativeArena;
 		wasmTmpP = wasmTmpStartP = wasmArena;
 	}
+	*/
 
 	// Should only happen when the WASM instance is destroyed - otherwise it should be returned to a pool (since we can't free the arena memory)
 	void wasmReadyToDestroy() {
 		_wasmReadyToDestroy = true;
 	}
 	
-	unsigned char *nativeArena, *nativeTmpStartP, *nativeTmpP;
+	unsigned char *nativeArena = nullptr, *nativeTmpStartP, *nativeTmpP;
 	void clearTemporaryNative() {
 		nativeTmpP = nativeTmpStartP;
 	}
@@ -114,7 +116,7 @@ struct WclapTranslationScope {
 	void clearTemporaryWasm() {
 		wasmTmpP = wasmTmpStartP;
 	}
-	WasmP temporaryWasmBytes(WasmP size, WasmP align) {
+	WasmP temporaryWasmBytes(WasmP size, WasmP align=1) {
 		while (wasmTmpP%align) ++wasmTmpP;
 		WasmP result = wasmTmpP;
 		wasmTmpP += size;
@@ -127,22 +129,8 @@ struct WclapTranslationScope {
 		wasmTmpStartP = wasmTmpP;
 	}
 	
-	template<class AutoTranslatedStruct>
-	AutoTranslatedStruct get(WasmP wasmP) {
-		return WclapStruct(nativeInWasm(wasmP), *this);
-	}
-
-	void assignWasmToNative(WasmP wasmP, ClapStructWithContext<clap_plugin_factory> &native) {
-		LOG_EXPR("assignWasmToNative: clap_plugin_factory");
-
-		// extra info so we can find ourselves again - usually this would be in a struct pointed to by the `void *` context pointer
-		native.wclapContext = {wasmP, &wclap};
-		
-		//auto wasmFactory = get<wclap_plugin_factory>(wasmP);
-		native.get_plugin_count = methods.plugin_factory.get_plugin_count;
-		native.get_plugin_descriptor = methods.plugin_factory.get_plugin_descriptor;
-		native.create_plugin = methods.plugin_factory.create_plugin;
-	}
+	template<class Native>
+	void assignWasmToNative(WasmP wasmP, Native &native);
 
 	/*
 	//---------- The main two categories of translators: simple or generated ----------//

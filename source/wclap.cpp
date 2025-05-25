@@ -4,6 +4,7 @@
 #endif
 
 #include "./wclap.h"
+#include "./wclap-thread.h"
 #include "./wclap-translation-scope.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
@@ -13,35 +14,11 @@ std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
 	return s;
 }
 
+namespace wclap {
+
 wasm_engine_t *global_wasm_engine;
 const char *wclap_error_message;
-
 std::string wclap_error_message_string;
-
-//---------- Thread Context ----------//
-
-void WclapThreadContext::addWclap(Wclap *wclap) {
-	std::lock_guard<std::mutex> lock{mutex};
-	wclaps.insert(wclap);
-}
-void WclapThreadContext::removeWclap(Wclap *wclap) {
-	// This might be called off-thread, if the Wclap is shutting down (and taking the WclapThreads with it)
-	if (isDestroying.load()) return; // this thread is stopping (and taking the Wclap pointer with it), so it's fine
-	std::lock_guard<std::mutex> lock{mutex};
-
-	if (auto iter = wclaps.find(wclap); iter != wclaps.end()) {
-		wclaps.erase(iter);
-	}
-}
-WclapThreadContext::~WclapThreadContext() {
-	isDestroying.store(true);
-	std::lock_guard<std::mutex> lock{mutex};
-	for (auto &wclap : wclaps) {
-		wclap->removeThread();
-	}
-}
-
-thread_local static WclapThreadContext wclapThreadContext;
 
 //---------- Common Wclap instance ----------//
 
@@ -49,19 +26,31 @@ Wclap::Wclap(const std::string &wclapDir, const std::string &presetDir, const st
 
 Wclap::~Wclap() {
 	if (initSuccess) {
-		auto scoped = getThread();
-		scoped.thread.entryDeinit();
+		auto scoped = lockRelaxedThread();
+
+		if (wasm64) {
+			abort(); // 64-bit not supported
+		} else {
+			auto entryP = uint32_t(scoped.thread.clapEntryP64);
+			auto wasmEntry = view<wclap32::wclap_plugin_entry>(entryP);
+			auto deinitFn = wasmEntry.deinit();
+			scoped.thread.callWasm_V(deinitFn);
+		}
 	}
 
-	{ // Lock while we clear all the threads
+	{ // Clear all threads/scopes
 		auto lock = writeLock();
-		threadMap.clear();
-		if (singleThread) singleThread = nullptr;
+		if (singleThread) singleThread->wasmReadyToDestroy();
+		singleThread = nullptr;
+		for (auto &thread : realtimeThreadPool) thread->wasmReadyToDestroy();
+		realtimeThreadPool.clear();
+		for (auto &thread : relaxedThreadPool) thread->wasmReadyToDestroy();
+		relaxedThreadPool.clear();
+		for (auto &scope : translationScopePool32) scope->wasmReadyToDestroy();
+		translationScopePool32.clear();
 	}
 	
-	// As a sanity-check, the translation scopes will abort() if they aren't told that the WCLAP is closing
-	if (entryTranslationScope32) entryTranslationScope32->wasmReadyToDestroy();
-	for (auto &t : poolTranslationScope32) t->wasmReadyToDestroy();
+	if (methods32) wclap32::destroyMethods(methods32);
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -88,9 +77,12 @@ uint8_t * Wclap::wasmMemory(uint64_t wasmP) {
 	}
 }
 	
-const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
+void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
-	if (error) return "Failed to compile module";
+	if (error) {
+		errorMessage = "Failed to compile module";
+		return;
+	}
 	
 	bool foundClapEntry = false;
 	{ // Find `clap_entry`, which is a memory-address pointer, so the type of it tells us if it's 64-bit
@@ -104,7 +96,10 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 			foundClapEntry = true;
 			auto *externType = wasm_exporttype_type(exportType);
 			auto *globalType = wasm_externtype_as_globaltype_const(externType);
-			if (!globalType) return "clap_entry is not a global (value) export";
+			if (!globalType) {
+				errorMessage = "clap_entry is not a global (value) export";
+				return;
+			}
 			auto *valType = wasm_globaltype_content(globalType);
 			auto kind = wasm_valtype_kind(valType);
 			
@@ -112,12 +107,16 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 				wasm64 = true;
 				break;
 			} else if (kind != WASMTIME_I32) {
-				return "clap_entry must be 32-bit or 64-bit memory address";
+				errorMessage = "clap_entry must be 32-bit or 64-bit memory address";
+				return;
 			}
 		}
 		wasm_exporttype_vec_delete(&exportTypes);
 	}
-	if (!foundClapEntry) return "clap_entry not found";
+	if (!foundClapEntry) {
+		errorMessage = "clap_entry not found";
+		return;
+	}
 
 	{ // Check for a shared-memory import - otherwise it's single-threaded
 		wasm_importtype_vec_t importTypes;
@@ -132,319 +131,130 @@ const char * Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 			if (!asMemory) continue;
 
 			if (!wasmtime_memorytype_isshared(asMemory)) {
-				return "imports non-shared memory";
+				errorMessage = "imports non-shared memory";
+				return;
 			}
 			bool mem64 = wasmtime_memorytype_is64(asMemory);
 			if (mem64 != wasm64) {
-				return mem64 ? "64-bit memory but 32-bit clap_entry" : "32-bit memory but 64-bit clap_entry";
+				errorMessage = mem64 ? "64-bit memory but 32-bit clap_entry" : "32-bit memory but 64-bit clap_entry";
+				return;
 			}
-			if (sharedMemory) return "multiple memory imports";
+			if (sharedMemory) {
+				errorMessage = "multiple memory imports";
+				return;
+			}
 
-			error = wasmtime_sharedmemory_new (global_wasm_engine, asMemory, &sharedMemory);
-			if (error || !sharedMemory) return "failed to create shared memory";
+			error = wasmtime_sharedmemory_new(global_wasm_engine, asMemory, &sharedMemory);
+			if (error || !sharedMemory) {
+				errorMessage = "failed to create shared memory";
+			}
 		}
 		wasm_importtype_vec_delete(&importTypes);
 	}
-	
+
+	WclapThread *rawPtr;
+
 	if (wasm64) {
-		return "64-bit WASM not currently supported";
+		errorMessage = "64-bit WASM not currently supported";
+		return;
 	} else {
-		methods32 = std::unique_ptr<wclap::wclap32::WclapMethods>{
-			new wclap::wclap32::WclapMethods()
-		};
+		methods32 = wclap::wclap32::createMethods();
+		rawPtr = new WclapThread(*this, claimTranslationScope32());
+		wclap32::registerMethods(methods32, *rawPtr);
 	}
+
+	if (!errorMessage) rawPtr->initModule();
+	if (!errorMessage) rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
+	if (errorMessage) {
+		delete rawPtr;
+		return;
+	}
+	initSuccess = true;
 	
-	LOG_EXPR(wasm64);
 	if (!sharedMemory) {
-		auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
-		auto lock = writeLock();
-		auto *errorMessage = wclapThread->startInstance(*methods32);
-		if (errorMessage) return errorMessage;
-		singleThread = std::unique_ptr<WclapThread>(wclapThread);
+		singleThread = std::unique_ptr<WclapThread>(rawPtr);
+	} else {
+		realtimeThreadPool.emplace_back(rawPtr);
 	}
-	LOG_EXPR(sharedMemory);
-	LOG_EXPR(singleThread);
-	
-	{
-		auto scoped = getThread();
-
-		if (wasm64) {
-			return "64-bit WASM not currently supported";
-		} else {
-			entryTranslationScope32 = std::unique_ptr<wclap::wclap32::WclapTranslationScope>{
-				new wclap::wclap32::WclapTranslationScope(*this, scoped.thread, *methods32)
-			};
-		}
-		
-		// TODO: check version compatibility, use minimum of plugin/bridge version
-		
-		const char *errorMessage = scoped.thread.entryInit();
-		initSuccess = !errorMessage;
-		return errorMessage;
-	}
-
-	return nullptr;
 }
 
-Wclap::ScopedThread Wclap::getThread() {
-	if (singleThread) {
-		// If the WCLAP didn't import shared memory, it's single-threaded
-		mutex.lock_shared();
-		return {*singleThread, &mutex};
+std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
+	if (singleThread) return {}; // null pointer
+	{
+		auto lock = writeLock();
+		if (realtimeThreadPool.size()) {
+			std::unique_ptr<WclapThread> result = std::move(realtimeThreadPool.back());
+			realtimeThreadPool.pop_back();
+			return result;
+		}
 	}
+	if (wasm64) {
+		abort();
+	} else {
+		auto threadPtr = std::unique_ptr<WclapThread>(new WclapThread(*this, claimTranslationScope32()));
+		if (threadPtr) threadPtr->translationScope32->mallocIfNeeded(*threadPtr);
+		return threadPtr;
+	}
+}
 
+void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
+	auto lock = writeLock();
+	realtimeThreadPool.emplace_back(std::move(ptr));
+}
+
+Wclap::ScopedThread::~ScopedThread() {
+	if (locked) thread.mutex.unlock();
+}
+
+Wclap::ScopedThread Wclap::lockRelaxedThread() {
+	if (singleThread) {
+		singleThread->mutex.lock();
+		return {*singleThread};
+	}
 	{
 		auto lock = readLock();
-		auto iter = threadMap.find(std::this_thread::get_id());
-		if (iter != threadMap.end()) return {*iter->second};
+		for (auto &threadPtr : relaxedThreadPool) {
+			if (threadPtr->mutex.try_lock()) return {*threadPtr};
+		}
 	}
-	
-	// Put ourselves in this thread's list, so we get notified when the thread closes
-	// The thread will remove us from this list when it gets destroyed
-	wclapThreadContext.addWclap(this);
 
-	auto *wclapThread = new WclapThread(*this, &wclapThreadContext);
-	auto lock = writeLock();
-	const char *errorMessage;
+	WclapThread *rawPtr;
 	if (wasm64) {
-		errorMessage = "64-bit not supported (yet)";
+		abort();
 	} else {
-		errorMessage = wclapThread->startInstance(*methods32);
+		rawPtr = new WclapThread(*this, claimTranslationScope32());
+		rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
 	}
-	if (errorMessage) {
-		LOG_EXPR(errorMessage);
-		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
-	}
-	threadMap[std::this_thread::get_id()] = std::unique_ptr<WclapThread>{wclapThread};
-	
-	if (errorMessage) {
-		LOG_EXPR(errorMessage);
-		abort(); // TODO: something better - this could be an error within the WCLAP, so *we* shouldn't crash
-	}
-	
-	return {*wclapThread};
-}
+	rawPtr->mutex.lock();
 
-void Wclap::removeThread() {
 	auto lock = writeLock();
-
-	auto iter = threadMap.find(std::this_thread::get_id());
-	if (iter == threadMap.end()) {
-		LOG_EXPR(iter == threadMap.end());
-		abort(); // This shouldn't be called unless we had a WclapThread for this thread
-	}
-	threadMap.erase(iter);
+	relaxedThreadPool.emplace_back(rawPtr);
+	return {*rawPtr};
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
 	LOG_EXPR(factory_id);
 	if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
 		LOG_EXPR(hasPluginFactory);
-		if (!hasPluginFactory) {
-			auto scoped = getThread();
-			auto wasmP = scoped.thread.entryGetFactory(factory_id);
-			if (!wasmP) return nullptr;
-			if (wasm64) {
-				return "64-bit not supported";
-			} else {
-				entryTranslationScope32->assignWasmToNative((uint32_t)wasmP, nativePluginFactory);
-				entryTranslationScope32->commitNative(); // assigned object needs to be persistent
+		if (wasm64) {
+			return nullptr;
+		} else {
+			if (!hasPluginFactory) {
+				auto scoped = lockRelaxedThread();
+
+				auto entryP = uint32_t(scoped.thread.clapEntryP64);
+				auto wasmEntry = view<wclap32::wclap_plugin_entry>(entryP);
+				
+				auto getFactoryFn = wasmEntry.get_factory();
+				auto factoryP = scoped.thread.callWasm_PS(getFactoryFn, factory_id);
+				if (!factoryP) return nullptr;
+				scoped.thread.translationScope32->assignWasmToNative(factoryP, nativePluginFactory32);
+				hasPluginFactory = true;
 			}
-			hasPluginFactory = true;
+			return &nativePluginFactory32;
 		}
-		return &nativePluginFactory;
 	}
 	return nullptr;
 }
 
-void Wclap::returnToPool(std::unique_ptr<wclap::wclap32::WclapTranslationScope> &ptr) {
-	ptr->unbindAndReset();
-	auto lock = writeLock();
-	poolTranslationScope32.emplace_back(std::move(ptr));
-}
-
-//---------- Wclap Thread ----------//
-
-const char * WclapThread::startInstance(wclap::wclap32::WclapMethods &methods) {
-	if (wasiConfig) return "startInstance() called twice";
-	
-	wasiConfig = wasi_config_new();
-	if (!wasiConfig) return "Failed to create WASI config";
-
-	wasi_config_inherit_stdout(wasiConfig);
-	wasi_config_inherit_stderr(wasiConfig);
-	// Link various directories - failure is allowed if `mustLinkDirs` is false
-	if (wclap.wclapDir.size()) {
-		if (!wasi_config_preopen_dir(wasiConfig, wclap.wclapDir.c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
-			if (wclap.mustLinkDirs) return "Failed to open /plugin/ in WASI config";
-		}
-	}
-	if (wclap.presetDir.size()) {
-		if (!wasi_config_preopen_dir(wasiConfig, wclap.presetDir.c_str(), "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (wclap.mustLinkDirs) return "Failed to open /presets/ in WASI config";
-		}
-	}
-	if (wclap.cacheDir.size()) {
-		if (!wasi_config_preopen_dir(wasiConfig, wclap.cacheDir.c_str(), "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (wclap.mustLinkDirs) return "Failed to open /cache/ in WASI config";
-		}
-	}
-	if (wclap.varDir.size()) {
-		if (!wasi_config_preopen_dir(wasiConfig, wclap.varDir.c_str(), "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			if (wclap.mustLinkDirs) return "Failed to open /var/ in WASI config";
-		}
-	}
-	
-	//---------- Start the instance ----------//
-
-	store = wasmtime_store_new(global_wasm_engine, nullptr, nullptr);
-	if (!store)  return "Failed to create store";
-	context = wasmtime_store_context(store);
-	if (!context) return "Failed to create context";
-	
-	// Create a linker with WASI functions defined
-	linker = wasmtime_linker_new(global_wasm_engine);
-	if (!linker) return "error creating linker";
-	error = wasmtime_linker_define_wasi(linker);
-	if (error) return "error linking WASI";
-
-	error = wasmtime_context_set_wasi(context, wasiConfig);
-	if (error) return "Failed to configure WASI";
-	wasiConfig = nullptr;
-
-	// This includes calling the WASI _start() or _initialize() methods
-	error = wasmtime_linker_instantiate(linker, context, wclap.module, &instance, &trap);
-	if (error) return "failed to create instance";
-	if (trap) return "failed to start instance";
-
-	//---------- Find exports ----------//
-
-	char *name;
-	size_t nameSize;
-	wasmtime_extern_t item;
-	
-	if (wasmtime_instance_export_get(context, &instance, "memory", 6, &item)) {
-		if (item.kind == WASMTIME_EXTERN_MEMORY || item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
-			memory = item.of.memory; // Shared memory is (in Wasmtime) a type of memory
-		} else {
-			wasmtime_extern_delete(&item);
-			return "exported memory isn't a (Shared)Memory";
-		}
-		wasmtime_extern_delete(&item);
-	} else if (!wclap.sharedMemory) {
-		return "must either export memory or import shared memory";
-	}
-
-	if (!wasmtime_instance_export_get(context, &instance, "clap_entry", 10, &item)) {
-		return "clap_entry not exported";
-	}
-	if (item.kind == WASMTIME_EXTERN_GLOBAL) {
-		wasmtime_val_t v;
-		wasmtime_global_get(context, &item.of.global, &v);
-		if (v.kind == WASM_I32 && !wclap.wasm64) {
-			clapEntryP64 = v.of.i32; // We store it as 64 bits, even though we know it's a 32-bit one
-		} else if (v.kind == WASM_I64 && wclap.wasm64) {
-			clapEntryP64 = v.of.i64;
-		} else {
-			return "clap_entry is not a (correctly-sized) pointer";
-		}
-	} else {
-		wasmtime_extern_delete(&item);
-		return "clap_entry isn't a Global";
-	}
-	wasmtime_extern_delete(&item);
-
-	if (!wasmtime_instance_export_get(context, &instance, "malloc", 6, &item)) {
-		return "malloc not exported";
-	}
-	if (item.kind == WASMTIME_EXTERN_FUNC) {
-		wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
-		const wasm_valtype_vec_t *params = wasm_functype_params(type);
-		const wasm_valtype_vec_t *results = wasm_functype_results(type);
-		if (params->size != 1 || results->size != 1) return "malloc() function signature mismatch";
-		if (wasm_valtype_kind(params->data[0]) != wasm_valtype_kind(results->data[0])) return "malloc() function signature mismatch";
-		if (wclap.wasm64) {
-			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I64) return "malloc() function signature mismatch";
-		} else {
-			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I32) return "malloc() function signature mismatch";
-		}
-		mallocFunc = item.of.func;
-		wasm_functype_delete(type);
-	} else {
-		wasmtime_extern_delete(&item);
-		return "malloc isn't a Function";
-	}
-	wasmtime_extern_delete(&item);
-
-	// Look for the first function table
-	size_t exportIndex = 0;
-	while (wasmtime_instance_export_nth(context, &instance, exportIndex, &name, &nameSize, &item)) {
-		if (item.kind == WASMTIME_EXTERN_TABLE) {
-			wasm_tabletype_t *type = wasmtime_table_type(context, &item.of.table);
-			const wasm_limits_t limits = *wasm_tabletype_limits(type);
-			auto elementKind = wasm_valtype_kind(wasm_tabletype_element(type));
-			wasm_tabletype_delete(type);
-
-			if (elementKind == WASM_FUNCREF) {
-				if (limits.max < 65536 || limits.max - 65536 < limits.min) {
-					return "exported function table can't grow enough for CLAP host functions";
-				}
-				functionTable = item.of.table;
-				break;
-			}
-		}
-		wasmtime_extern_delete(&item);
-		++exportIndex;
-	}
-	
-	//methods.bind([&](
-
-	// Call the WASI entry-point `_initialize()` if it exists
-	if (wasmtime_instance_export_get(context, &instance, "_initialize", 11, &item)) {
-		if (item.kind == WASMTIME_EXTERN_FUNC) {
-			wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
-			const wasm_valtype_vec_t *params = wasm_functype_params(type);
-			const wasm_valtype_vec_t *results = wasm_functype_results(type);
-			if (params->size != 0 || results->size != 0) return "_initialize() function signature mismatch";
-			wasm_functype_delete(type);
-
-			wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
-			if (trap) {
-				wasmtime_extern_delete(&item);
-				return "_initialize() threw an error";
-			}
-		} else {
-			wasmtime_extern_delete(&item);
-			return "_initialize isn't a function";
-		}
-		wasmtime_extern_delete(&item);
-	}
-
-	return nullptr;
-}
-
-WclapThread::~WclapThread() {
-	if (threadContext) threadContext->removeWclap(&wclap);
-	
-	if (trap) {
-		wclap_error_message_string = wclap_error_message;
-		wclap_error_message_string += ": ";
-		wasm_message_t message;
-		wasm_trap_message(trap, &message);
-		wclap_error_message_string += message.data; // should always be null-terminated C string
-		wclap_error_message = wclap_error_message_string.c_str();
-	}
-
-	if (error) {
-		wclap_error_message_string = wclap_error_message;
-		wclap_error_message_string += ": ";
-		wasm_name_t message;
-		wasmtime_error_message(error, &message);
-		wclap_error_message_string.append(message.data, message.size);
-		wclap_error_message = wclap_error_message_string.c_str();
-
-		wasmtime_error_delete(error);
-	}
-	if (linker) wasmtime_linker_delete(linker);
-	if (store) wasmtime_store_delete(store);
-}
+} // namespace

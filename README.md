@@ -4,25 +4,6 @@ This provides a bridge which loads a WCLAP (CLAP API compiled to `.wasm`) and pr
 
 It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://docs.wasmtime.dev/c-api/index.html).  Alternative runtimes (for different speed/binary-size tradeoffs) and `wasm64` support are on the wishlist.
 
-## What is a WCLAP
-
-A WCLAP is a CLAP plugin compiled to the `wasm32` architecture.  CLAP plugins are normally dynamic libraries (to be loaded into the host's address space), but WASM doesn't support that.  WCLAPs are therefore standalone, and must have the following imports:
-
-* export `clap_entry` - memory address for the entry struct.
-* at least one of:
-	* import `env`:`memory` - this must be shared memory (recommended, since it allows multi-threaded use)
-	* export `memory` - plugin will be single-threaded only (not recommended)
-* `malloc()` - accepts a size, returns a pointer
-
-The module is placed at the top level of the plugin folder, e.g. `my-plugin.wclap/module.wasm`.  The folder can also contain any other resources used by the plugin.  If made available HTTP, the plugin folder should be compressed as a `.tar.gz`, so that hosts have immediate (synchronous) access to all bundle resources.
-
-WCLAPs _may_ use WASI for sandboxed access to plugin resources.  From the plugin's perspective, it has the following paths (mapped through WASI to platform-appropriate storage):
-
-* `/plugin/` - the plugin folder, e.g. `my-plugin.wclap/`
-* `/presets/` - suitable for storing user presets, persistent and shared between instances of this WCLAP.  May be modified by the host to share/merge/reset the preset collection.
-* `/var/` - file storage for plugin use, persistent and shared between instances of this WCLAP.  Must not be modified by the host.
-* `/cache/` - temporary file storage for the plugin to avoid redundant work.  Ideally persistent (for performance) but may be deleted/emptied by the host while no instances of this WCLAP are active.
-
 ## How to use the bridge
 
 It's only 7 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
@@ -41,17 +22,27 @@ The factories returned from `wclap_get_factory()` are equivalent to a native CLA
 
 The strings returned by `wclap_error()` are only valid until the next API call (including `wclap_error()`), so make a copy if you want to store it.
 
-Errors reported by `wclap_error()` are recoverable, but the WCLAP instance won't funct.  For now, catastrophic errors will abort.
+Errors reported by `wclap_error()` are recoverable, but the WCLAP instance won't work properly.  For now, catastrophic errors call `abort()`.
 
-## WCLAP overview
+## What is a WCLAP?
 
-At its core, WCLAP is the CLAP API compiled to the `wasm32` architecture, provided as a `.wasm`.  As well as `clap_entry`, modules must also:
+A WCLAP is a CLAP plugin compiled to the `wasm32` architecture.  CLAP plugins are normally dynamic libraries (to be loaded into the host's address space), but WASM doesn't support that.  WCLAPs are therefore standalone, and must have the following imports:
 
-* _either_ export their memory as `memory`, or import it as `env`:`memory` (accepting any size of growable memory).
-* export `malloc()` (so the host can implement an [arena allocator](https://en.wikipedia.org/wiki/Region-based_memory_management) for its own data structures).  Other memory APIs aren't needed, so this can be a simple shim.
+* export `clap_entry` - memory address for the entry struct.
+* at least one of:
+	* import `env`:`memory` - this must be shared memory (recommended, since it allows multi-threaded use)
+	* export `memory` - plugin will be single-threaded only (not recommended)
+* export `malloc()` - accepts a size, returns a pointer
 * export a single function table, which can be grown/edited by the host.  This is _probably_ named `__indirect_function_table` as per the [original WASI spec](https://github.com/WebAssembly/WASI/blob/main/legacy/application-abi.md), but WCLAP hosts are encouraged to use the first exported function table regardless of name.
 
-Modules may require WASI imports (only `wasi_snapshot_preview1` is supported here).  If they export _either_ a `_start()` or `_initialize()` function, the host must call it first.
+The module is placed at the top level of the plugin folder, e.g. `my-plugin.wclap/module.wasm`.  The folder can also contain any other resources used by the plugin.  If made available HTTP, the plugin folder should be compressed as a `.tar.gz`, so that hosts have immediate (synchronous) access to all bundle resources.
+
+WCLAPs _may_ use WASI for sandboxed access to plugin resources.  From the plugin's perspective, it has the following paths (mapped through WASI to platform-appropriate storage):
+
+* `/plugin/` - the plugin folder, e.g. `my-plugin.wclap/`
+* `/presets/` - suitable for storing user presets, persistent and shared between instances of this WCLAP.  May be modified by the host to share/merge/reset the preset collection.
+* `/var/` - file storage for plugin use, persistent and shared between instances of this WCLAP.  Must not be modified by the host.
+* `/cache/` - temporary file storage for the plugin to avoid redundant work.  Ideally persistent (for performance) but may be deleted/emptied by the host while no instances of this WCLAP are active.
 
 ## Design
 
@@ -59,45 +50,27 @@ Aside from the kerfuffle of setting up the WASM engine, this repo also provides 
 
 All CLAP API functions only accept/return basic numerical values or pointers to structs. 
 
-This
-
 Pointers to structs made entirely of numerical values can be used by native code by simply offsetting to their location in the WASM instance's memory.  Native structs need to be copied into the WASM memory first.
 
 Pointers to other structs (containing pointers or function-pointers) need to be translated, by translating each of their members individually.  There are no circular references in the CLAP API, so pointers to structs can be translated by translating the pointed-to struct and referencing that.
 
-### Objects and methods
+### Threads
 
-With the exception of `clap_entry::get_factory`, all CLAP API functions are effectively methods, called with an "object" first argument which always contains an opaque `void *` context/data field.
+WASM instances are single-threaded, and multiple execution is achieved through having multiple instances pointing to a common shared memory.
 
-Whenever we translate a function, we expect to know what object will be used as this first argument, and we can store translation data in that object.
+The `Wclap` (having loaded a particular WCLAP) keeps a pool of instances (`WclapThread`s) for use by non-realtime threads.  Plugins themselves also reserve a `WclapThread` for audio-thread calls.  While "audio thread" is a role rather than a particular thread, CLAP guarantees that hosts don't make simultaneous audio-thread calls, so a `WclapThread` per plugin is sufficient for all realtime calls.
 
-We create a distinct native function for each "API position" (struct/field combination) in the CLAP API, and this position is used as part of mapping as well.  
+### Host methods
 
-### Native → WASM
+All supported host functions are added to the WCLAP's exported function table every time a `WclapThread` is constructed, so that they all have consistent function reference numbers which can be used in host structs.
 
-We assume(⚠️) that the native host is not constantly compiling/assembling new functions, and therefore there are a finite number of function pointers which could possibly be passed to the WCLAP.  We therefore adapt/insert native functions into the WASM instance's function table.  This requires an `O(log(N))` lookup (for a `std::map`) for each incoming function (to re-use the existing index), but `O(1)` overhead when calling them from WASM.
+### Host structures in WASM memory
 
-Structs which contain a `.destroy` method are given a persistent mapping, and their own chunk of memory for temporary data.
+Each `WclapThread` has a `WclapTranslationScope`s, which own a section of WASM memory (obtained by calling the WCLAP's exported `malloc()`) which it uses to store temporary structures.  It can then pass pointers to these temporary structures as arguments when calling WASM functions.
 
-### WASM → Native
+There are also `WclapTranslationScope`s associated with long-lived host structures (such as `clap_host_t` and associated extensions).  Since the WCLAP doesn't export `free()`, these are returned to a pool when no longer needed, instead of being destroyed.
 
-For WASM functions, 
-
-When making a native proxy for a WASM structs, we fill that pointer to a support data structure which contains:
-
-* which WASM instance it lives in
-* a (WASM) pointer to the equivalent WASM struct
-* an array mapping every CLAP API function (which might use this struct as its "object" argument) to a WASM function-table index
-
-We assume(⚠️) that the WCLAP will only use one function for a given API-position/object combo, so whenever we translate a WASM function pointer, we set the corresponding entry in the object's function mapping.
-
-### Structs and lifetime
-
-When making a WASM proxy for a native struct, we fill that pointer to a support data structure which contains:
-
-* a (native) pointer to the equivalent native struct
-
-All possible API functions are bound to the WASM instance directly after initialisation, and the indices are checked (to be the same across thread instances).
+`WclapTranslationScope`s also own a section of native memory, used as temporary storage for translating values when the WCLAP calls host functions.  By default, this is 64KB, but
 
 ## Known issues
 

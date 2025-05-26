@@ -43,22 +43,6 @@ struct WclapThread {
 
 	void initModule(); // called only once, on the first thread
 
-	/*
-	static char typeCode(wasm_valkind_t k) {
-		if (k < 4) {
-			return "ILFD"[k];
-		} else if (k == WASM_EXTERNREF) {
-			return 'X';
-		} else if (k == WASM_FUNCREF) {
-			return '$';
-		}
-		return '?';
-	}
-	static char typeCode(const wasm_valtype_t *t) {
-		return typeCode(wasm_valtype_kind(t));
-	}
-	*/
-
 	uint64_t wasmMalloc(size_t bytes) {
 		uint64_t wasmP;
 		
@@ -105,7 +89,7 @@ struct WclapThread {
 		error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
 		if (trap) wclap.errorMessage = "function call threw (trapped)";
 		if (error) wclap.errorMessage = "calling function failed";
-		if (!--callDepth) translationScope32->clearTemporaryWasm();
+		if (!--callDepth) translationScope32->rewindWasm();
 	}
 		
 	size_t callDepth = 0;
@@ -116,7 +100,8 @@ struct WclapThread {
 		L: int64
 		F: float
 		D: double
-		P: pointer (32-bit for now)
+		P: pointer (32-bit for now, but listed separately for future 64-bit compatibility)
+		S: string (
 	*/
 
 	void callWasm_V(wclap32::WasmP fnP) {
@@ -129,12 +114,19 @@ struct WclapThread {
 		return values[0].i32;
 	}
 	wclap32::WasmP callWasm_PS(wclap32::WasmP fnP, const char *str) {
-		return callWasm_IS(fnP, str);
+		wasmtime_val_raw values[] = {{.i32=int32_t(temporaryStringToWasm32(str))}};
+		callWasmFnP32(fnP, values, 1);
+		return uint32_t(values[0].i32);
+	}
+	uint32_t callWasm_IP(wclap32::WasmP fnP, wclap32::WasmP arg1) {
+		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
+		callWasmFnP32(fnP, values, 1);
+		return values[0].i32;
 	}
 
 	wclap32::WasmP temporaryStringToWasm32(const char *str) {
 		size_t length = std::strlen(str);
-		auto wasmTmp = translationScope32->temporaryWasmBytes(length + 1);
+		auto wasmTmp = translationScope32->wasmBytes(length + 1);
 		auto *nativeTmp = (char *)wclap.wasmMemory(wasmTmp);
 		for (size_t i = 0; i < length; ++i) {
 			nativeTmp[i] = str[i];
@@ -142,73 +134,7 @@ struct WclapThread {
 		nativeTmp[length] = 0;
 		return wasmTmp;
 	}
-	
-/*
-	void entryDeinit() {
-		uint64_t funcIndex;
-		if (wclap.wasm64) {
-			auto *wasmEntry = (WasmClapEntry64 *)wclap.wasmMemory(clapEntryP64);
-			funcIndex = wasmEntry->deinit;
-		} else {
-			auto *wasmEntry = (WasmClapEntry32 *)wclap.wasmMemory(clapEntryP64);
-			funcIndex = wasmEntry->deinit;
-		}
 
-		wasmtime_val_t funcVal;
-		if (!wasmtime_table_get(context, &functionTable, funcIndex, &funcVal)) return;
-		if (funcVal.kind != WASMTIME_FUNCREF) return;
-
-		// We completely ignore this result
-		wasmtime_func_call(context, &funcVal.of.funcref, nullptr, 0, nullptr, 0, &trap);
-	}
-
-	uint64_t entryGetFactory(const char *factoryId) {
-		uint64_t funcIndex;
-		if (wclap.wasm64) {
-			auto *wasmEntry = (WasmClapEntry64 *)wclap.wasmMemory(clapEntryP64);
-			funcIndex = wasmEntry->get_factory;
-		} else {
-			auto *wasmEntry = (WasmClapEntry32 *)wclap.wasmMemory(clapEntryP64);
-			funcIndex = wasmEntry->get_factory;
-		}
-
-		wasmtime_val_t funcVal;
-		if (!wasmtime_table_get(context, &functionTable, funcIndex, &funcVal)) return 0;//"clap_entry.get_factory doesn't resolve";
-		if (funcVal.kind != WASMTIME_FUNCREF) return 0; // should never happen, since we checked the function table type
-
-		uint64_t wasmStr = copyStringConstantToWasm(factoryId);
-		if (!wasmStr) return 0;
-
-		wasmtime_val_t args[1], results[1];
-		if (wclap.wasm64) {
-			args[0].kind = WASMTIME_I64;
-			args[0].of.i64 = wasmStr;
-		} else {
-			args[0].kind = WASMTIME_I32;
-			args[0].of.i32 = (uint32_t)wasmStr;
-		}
-
-		error = wasmtime_func_call(context, &funcVal.of.funcref, args, 1, results, 1, &trap);
-		if (error) return 0;
-		if (trap) return 0; // "get_factory() threw (trapped)";
-		return (results[0].kind == WASMTIME_I64) ? results[0].of.i64 : results[0].of.i32;
-	}
-*/
-
-private:
-	/*
-	uint64_t copyStringConstantToWasm(const char *str) {
-		size_t bytes = std::strlen(str) + 1;
-		uint64_t wasmP = wasmMalloc(bytes);
-		if (!wasmP) return wasmP;
-		
-		auto *wasmBytes = (char *)(wclap.wasmMemory(wasmP));
-		for (size_t i = 0; i < bytes; ++i) {
-			wasmBytes[i] = str[i];
-		}
-		return wasmP;
-	}
-	*/
 };
 
 } // namespace

@@ -5,8 +5,8 @@ using WasmP = uint64_t;
 
 using wclap_version = clap_version_t;
 
-struct wclap_process : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct wclap_process {
+	wclap_process(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 
 	int64_t & steady_time() {
 		return *(int64_t *)pointerInWasm;
@@ -35,10 +35,12 @@ struct wclap_process : public WclapStructView {
 	WasmP & out_events() {
 		return *(WasmP *)(pointerInWasm + 56);
 	}
+private:
+	unsigned char * pointerInWasm;
 };
 
-struct wclap_plugin_descriptor : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct wclap_plugin_descriptor {
+	wclap_plugin_descriptor(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;
@@ -70,10 +72,12 @@ struct wclap_plugin_descriptor : public WclapStructView {
 	WasmP & features() {
 		return *(WasmP *)(pointerInWasm + 80);
 	}
+private:
+	unsigned char * pointerInWasm;
 };
 
-struct wclap_plugin : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct wclap_plugin {
+	wclap_plugin(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 
 	WasmP & desc() {
 		return *(WasmP *)pointerInWasm;
@@ -111,10 +115,12 @@ struct wclap_plugin : public WclapStructView {
 	WasmP & on_main_thread() {
 		return *(WasmP *)(pointerInWasm + 88);
 	}
+private:
+	unsigned char * pointerInWasm;
 };
 
-struct wclap_plugin_factory : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct wclap_plugin_factory {
+	wclap_plugin_factory(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 
 	WasmP & get_plugin_count() {
 		return *(WasmP *)pointerInWasm;
@@ -125,10 +131,12 @@ struct wclap_plugin_factory : public WclapStructView {
 	WasmP & create_plugin() {
 		return *(WasmP *)(pointerInWasm + 16);
 	}
+private:
+	unsigned char * pointerInWasm;
 };
 
-struct wclap_plugin_entry : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct wclap_plugin_entry {
+	wclap_plugin_entry(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;
@@ -142,5 +150,7 @@ struct wclap_plugin_entry : public WclapStructView {
 	WasmP & get_factory() {
 		return *(WasmP *)(pointerInWasm + 32);
 	}
+private:
+	unsigned char * pointerInWasm;
 };
 }} // namespace

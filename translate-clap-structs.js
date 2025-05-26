@@ -188,8 +188,8 @@ using ${wclapClass} = ${name};`;
 				}
 				code += `
 
-struct ${wclapClass} : public WclapStructView {
-	using WclapStructView::WclapStructView;
+struct ${wclapClass} {
+	${wclapClass}(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
 `;
 				structFields.forEach(field => {
 					let fieldType = getType(field.type);
@@ -218,6 +218,8 @@ struct ${wclapClass} : public WclapStructView {
 					}
 				});
 				code += `
+private:
+	unsigned char * pointerInWasm;
 };`;
 			}
 		});

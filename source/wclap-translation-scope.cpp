@@ -14,10 +14,14 @@ WclapTranslationScope::~WclapTranslationScope() {
 
 void WclapTranslationScope::mallocIfNeeded(WclapThread &currentThread) {
 	if (!nativeArena) {
-		nativeArena = nativeTmpStartP = nativeTmpP = (unsigned char *)malloc(arenaBytes);
-		wasmArena = wasmTmpStartP = wasmTmpP = currentThread.wasmMalloc(arenaBytes);
+		nativeArena = nativeArenaPos = (unsigned char *)malloc(arenaBytes);
+		nativeArenaEnd = nativeArena + arenaBytes;
+		wasmArena = wasmArenaPos = currentThread.wasmMalloc(arenaBytes);
+		wasmArenaEnd = wasmArena + arenaBytes;
 		LOG_EXPR((void *)nativeArena);
+		LOG_EXPR((void *)nativeArenaEnd);
 		LOG_EXPR(wasmArena);
+		LOG_EXPR(wasmArenaEnd);
 	}
 }
 
@@ -33,7 +37,36 @@ struct WclapMethods {
 			auto scopedThread = context.wclap->lockRelaxedThread();
 			return scopedThread.thread.callWasm_IP(wasmFactory.get_plugin_count(), context.wasmP);
 		}
+		static const clap_plugin_descriptor_t * get_plugin_descriptor(const struct clap_plugin_factory *factory, uint32_t index) {
+//			auto *withContext = (ClapStructWithContext<clap_plugin_factory> *)factory;
+//			auto &context = withContext->wclapContext;
+//			auto wasmFactory = context.wclap->view<wclap_plugin_factory>(context.wasmP);
+//			auto scopedThread = context.wclap->lockRelaxedThread();
+//			auto descriptorP = scopedThread.thread.callWasm_PPI(wasmFactory.get_plugin_descriptor(), context.wasmP, index);
+			// TODO: translate descriptor into some persistent storage
+			return nullptr;
+		}
+		static const clap_plugin_t * create_plugin(const struct clap_plugin_factory *factory, const clap_host *host, const char *plugin_id) {
+			// TODO: translate descriptor into some persistent storage
+			return nullptr;
+		}
 	} plugin_factory;
+	
+	struct {
+		static uint32_t some_dummy_method_fn() {
+			return 5;
+		}
+		WasmP some_dummy_method = 0;
+
+		void registerMethods(WclapThread &thread) {
+			// This should add to the WASM instance's function table, and store (or compare) the index, so it can be used
+			//thread.addHostMethod_I(some_dummy_method, some_dummy_method_fn);
+		}
+	} host_example_struct_dummy;
+	
+	void registerHostMethods(WclapThread &thread) {
+		host_example_struct_dummy.registerMethods(thread);
+	}
 };
 
 WclapMethods * createMethods() {
@@ -42,8 +75,8 @@ WclapMethods * createMethods() {
 void destroyMethods(WclapMethods *methods) {
 	delete methods;
 }
-void registerMethods(WclapMethods *methods, WclapThread &thread) {
-	methods->registerMethods(thread);
+void registerHostMethods(WclapMethods *methods, WclapThread &thread) {
+	methods->registerHostMethods(thread);
 }
 
 template<>

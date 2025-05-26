@@ -160,7 +160,7 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	} else {
 		methods32 = wclap::wclap32::createMethods();
 		rawPtr = new WclapThread(*this, claimTranslationScope32());
-		wclap32::registerMethods(methods32, *rawPtr);
+		wclap32::registerHostMethods(methods32, *rawPtr);
 	}
 
 	if (!errorMessage) rawPtr->initModule();

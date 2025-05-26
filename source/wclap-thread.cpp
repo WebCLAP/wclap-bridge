@@ -105,8 +105,18 @@ WclapThread::WclapThread(Wclap &wclap, std::unique_ptr<wclap32::WclapTranslation
 	wasmtime_extern_t item;
 	
 	if (wasmtime_instance_export_get(context, &instance, "memory", 6, &item)) {
-		if (item.kind == WASMTIME_EXTERN_MEMORY || item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
-			memory = item.of.memory; // Shared memory is (in Wasmtime) a type of memory
+		LOG_EXPR("memory");
+		LOG_EXPR(item.kind);
+		LOG_EXPR(item.kind == WASMTIME_EXTERN_MEMORY);
+		LOG_EXPR(item.kind == WASMTIME_EXTERN_SHAREDMEMORY);
+		if (item.kind == WASMTIME_EXTERN_MEMORY) {
+			memory = item.of.memory;
+		} else if (item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
+			// TODO: it should be the same as the import - not sure how to check this
+			if (!wclap.sharedMemory) {
+				wclap.errorMessage = "exported shared memory, but didn't import it";
+				return;
+			}
 		} else {
 			wasmtime_extern_delete(&item);
 			wclap.errorMessage = "exported memory isn't a (Shared)Memory";
@@ -253,16 +263,19 @@ void WclapThread::initModule() {
 		}
 		wasmtime_extern_delete(&item);
 	}
+}
 
-	// Call `clap_entry.init()`
+void WclapThread::initEntry() {
 	uint64_t funcIndex;
 	if (wclap.wasm64) {
 		wclap.errorMessage = "64-bit not supported";
 		return;
 	} else {
 		auto entryP = uint32_t(clapEntryP64);
+		LOG_EXPR(entryP);
 		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(entryP);
 		auto initFn = wasmEntry.init();
+		LOG_EXPR(initFn);
 		auto success = callWasm_IS(initFn, "/plugin/");
 		if (trap) {
 			wclap.errorMessage = "clap_entry.init() threw (trapped)";

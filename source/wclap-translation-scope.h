@@ -106,6 +106,7 @@ struct WclapTranslationScope {
 		WasmP result = wasmArenaPos;
 		wasmArenaPos += size;
 		if (wasmArenaPos > wasmArenaEnd) {
+			LOG_EXPR(wasmArenaPos > wasmArenaEnd);
 			abort(); // TODO: grow list of arenas
 		}
 		return result;

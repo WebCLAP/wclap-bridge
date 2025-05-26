@@ -29,6 +29,7 @@ Wclap::~Wclap() {
 		auto scoped = lockRelaxedThread();
 
 		if (wasm64) {
+			LOG_EXPR("Wclap::~Wclap");
 			abort(); // 64-bit not supported
 		} else {
 			auto entryP = uint32_t(scoped.thread.clapEntryP64);
@@ -163,19 +164,21 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		wclap32::registerHostMethods(methods32, *rawPtr);
 	}
 
+
 	if (!errorMessage) rawPtr->initModule();
 	if (!errorMessage) rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
-	if (errorMessage) {
+	if (!errorMessage) {
 		delete rawPtr;
 		return;
 	}
-	initSuccess = true;
-	
 	if (!sharedMemory) {
+		// need to do this before .initEntry(), so singleThread exists (if needed) since it owns the memory export
 		singleThread = std::unique_ptr<WclapThread>(rawPtr);
 	} else {
 		realtimeThreadPool.emplace_back(rawPtr);
 	}
+	if (!errorMessage) rawPtr->initEntry();
+	initSuccess = !errorMessage;
 }
 
 std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
@@ -189,6 +192,7 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 		}
 	}
 	if (wasm64) {
+		LOG_EXPR("Wclap::claimRealtimeThread");
 		abort();
 	} else {
 		auto threadPtr = std::unique_ptr<WclapThread>(new WclapThread(*this, claimTranslationScope32()));
@@ -220,6 +224,7 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 
 	WclapThread *rawPtr;
 	if (wasm64) {
+		LOG_EXPR("Wclap::lockRelaxedThread");
 		abort();
 	} else {
 		rawPtr = new WclapThread(*this, claimTranslationScope32());

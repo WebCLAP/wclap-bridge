@@ -42,6 +42,7 @@ struct WclapThread {
 	}
 
 	void initModule(); // called only once, on the first thread
+	void initEntry(); // also called only once, but after the thread/translation-scope is set up
 
 	uint64_t wasmMalloc(size_t bytes) {
 		uint64_t wasmP;

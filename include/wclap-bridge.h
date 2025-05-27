@@ -8,7 +8,7 @@ extern "C" {
 	100 - semantic checks (e.g. param IDs exist, note-off matches a note-on, etc.)
 	200 - opinionated safety checks (e.g. no more than 1000 plugins per module)
  */
-bool wclap_global_init(size_t validityCheckLevel);
+bool wclap_global_init(unsigned int validityCheckLevel);
 void wclap_global_deinit();
 
 // Opens a WCLAP, returning an opaque identifier (or null on failure)

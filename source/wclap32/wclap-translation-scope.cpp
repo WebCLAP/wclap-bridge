@@ -1,3 +1,5 @@
+#include "./wclap-translation-scope.h"
+
 #define WCLAP_MULTIPLE_INCLUDES_NAMESPACE wclap32
 #define WCLAP_MULTIPLE_INCLUDES_WASMP uint32_t
 #include "../wclapN/wclap-translation-scope.hxx"

@@ -3,14 +3,14 @@
 #	error must not be included directly
 #endif
 
-#include "./wclapN-translation-scope.h"
-#include "./wclap-thread.h"
-#include "./validity.h"
+#include "../validity.h"
+#include "../wclap-thread.h"
+#include "../wclap.h"
 
 namespace wclap {
 namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
-WclapTranslationScope::WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) {
+WclapTranslationScope::WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
 	nativeArena = nativeArenaPos = (unsigned char *)malloc(arenaBytes);
 	nativeArenaEnd = nativeArena + arenaBytes;
 	wasmArena = wasmArenaPos = currentThread.wasmMalloc(arenaBytes);
@@ -23,7 +23,7 @@ WclapTranslationScope::~WclapTranslationScope() {
 
 WasmP WclapTranslationScope::copyStringToWasm(const char *str) {
 	size_t length = std::strlen(str);
-	if (validity.length && length > validity.maxStringLength) {
+	if (validity.lengths && length > validity.maxStringLength) {
 		length = validity.maxStringLength;
 	}
 	auto wasmTmp = wasmBytes(length + 1);

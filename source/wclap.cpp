@@ -210,14 +210,7 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 		}
 	}
 
-	WclapThread *rawPtr;
-	if (wasm64) {
-		LOG_EXPR("Wclap::lockRelaxedThread");
-		abort();
-	} else {
-		rawPtr = new WclapThread(*this, claimTranslationScope32());
-		rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
-	}
+	auto *rawPtr = new WclapThread(*this);
 	rawPtr->mutex.lock();
 
 	auto lock = writeLock();

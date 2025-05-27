@@ -5,6 +5,7 @@
 
 #include "./wclap-thread.h"
 #include "./wclap.h"
+#include "./wclap32/wclap-translation.h"
 
 namespace wclap {
 
@@ -209,8 +210,8 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 		LOG_EXPR("WclapThread::WclapThread");
 		abort();
 	} else {
-		translationScope32 = std::unique_ptr<wasm32::WclapTranslationScope>{
-			new wasm32::WclapTranslationScope(wclap, *this);
+		translationScope32 = std::unique_ptr<wclap32::WclapTranslationScope>{
+			new wclap32::WclapTranslationScope(wclap, *this)
 		};
 	}
 }

@@ -14,7 +14,7 @@ static std::string ensureTrailingSlash(const char *dirC) {
 	return dir;
 }
 
-bool wclap_global_init(size_t validityCheckLevel) {
+bool wclap_global_init(unsigned int validityCheckLevel) {
 	wclap::validity = {validityCheckLevel};
 
 	wasm_config_t *config = wasm_config_new();

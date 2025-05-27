@@ -2,6 +2,6 @@
 
 namespace wclap {
 
-ValidityChecks validity;
+ValidityChecks validity{0};
 
 } // namespace

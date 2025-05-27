@@ -5,7 +5,8 @@
 
 #include "./wclap.h"
 #include "./wclap-thread.h"
-#include "./wclap-translation-scope.h"
+#include "./wclap32/wclap-translation-scope.h"
+#include "./wclap32/wclap-translation.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
 	for (size_t i = 0; i < bytes.size; ++i) {
@@ -41,17 +42,12 @@ Wclap::~Wclap() {
 
 	{ // Clear all threads/scopes
 		auto lock = writeLock();
-		if (singleThread) singleThread->wasmReadyToDestroy();
 		singleThread = nullptr;
-		for (auto &thread : realtimeThreadPool) thread->wasmReadyToDestroy();
 		realtimeThreadPool.clear();
-		for (auto &thread : relaxedThreadPool) thread->wasmReadyToDestroy();
 		relaxedThreadPool.clear();
-		for (auto &scope : translationScopePool32) scope->wasmReadyToDestroy();
-		translationScopePool32.clear();
 	}
 	
-	if (methods32) wclap32::destroyMethods(methods32);
+	if (methods32) delete methods32;
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -159,14 +155,11 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		errorMessage = "64-bit WASM not currently supported";
 		return;
 	} else {
-		methods32 = wclap::wclap32::createMethods();
-		rawPtr = new WclapThread(*this, claimTranslationScope32());
-		wclap32::registerHostMethods(methods32, *rawPtr);
+		methods32 = new wclap::wclap32::WclapMethods(*this);
+		rawPtr = new WclapThread(*this, true);
+		methods32->registerHostMethods(*rawPtr);
 	}
 
-
-	if (!errorMessage) rawPtr->initModule();
-	if (!errorMessage) rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
 	if (errorMessage) {
 		delete rawPtr;
 		return;
@@ -191,20 +184,15 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 			return result;
 		}
 	}
-	if (wasm64) {
-		LOG_EXPR("Wclap::claimRealtimeThread");
-		abort();
-	} else {
-		auto threadPtr = std::unique_ptr<WclapThread>(new WclapThread(*this, claimTranslationScope32()));
-		if (threadPtr) threadPtr->translationScope32->mallocIfNeeded(*threadPtr);
-		return threadPtr;
-	}
+	return std::unique_ptr<WclapThread>(new WclapThread(*this));
 }
 
+/*
 void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
 	auto lock = writeLock();
 	realtimeThreadPool.emplace_back(std::move(ptr));
 }
+*/
 
 Wclap::ScopedThread::~ScopedThread() {
 	if (locked) thread.mutex.unlock();
@@ -238,26 +226,11 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
-	if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
-		if (wasm64) {
-			return nullptr;
-		} else {
-			if (!hasPluginFactory) {
-				auto scoped = lockRelaxedThread();
-
-				auto entryP = uint32_t(scoped.thread.clapEntryP64);
-				auto wasmEntry = view<wclap32::wclap_plugin_entry>(entryP);
-				
-				auto getFactoryFn = wasmEntry.get_factory();
-				auto factoryP = scoped.thread.callWasm_PS(getFactoryFn, factory_id);
-				if (!factoryP) return nullptr;
-				scoped.thread.translationScope32->assignWasmToNative(factoryP, nativePluginFactory32);
-				hasPluginFactory = true;
-			}
-			return &nativePluginFactory32;
-		}
+	if (wasm64) {
+		return nullptr;
+	} else {
+		return methods32->getFactory(factory_id);
 	}
-	return nullptr;
 }
 
 } // namespace

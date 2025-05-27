@@ -2,7 +2,13 @@
 extern "C" {
 #endif
 
-bool wclap_global_init();
+/*
+	0 - translate WCLAP values as closely as possible, leave validity-checking to the host
+	10 - basic range/type checks (e.g. NULL where not allowed)
+	100 - semantic checks (e.g. param IDs exist, note-off matches a note-on, etc.)
+	200 - opinionated safety checks (e.g. no more than 1000 plugins per module)
+ */
+bool wclap_global_init(size_t validityCheckLevel);
 void wclap_global_deinit();
 
 // Opens a WCLAP, returning an opaque identifier (or null on failure)

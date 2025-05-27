@@ -7,10 +7,11 @@
 #include <vector>
 #include <mutex>
 
-#include "./wclap.h"
-#include "./wclap-translation-scope.h"
+#include "./wclap32/wclap-translation-scope.h"
 
 namespace wclap {
+
+struct Wclap;
 
 struct WclapThread {
 	Wclap &wclap;
@@ -33,67 +34,15 @@ struct WclapThread {
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	wasmtime_instance_t instance;
 	
-	WclapThread(Wclap &wclap, std::unique_ptr<wclap32::WclapTranslationScope> &&translationScope32);
+	WclapThread(Wclap &wclap, bool andInitModule=false);
 	~WclapThread();
-
-	// We're about to be destroyed (instead of returned to a pool)
-	void wasmReadyToDestroy() {
-		if (translationScope32) translationScope32->wasmReadyToDestroy();
-	}
 
 	void initModule(); // called only once, on the first thread
 	void initEntry(); // also called only once, but after the thread/translation-scope is set up
 
-	uint64_t wasmMalloc(size_t bytes) {
-		uint64_t wasmP;
-		
-		wasmtime_val_t args[1];
-		wasmtime_val_t results[1];
-		if (wclap.wasm64) {
-			args[0].kind = WASMTIME_I64;
-			args[0].of.i64 = bytes;
-		} else {
-			args[0].kind = WASMTIME_I32;
-			args[0].of.i32 = (uint32_t)bytes;
-		}
-		
-		error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
-		if (error) {
-			wclap.errorMessage = "calling malloc() failed";
-			return 0;
-		}
-		if (trap) {
-			wclap.errorMessage = "calling malloc() threw (trapped)";
-			return 0;
-		}
-		if (wclap.wasm64) {
-			if (results[0].kind != WASMTIME_I64) return 0;
-			return results[0].of.i64;
-		} else {
-			if (results[0].kind != WASMTIME_I32) return 0;
-			return results[0].of.i32;
-		}
-	}
+	uint64_t wasmMalloc(size_t bytes);
 	
-	void callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-		wasmtime_val_t funcVal;
-		if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
-			wclap.errorMessage = "function pointer doesn't resolve";
-			return;
-		}
-		if (funcVal.kind != WASMTIME_FUNCREF) {
-			wclap.errorMessage = "function pointer didn't resolve to a function";
-			return;
-		}
-
-		++callDepth;
-		error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
-		if (trap) wclap.errorMessage = "function call threw (trapped)";
-		if (error) wclap.errorMessage = "calling function failed";
-		if (!--callDepth) translationScope32->rewindWasm();
-	}
-		
-	size_t callDepth = 0;
+	void callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN);
 	
 	/* Function call signatures: (return) (args...)
 		V: void
@@ -109,13 +58,15 @@ struct WclapThread {
 		callWasmFnP32(fnP, nullptr, 0);
 	}
 
-	uint32_t callWasm_IS(wclap32::WasmP fnP, const char *str) {
-		wasmtime_val_raw values[] = {{.i32=int32_t(temporaryStringToWasm32(str))}};
+	int32_t callWasm_IS(wclap32::WasmP fnP, const char *str) {
+		auto wasmStr = translationScope32->copyStringToWasm(str);
+		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);
 		return values[0].i32;
 	}
 	wclap32::WasmP callWasm_PS(wclap32::WasmP fnP, const char *str) {
-		wasmtime_val_raw values[] = {{.i32=int32_t(temporaryStringToWasm32(str))}};
+		auto wasmStr = translationScope32->copyStringToWasm(str);
+		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);
 		return uint32_t(values[0].i32);
 	}
@@ -124,18 +75,6 @@ struct WclapThread {
 		callWasmFnP32(fnP, values, 1);
 		return values[0].i32;
 	}
-
-	wclap32::WasmP temporaryStringToWasm32(const char *str) {
-		size_t length = std::strlen(str);
-		auto wasmTmp = translationScope32->wasmBytes(length + 1);
-		auto *nativeTmp = (char *)wclap.wasmMemory(wasmTmp);
-		for (size_t i = 0; i < length; ++i) {
-			nativeTmp[i] = str[i];
-		}
-		nativeTmp[length] = 0;
-		return wasmTmp;
-	}
-
 };
 
 } // namespace

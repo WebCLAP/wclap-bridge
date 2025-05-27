@@ -6,6 +6,7 @@
 #include "wclap-bridge.h"
 
 #include "./wclap.h"
+#include "./validity.h"
 
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;
@@ -13,7 +14,9 @@ static std::string ensureTrailingSlash(const char *dirC) {
 	return dir;
 }
 
-bool wclap_global_init() {
+bool wclap_global_init(size_t validityCheckLevel) {
+	wclap::validity = {validityCheckLevel};
+
 	wasm_config_t *config = wasm_config_new();
 	if (!config) {
 		wclap::wclap_error_message = "couldn't create config";

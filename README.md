@@ -8,7 +8,7 @@ It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://doc
 
 It's only 7 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
 
-* `wclap_global_init()`: call only once, before any other API calls
+* `wclap_global_init(validityCheckLevel)`: call only once, before any other API calls
 * `wclap_global_deinit()`: call at the end to clean up
 * `wclap_open()`: opens a WCLAP (including calling its `clap_entry->init()`), returning an opaque pointer which is non-`NULL` on success
 * `wclap_open_with_dirs()`: opens a WCLAP, providing optional preset/cache/var directories for WASI
@@ -71,6 +71,19 @@ Each `WclapThread` has a `WclapTranslationScope`s, which own a section of WASM m
 There are also `WclapTranslationScope`s associated with long-lived host structures (such as `clap_host_t` and associated extensions).  Since the WCLAP doesn't export `free()`, these are returned to a pool when no longer needed, instead of being destroyed.
 
 `WclapTranslationScope`s also own a section of native memory, used as temporary storage for translating values when the WCLAP calls host functions.  By default, this is 64KB, but
+
+### Validity checking
+
+Since a native CLAP plugin is loaded as a dynamic library into the host process, the plugin is implicitly trusted.  Hosts might (completely reasonably!) protect against buggy behaviour, but not malicious behaviour, since that's impossible.
+
+However, untrusted WCLAPs _should_ be safe to run.  Much like opening a webpage in a browser, at worst they should be annoying, but not crash the system or leak user data.  WCLAPs are sandboxed by the WebAssembly engine (including system access via WASI), but could still return values which aim to cause misbehaviour or crashes in the host.
+
+`wclap_global_init()` therefore has a `validityCheckLevel` argument, where `0` means the host (not this bridge) is responsible for validating all values, preventing crashes or unsafe behaviour.  Here are other thresholds, and the assumptions they check/enforce:
+
+* `10` - basic range/type checks
+* `100` - semantic validity checks
+* `200` - opinionated safety checks
+	* no more than 1000 plugins per module
 
 ## Known issues
 

@@ -8,7 +8,7 @@
 #include <shared_mutex>
 #include <string>
 
-#include "./wclap-translation-scope.h"
+#include "./wclap32/wclap-translation-scope.h"
 
 namespace wclap {
 
@@ -58,33 +58,15 @@ struct Wclap {
 	void initWasmBytes(const uint8_t *bytes, size_t size);
 	void deinit();
 
-	std::vector<std::unique_ptr<wclap32::WclapTranslationScope>> translationScopePool32;
-	// The translation scope this returns *might not* have allocated anything, so needs `.mallocIfNeeded()` called
-	std::unique_ptr<wclap32::WclapTranslationScope> claimTranslationScope32() {
-		{
-			auto lock = writeLock();
-			if (translationScopePool32.size()) {
-				std::unique_ptr<wclap32::WclapTranslationScope> result{std::move(translationScopePool32.back())};
-				translationScopePool32.pop_back();
-				return result;
-			}
-		}
-		return std::unique_ptr<wclap32::WclapTranslationScope>{
-			new wclap32::WclapTranslationScope(*this, *methods32)
-		};
-	}
-	void returnTranslationScope32(std::unique_ptr<wclap32::WclapTranslationScope> &ptr) {
-		auto lock = writeLock();
-		translationScopePool32.emplace_back(std::move(ptr));
-	}
-
 	std::unique_ptr<WclapThread> singleThread; // if defined, neither pool is ever used
 	std::vector<std::unique_ptr<WclapThread>> realtimeThreadPool; // removed from the pool, locked later
 	std::vector<std::unique_ptr<WclapThread>> relaxedThreadPool; // never leaves the pool
 
 	// obtains a thread for realtime calls by removing from the pool, or creating if needed
 	std::unique_ptr<WclapThread> claimRealtimeThread();
+	/*
 	void returnRealtimeThread(std::unique_ptr<WclapThread> &ptr);
+	*/
 	
 	// borrows a locked non-realtime thread, adding to the pool if necessary
 	struct ScopedThread {
@@ -103,10 +85,7 @@ struct Wclap {
 private:
 	bool initSuccess = false;
 	
-	bool hasPluginFactory = false;
-	wclap32::ClapStructWithContext<clap_plugin_factory> nativePluginFactory32;
-
-	wclap::wclap32::WclapMethods *methods32;
+	wclap32::WclapMethods *methods32;
 
 	mutable std::shared_mutex mutex;
 	std::shared_lock<std::shared_mutex> readLock() const {

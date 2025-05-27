@@ -4,10 +4,11 @@
 #endif
 
 #include "./wclap-thread.h"
+#include "./wclap.h"
 
 namespace wclap {
 
-WclapThread::WclapThread(Wclap &wclap, std::unique_ptr<wclap32::WclapTranslationScope> &&translationScope32) : wclap(wclap), translationScope32(std::move(translationScope32)) {
+WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 	if (wasiConfig) {
 		wclap.errorMessage = "instantiate() called twice";
 		return;
@@ -201,13 +202,20 @@ WclapThread::WclapThread(Wclap &wclap, std::unique_ptr<wclap32::WclapTranslation
 		wasmtime_extern_delete(&item);
 		++exportIndex;
 	}
+	
+	if (andInitModule) initModule();
+	
+	if (wclap.wasm64) {
+		LOG_EXPR("WclapThread::WclapThread");
+		abort();
+	} else {
+		translationScope32 = std::unique_ptr<wasm32::WclapTranslationScope>{
+			new wasm32::WclapTranslationScope(wclap, *this);
+		};
+	}
 }
 
 WclapThread::~WclapThread() {
-	if (translationScope32) {
-		wclap.returnTranslationScope32(translationScope32);
-	}
-
 	if (trap) {
 		wclap_error_message_string = wclap_error_message;
 		wclap_error_message_string += ": ";
@@ -280,6 +288,55 @@ void WclapThread::initEntry() {
 			return;
 		}
 	}
+}
+
+uint64_t WclapThread::wasmMalloc(size_t bytes) {
+	uint64_t wasmP;
+	
+	wasmtime_val_t args[1];
+	wasmtime_val_t results[1];
+	if (wclap.wasm64) {
+		args[0].kind = WASMTIME_I64;
+		args[0].of.i64 = bytes;
+	} else {
+		args[0].kind = WASMTIME_I32;
+		args[0].of.i32 = (uint32_t)bytes;
+	}
+	
+	error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
+	if (error) {
+		wclap.errorMessage = "calling malloc() failed";
+		return 0;
+	}
+	if (trap) {
+		wclap.errorMessage = "calling malloc() threw (trapped)";
+		return 0;
+	}
+	if (wclap.wasm64) {
+		if (results[0].kind != WASMTIME_I64) return 0;
+		return results[0].of.i64;
+	} else {
+		if (results[0].kind != WASMTIME_I32) return 0;
+		return results[0].of.i32;
+	}
+}
+
+void WclapThread::callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
+	wasmtime_val_t funcVal;
+	if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
+		wclap.errorMessage = "function pointer doesn't resolve";
+		return;
+	}
+	if (funcVal.kind != WASMTIME_FUNCREF) {
+		wclap.errorMessage = "function pointer didn't resolve to a function";
+		return;
+	}
+
+	auto pos = translationScope32->wasmArenaPos;
+	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
+	if (trap) wclap.errorMessage = "function call threw (trapped)";
+	if (error) wclap.errorMessage = "calling function failed";
+	translationScope32->wasmArenaPos = pos;
 }
 
 } // namespace

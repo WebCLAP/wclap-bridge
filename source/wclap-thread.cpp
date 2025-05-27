@@ -105,10 +105,6 @@ WclapThread::WclapThread(Wclap &wclap, std::unique_ptr<wclap32::WclapTranslation
 	wasmtime_extern_t item;
 	
 	if (wasmtime_instance_export_get(context, &instance, "memory", 6, &item)) {
-		LOG_EXPR("memory");
-		LOG_EXPR(item.kind);
-		LOG_EXPR(item.kind == WASMTIME_EXTERN_MEMORY);
-		LOG_EXPR(item.kind == WASMTIME_EXTERN_SHAREDMEMORY);
 		if (item.kind == WASMTIME_EXTERN_MEMORY) {
 			memory = item.of.memory;
 		} else if (item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
@@ -272,10 +268,8 @@ void WclapThread::initEntry() {
 		return;
 	} else {
 		auto entryP = uint32_t(clapEntryP64);
-		LOG_EXPR(entryP);
 		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(entryP);
 		auto initFn = wasmEntry.init();
-		LOG_EXPR(initFn);
 		auto success = callWasm_IS(initFn, "/plugin/");
 		if (trap) {
 			wclap.errorMessage = "clap_entry.init() threw (trapped)";

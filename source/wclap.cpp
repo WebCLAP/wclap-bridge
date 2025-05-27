@@ -167,7 +167,7 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 
 	if (!errorMessage) rawPtr->initModule();
 	if (!errorMessage) rawPtr->translationScope32->mallocIfNeeded(*rawPtr);
-	if (!errorMessage) {
+	if (errorMessage) {
 		delete rawPtr;
 		return;
 	}
@@ -238,9 +238,7 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
-	LOG_EXPR(factory_id);
 	if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
-		LOG_EXPR(hasPluginFactory);
 		if (wasm64) {
 			return nullptr;
 		} else {

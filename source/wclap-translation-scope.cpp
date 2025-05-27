@@ -18,10 +18,6 @@ void WclapTranslationScope::mallocIfNeeded(WclapThread &currentThread) {
 		nativeArenaEnd = nativeArena + arenaBytes;
 		wasmArena = wasmArenaPos = currentThread.wasmMalloc(arenaBytes);
 		wasmArenaEnd = wasmArena + arenaBytes;
-		LOG_EXPR((void *)nativeArena);
-		LOG_EXPR((void *)nativeArenaEnd);
-		LOG_EXPR(wasmArena);
-		LOG_EXPR(wasmArenaEnd);
 	}
 }
 
@@ -43,6 +39,7 @@ struct WclapMethods {
 //			auto wasmFactory = context.wclap->view<wclap_plugin_factory>(context.wasmP);
 //			auto scopedThread = context.wclap->lockRelaxedThread();
 //			auto descriptorP = scopedThread.thread.callWasm_PPI(wasmFactory.get_plugin_descriptor(), context.wasmP, index);
+//			if (!descriptorP) return nullptr;
 			// TODO: translate descriptor into some persistent storage
 			return nullptr;
 		}

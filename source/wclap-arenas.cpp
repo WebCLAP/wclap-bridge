@@ -17,7 +17,8 @@ WclapArenas::~WclapArenas() {
 	if (nativeArena) free(nativeArena);
 }
 
-size_t WclapArenas::copyStringToWasm(const char *str) {
+template<>
+uint64_t WclapArenas::copyStringToWasm<uint64_t>(const char *str) {
 	size_t length = std::strlen(str);
 	if (validity.lengths && length > validity.maxStringLength) {
 		length = validity.maxStringLength;
@@ -29,6 +30,11 @@ size_t WclapArenas::copyStringToWasm(const char *str) {
 	}
 	nativeTmp[length] = 0;
 	return wasmTmp;
+}
+
+template<>
+uint32_t WclapArenas::copyStringToWasm<uint32_t>(const char *str) {
+	return uint32_t(copyStringToWasm<uint64_t>(str));
 }
 
 } // namespace

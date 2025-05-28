@@ -88,6 +88,7 @@ private:
 	bool initSuccess = false;
 	
 	wclap32::WclapMethods *methods32;
+	wclap64::WclapMethods *methods64;
 
 	mutable std::shared_mutex mutex;
 	std::shared_lock<std::shared_mutex> readLock() const {

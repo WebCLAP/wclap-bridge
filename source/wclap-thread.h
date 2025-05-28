@@ -12,14 +12,6 @@
 
 namespace wclap {
 
-// TODO: remove this and make the callWasm_* methods only have a return value, inferring bit-depth from the function pointer type and everything else from type overloads
-namespace wclap32 {
-	using WasmP = uint32_t;
-}
-namespace wclap64 {
-	using WasmP = uint64_t;
-}
-
 struct Wclap;
 
 struct WclapThread {
@@ -55,7 +47,7 @@ struct WclapThread {
 		if (validity.executionDeadlines) wasmtime_context_set_epoch_deadline(context, ms/10 + 2);
 	}
 	
-	void callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN);
+	void callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);
 	
 	/* Function call signatures: (return) (args...)
 		V: void
@@ -67,28 +59,38 @@ struct WclapThread {
 		S: string (
 	*/
 
-	void callWasm_V(wclap32::WasmP fnP) {
-		callWasmFnP32(fnP, nullptr, 0);
+	void callWasm_V(uint64_t fnP) {
+		callWasmFnP(fnP, nullptr, 0);
+	}
+	
+	int32_t callWasm_I(uint64_t fnP, uint32_t arg1) {
+		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
+		callWasmFnP(fnP, values, 1);
+		return values[0].i32;
+	}
+	int32_t callWasm_I(uint64_t fnP, uint64_t arg1) {
+		wasmtime_val_raw values[] = {{.i64=int64_t(arg1)}};
+		callWasmFnP(fnP, values, 1);
+		return values[0].i32;
+	}
+	int64_t callWasm_L(uint64_t fnP, uint32_t arg1) {
+		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
+		callWasmFnP(fnP, values, 1);
+		return values[0].i64;
+	}
+	int64_t callWasm_L(uint64_t fnP, uint64_t arg1) {
+		wasmtime_val_raw values[] = {{.i64=int64_t(arg1)}};
+		callWasmFnP(fnP, values, 1);
+		return values[0].i64;
 	}
 
-	int32_t callWasm_IS(wclap32::WasmP fnP, const char *str) {
-		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = translationScope->copyStringToWasm(str);
-		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
-		callWasmFnP32(fnP, values, 1);
-		return values[0].i32;
+	template<class ...Args>
+	uint32_t callWasm_P(uint32_t fnP, Args ...args) {
+		return callWasm_I(fnP, std::forward<Args>(args)...);
 	}
-	wclap32::WasmP callWasm_PS(wclap32::WasmP fnP, const char *str) {
-		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = translationScope->copyStringToWasm(str);
-		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
-		callWasmFnP32(fnP, values, 1);
-		return uint32_t(values[0].i32);
-	}
-	uint32_t callWasm_IP(wclap32::WasmP fnP, wclap32::WasmP arg1) {
-		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
-		callWasmFnP32(fnP, values, 1);
-		return values[0].i32;
+	template<class ...Args>
+	uint64_t callWasm_P(uint64_t fnP, Args ...args) {
+		return callWasm_L(fnP, std::forward<Args>(args)...);
 	}
 };
 

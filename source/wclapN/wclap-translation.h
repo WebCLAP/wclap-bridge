@@ -33,7 +33,7 @@ struct WclapMethods {
 
 			context = c;
 
-			auto count = thread.callWasm_IP(wasmFactory.get_plugin_count(), context.wasmP);
+			auto count = thread.callWasm_I(wasmFactory.get_plugin_count(), context.wasmP);
 			if (validity.lengths && count > validity.maxPlugins) {
 				context.wclap->errorMessage = "plugin factory advertised too many plugins";
 				descriptorPointers.clear();
@@ -69,7 +69,12 @@ struct WclapMethods {
 		auto wasmEntry = wclap.view<wclap_plugin_entry>(entryP);
 		
 		auto getFactoryFn = wasmEntry.get_factory();
-		auto factoryP = scoped.thread.callWasm_PS(getFactoryFn, factory_id);
+		WasmP factoryP;
+		{
+			auto reset = scoped.thread.translationScope->scopedWasmReset();
+			auto wasmStr = scoped.thread.translationScope->copyStringToWasm<WasmP>(factory_id);
+			factoryP = scoped.thread.callWasm_P(getFactoryFn, wasmStr);
+		}
 		if (!factoryP) return nullptr;
 
 		if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {

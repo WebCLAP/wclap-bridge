@@ -55,7 +55,8 @@ struct WclapArenas {
 		return result;
 	}
 
-	size_t copyStringToWasm(const char *str);
+	template<typename WasmP>
+	WasmP copyStringToWasm(const char *str);
 	
 	// Object that resets the arena position when it goes out of scope
 	struct ScopedWasmPosReset {

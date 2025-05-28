@@ -6,6 +6,7 @@
 #include "./wclap-thread.h"
 #include "./wclap.h"
 #include "./wclap32/wclap-translation.h"
+#include "./wclap64/wclap-translation.h"
 
 namespace wclap {
 
@@ -273,22 +274,27 @@ void WclapThread::initModule() {
 
 void WclapThread::initEntry() {
 	uint64_t funcIndex;
+	int32_t success;
 	if (wclap.wasm64) {
-		wclap.errorMessage = "64-bit not supported";
-		return;
-	} else {
-		auto entryP = uint32_t(clapEntryP64);
-		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(entryP);
+		auto wasmEntry = wclap.view<wclap64::wclap_plugin_entry>(clapEntryP64);
 		auto initFn = wasmEntry.init();
-		auto success = callWasm_IS(initFn, "/plugin/");
-		if (trap) {
-			wclap.errorMessage = "clap_entry.init() threw (trapped)";
-			return;
-		}
-		if (!success) {
-			wclap.errorMessage = "clap_entry.init() returned false";
-			return;
-		}
+		auto reset = translationScope->scopedWasmReset();
+		auto wasmStr = translationScope->copyStringToWasm<wclap64::WasmP>("/plugin/");
+		success = callWasm_I(initFn, wasmStr);
+	} else {
+		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(uint32_t(clapEntryP64));
+		auto initFn = wasmEntry.init();
+		auto reset = translationScope->scopedWasmReset();
+		auto wasmStr = translationScope->copyStringToWasm<wclap32::WasmP>("/plugin/");
+		success = callWasm_I(initFn, wasmStr);
+	}
+	if (trap) {
+		wclap.errorMessage = "clap_entry.init() threw (trapped)";
+		return;
+	}
+	if (!success) {
+		wclap.errorMessage = "clap_entry.init() returned false";
+		return;
 	}
 }
 
@@ -324,7 +330,7 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 	}
 }
 
-void WclapThread::callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
+void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
 	wasmtime_val_t funcVal;
 	if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
 		wclap.errorMessage = "function pointer doesn't resolve";

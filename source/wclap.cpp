@@ -6,6 +6,7 @@
 #include "./wclap.h"
 #include "./wclap-thread.h"
 #include "./wclap32/wclap-translation.h"
+#include "./wclap64/wclap-translation.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
 	for (size_t i = 0; i < bytes.size; ++i) {
@@ -27,13 +28,12 @@ Wclap::Wclap(const std::string &wclapDir, const std::string &presetDir, const st
 Wclap::~Wclap() {
 	if (initSuccess) {
 		auto scoped = lockRelaxedThread();
-
 		if (wasm64) {
-			LOG_EXPR("Wclap::~Wclap");
-			abort(); // 64-bit not supported
+			auto wasmEntry = view<wclap64::wclap_plugin_entry>(scoped.thread.clapEntryP64);
+			auto deinitFn = wasmEntry.deinit();
+			scoped.thread.callWasm_V(deinitFn);
 		} else {
-			auto entryP = uint32_t(scoped.thread.clapEntryP64);
-			auto wasmEntry = view<wclap32::wclap_plugin_entry>(entryP);
+			auto wasmEntry = view<wclap32::wclap_plugin_entry>(uint32_t(scoped.thread.clapEntryP64));
 			auto deinitFn = wasmEntry.deinit();
 			scoped.thread.callWasm_V(deinitFn);
 		}
@@ -47,6 +47,7 @@ Wclap::~Wclap() {
 	}
 	
 	if (methods32) delete methods32;
+	if (methods64) delete methods64;
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -144,8 +145,11 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	WclapThread *rawPtr;
 
 	if (wasm64) {
-		errorMessage = "64-bit WASM not currently supported";
-		return;
+		methods64 = new wclap::wclap64::WclapMethods(*this);
+		rawPtr = new WclapThread(*this, true);
+		if (!errorMessage) {
+			methods64->registerHostMethods(*rawPtr);
+		}
 	} else {
 		methods32 = new wclap::wclap32::WclapMethods(*this);
 		rawPtr = new WclapThread(*this, true);
@@ -212,7 +216,7 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 
 const void * Wclap::getFactory(const char *factory_id) {
 	if (wasm64) {
-		return nullptr;
+		return methods64->getFactory(factory_id);
 	} else {
 		return methods32->getFactory(factory_id);
 	}

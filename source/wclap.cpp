@@ -16,7 +16,7 @@ std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
 
 namespace wclap {
 
-wasm_engine_t *global_wasm_engine;
+std::atomic<wasm_engine_t *> global_wasm_engine;
 const char *wclap_error_message;
 std::string wclap_error_message_string;
 
@@ -149,7 +149,9 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	} else {
 		methods32 = new wclap::wclap32::WclapMethods(*this);
 		rawPtr = new WclapThread(*this, true);
-		methods32->registerHostMethods(*rawPtr);
+		if (!errorMessage) {
+			methods32->registerHostMethods(*rawPtr);
+		}
 	}
 
 	if (errorMessage) {

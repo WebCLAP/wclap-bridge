@@ -10,6 +10,8 @@
 namespace wclap {
 
 WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
+	if (wclap.errorMessage) return;
+
 	if (wasiConfig) {
 		wclap.errorMessage = "instantiate() called twice";
 		return;
@@ -206,14 +208,16 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 	
 	if (andInitModule) initModule();
 	
-	translationScope = std::unique_ptr<WclapArenas>{
-		new WclapArenas(wclap, *this)
-	};
+	if (!wclap.errorMessage) {
+		translationScope = std::unique_ptr<WclapArenas>{
+			new WclapArenas(wclap, *this)
+		};
+	}
 }
 
 WclapThread::~WclapThread() {
 	if (trap) {
-		wclap_error_message_string = wclap_error_message;
+		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown trap]");
 		wclap_error_message_string += ": ";
 		wasm_message_t message;
 		wasm_trap_message(trap, &message);
@@ -222,7 +226,7 @@ WclapThread::~WclapThread() {
 	}
 
 	if (error) {
-		wclap_error_message_string = wclap_error_message;
+		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown error]");
 		wclap_error_message_string += ": ";
 		wasm_name_t message;
 		wasmtime_error_message(error, &message);
@@ -236,6 +240,8 @@ WclapThread::~WclapThread() {
 }
 
 void WclapThread::initModule() {
+	setWasmDeadline(validity.deadlines.initModule);
+
 	wasmtime_extern_t item;
 
 	// Call the WASI entry-point `_initialize()` if it exists - WCLAPs don't *have* to use WASI, so it's fine not to
@@ -299,6 +305,7 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 		args[0].of.i32 = (uint32_t)bytes;
 	}
 	
+	setWasmDeadline(validity.deadlines.malloc);
 	error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
 	if (error) {
 		wclap.errorMessage = "calling malloc() failed";
@@ -328,11 +335,10 @@ void WclapThread::callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndRes
 		return;
 	}
 
-	auto pos = translationScope->wasmArenaPos;
+	setWasmDeadline(validity.deadlines.other);
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
 	if (trap) wclap.errorMessage = "function call threw (trapped)";
 	if (error) wclap.errorMessage = "calling function failed";
-	translationScope->wasmArenaPos = pos;
 }
 
 } // namespace

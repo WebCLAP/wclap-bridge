@@ -11,7 +11,19 @@ struct ValidityChecks {
 	
 	bool filterOnlyWorking = false;
 	
+	bool executionDeadlines = false;
+	// various deadlines in ms - epoch ticks are every 10ms so it could be longer than this
+	struct {
+		unsigned int initModule = 100;
+		unsigned int malloc = 10;
+		unsigned int other = 10;
+	} deadlines;
+	
 	ValidityChecks(unsigned int level) {
+		if (level > 0) {
+			executionDeadlines = true;
+		}
+	
 		// basic range/type checks
 		if (level >= 10) {
 			range = true;

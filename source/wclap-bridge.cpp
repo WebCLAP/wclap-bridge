@@ -8,11 +8,23 @@
 #include "./wclap.h"
 #include "./validity.h"
 
+#include <atomic>
+#include <thread>
+
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;
 	if (dir.size() && dir.back() != '/') dir += "/";
 	return dir;
 }
+
+static std::atomic_flag globalEpochRunning;
+static void epochThreadFunction() {
+	while (globalEpochRunning.test()) {
+		wasmtime_engine_increment_epoch(wclap::global_wasm_engine);
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+}
+static std::thread globalEpochThread;
 
 bool wclap_global_init(unsigned int validityCheckLevel) {
 	wclap::validity = {validityCheckLevel};
@@ -23,15 +35,30 @@ bool wclap_global_init(unsigned int validityCheckLevel) {
 		return false;
 	}
 
-	// TODO: enable epoch_interruption to prevent locks
+	if (wclap::validity.executionDeadlines) {
+		// enable epoch_interruption to prevent locks - has a speed cost (10% according to docs)
+		wasmtime_config_epoch_interruption_set(config, true);
+	}
+	
 	wclap::global_wasm_engine = wasm_engine_new_with_config(config);
 	if (!wclap::global_wasm_engine) {
 		wclap::wclap_error_message = "couldn't create engine";
 		return false;
 	}
+
+	if (wclap::validity.executionDeadlines) {
+		globalEpochRunning.test_and_set();
+		globalEpochThread = std::thread{epochThreadFunction};
+	}
+
 	return true;
 }
 void wclap_global_deinit() {
+	if (globalEpochThread.joinable()) {
+		globalEpochRunning.clear();
+		globalEpochThread.join();
+	}
+	
 	if (wclap::global_wasm_engine) {
 		wasm_engine_delete(wclap::global_wasm_engine);
 		wclap::global_wasm_engine = nullptr;

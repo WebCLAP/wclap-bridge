@@ -7,10 +7,11 @@
 #include <vector>
 #include <shared_mutex>
 #include <string>
+#include <atomic>
 
 namespace wclap {
 
-extern wasm_engine_t *global_wasm_engine;
+extern std::atomic<wasm_engine_t *> global_wasm_engine;
 extern const char *wclap_error_message;
 extern std::string wclap_error_message_string;
 

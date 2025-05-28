@@ -56,6 +56,24 @@ struct WclapArenas {
 	}
 
 	size_t copyStringToWasm(const char *str);
+	
+	// Object that resets the arena position when it goes out of scope
+	struct ScopedWasmPosReset {
+		ScopedWasmPosReset(WclapArenas &arena, size_t pos) : arena(arena), pos(pos) {}
+		ScopedWasmPosReset(ScopedWasmPosReset &&other) : arena(other.arena), pos(other.pos) {
+			other.active = false;
+		}
+		~ScopedWasmPosReset() {
+			if (active) arena.wasmArenaPos = pos;
+		}
+	private:
+		WclapArenas &arena;
+		size_t pos;
+		bool active = true;
+	};
+	ScopedWasmPosReset scopedWasmReset() {
+		return {*this, wasmArenaPos};
+	}
 
 private:
 	unsigned char * nativeInWasm(size_t wasmP);

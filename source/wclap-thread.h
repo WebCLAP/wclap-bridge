@@ -7,6 +7,7 @@
 #include <vector>
 #include <mutex>
 
+#include "./validity.h"
 #include "./wclap-arenas.h"
 
 namespace wclap {
@@ -50,6 +51,10 @@ struct WclapThread {
 
 	uint64_t wasmMalloc(size_t bytes);
 	
+	void setWasmDeadline(size_t ms) {
+		if (validity.executionDeadlines) wasmtime_context_set_epoch_deadline(context, ms/10 + 2);
+	}
+	
 	void callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndResults, size_t argN);
 	
 	/* Function call signatures: (return) (args...)
@@ -67,12 +72,14 @@ struct WclapThread {
 	}
 
 	int32_t callWasm_IS(wclap32::WasmP fnP, const char *str) {
+		auto reset = translationScope->scopedWasmReset();
 		auto wasmStr = translationScope->copyStringToWasm(str);
 		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);
 		return values[0].i32;
 	}
 	wclap32::WasmP callWasm_PS(wclap32::WasmP fnP, const char *str) {
+		auto reset = translationScope->scopedWasmReset();
 		auto wasmStr = translationScope->copyStringToWasm(str);
 		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);

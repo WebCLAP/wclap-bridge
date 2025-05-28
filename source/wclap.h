@@ -43,14 +43,9 @@ struct Wclap {
 	uint8_t * wasmMemory(uint64_t wasmP);
 
 	template<class AutoTranslatedStruct>
-	AutoTranslatedStruct view(uint32_t wasmP) {
-		// TODO: bounds check
-		return AutoTranslatedStruct{wasmMemory(wasmP)};
-	}
-	template<class AutoTranslatedStruct>
 	AutoTranslatedStruct view(uint64_t wasmP) {
 		// TODO: bounds check
-		return AutoTranslatedStruct{wasmMemory(wasmP)};
+		return AutoTranslatedStruct{wasmP ? wasmMemory(wasmP) : nullptr};
 	}
 
 	std::string wclapDir, presetDir, cacheDir, varDir;
@@ -87,8 +82,8 @@ struct Wclap {
 private:
 	bool initSuccess = false;
 	
-	wclap32::WclapMethods *methods32;
-	wclap64::WclapMethods *methods64;
+	wclap32::WclapMethods *methods32 = nullptr;
+	wclap64::WclapMethods *methods64 = nullptr;
 
 	mutable std::shared_mutex mutex;
 	std::shared_lock<std::shared_mutex> readLock() const {

@@ -17,24 +17,8 @@ WclapArenas::~WclapArenas() {
 	if (nativeArena) free(nativeArena);
 }
 
-template<>
-uint64_t WclapArenas::copyStringToWasm<uint64_t>(const char *str) {
-	size_t length = std::strlen(str);
-	if (validity.lengths && length > validity.maxStringLength) {
-		length = validity.maxStringLength;
-	}
-	auto wasmTmp = wasmBytes(length + 1);
-	auto *nativeTmp = (char *)wclap.wasmMemory(wasmTmp);
-	for (size_t i = 0; i < length; ++i) {
-		nativeTmp[i] = str[i];
-	}
-	nativeTmp[length] = 0;
-	return wasmTmp;
-}
-
-template<>
-uint32_t WclapArenas::copyStringToWasm<uint32_t>(const char *str) {
-	return uint32_t(copyStringToWasm<uint64_t>(str));
+uint8_t * WclapArenas::wasmMemory(uint64_t wasmP) {
+	return wclap.wasmMemory(wasmP);
 }
 
 } // namespace

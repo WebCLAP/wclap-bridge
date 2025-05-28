@@ -62,7 +62,21 @@ struct WclapThread {
 	void callWasm_V(uint64_t fnP) {
 		callWasmFnP(fnP, nullptr, 0);
 	}
-	
+
+	template<typename ...Args>
+	int32_t callWasm_I(uint64_t fnP, Args ...args) {
+		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
+		callWasmFnP(fnP, values, sizeof...(args));
+		return values[0].i32;
+	}
+	template<typename ...Args>
+	int64_t callWasm_L(uint64_t fnP, Args ...args) {
+		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
+		callWasmFnP(fnP, values, sizeof...(args));
+		return values[0].i32;
+	}
+
+	/*
 	int32_t callWasm_I(uint64_t fnP, uint32_t arg1) {
 		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
 		callWasmFnP(fnP, values, 1);
@@ -83,6 +97,7 @@ struct WclapThread {
 		callWasmFnP(fnP, values, 1);
 		return values[0].i64;
 	}
+	*/
 
 	template<class ...Args>
 	uint32_t callWasm_P(uint32_t fnP, Args ...args) {
@@ -91,6 +106,20 @@ struct WclapThread {
 	template<class ...Args>
 	uint64_t callWasm_P(uint64_t fnP, Args ...args) {
 		return callWasm_L(fnP, std::forward<Args>(args)...);
+	}
+
+private:
+	wasmtime_val_raw argToWasmVal(uint32_t v) {
+		return {.i32=int32_t(v)};
+	}
+	wasmtime_val_raw argToWasmVal(uint64_t v) {
+		return {.i64=int64_t(v)};
+	}
+	wasmtime_val_raw argToWasmVal(float v) {
+		return {.f32=v};
+	}
+	wasmtime_val_raw argToWasmVal(double v) {
+		return {.f64=v};
 	}
 };
 

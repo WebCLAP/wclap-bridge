@@ -23,6 +23,7 @@ struct WclapMethods {
 
 	struct plugin_factory : public clap_plugin_factory {
 		WclapContext context;
+		std::unique_ptr<WclapArenas> arenas;
 		
 		std::vector<clap_plugin_descriptor *> descriptorPointers;
 		
@@ -32,6 +33,9 @@ struct WclapMethods {
 			this->create_plugin = native_create_plugin;
 
 			context = c;
+			arenas = std::unique_ptr<WclapArenas>{
+				new WclapArenas(*c.wclap, thread)
+			};
 
 			auto count = thread.callWasm_I(wasmFactory.get_plugin_count(), context.wasmP);
 			if (validity.lengths && count > validity.maxPlugins) {
@@ -40,7 +44,18 @@ struct WclapMethods {
 				return;
 			}
 			
-			descriptorPointers.assign(count, nullptr);
+			descriptorPointers.clear();
+			for (uint32_t i = 0; i < count; ++i) {
+				auto wasmP = thread.callWasm_P(wasmFactory.get_plugin_descriptor(), context.wasmP, i);
+				if (wasmP) {
+					auto view = c.wclap->view<wclap_plugin_descriptor>(wasmP);
+					if (view) {
+						descriptorPointers.push_back(wasmToNative(*arenas, view));
+					} else if (!validity.filterOnlyWorking) {
+						descriptorPointers.push_back(nullptr);
+					}
+				}
+			}
 		}
 	
 		static uint32_t native_get_plugin_count(const struct clap_plugin_factory *obj) {
@@ -55,11 +70,67 @@ struct WclapMethods {
 			return nullptr;
 		}
 		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *factory, const clap_host *host, const char *plugin_id) {
-			// TODO: translate descriptor into some persistent storage
 			return nullptr;
 		}
 	};
 
+	static WasmP nativeToWasm(WclapArenas &arenas, const char *str) {
+		if (!str) return 0;
+		size_t length = std::strlen(str);
+		if (validity.lengths && length > validity.maxStringLength) {
+			length = validity.maxStringLength;
+		}
+		auto wasmTmp = arenas.wasmBytes(length + 1);
+		auto *nativeTmp = (char *)arenas.wasmMemory(wasmTmp);
+		for (size_t i = 0; i < length; ++i) {
+			nativeTmp[i] = str[i];
+		}
+		nativeTmp[length] = 0;
+		return wasmTmp;
+	}
+
+	static const char * wasmToNativeString(WclapArenas &arenas, WasmP wasmStr) {
+		if (!wasmStr) return nullptr;
+		auto *nativeInWasm = (char *)arenas.wasmMemory(wasmStr);
+		size_t length = std::strlen(nativeInWasm);
+		if (validity.lengths && length > validity.maxStringLength) {
+			length = validity.maxStringLength;
+		}
+		auto *nativeTmp = (char *)arenas.nativeBytes(length + 1);
+		for (size_t i = 0; i < length; ++i) {
+			nativeTmp[i] = nativeInWasm[i];
+		}
+		nativeTmp[length] = 0;
+		return nativeTmp;
+	}
+
+	static clap_plugin_descriptor * wasmToNative(WclapArenas &arenas, wclap_plugin_descriptor &wasm) {
+		auto *native = arenas.nativeTyped<clap_plugin_descriptor>();
+		native->clap_version = wasm.clap_version();
+		native->id = wasmToNativeString(arenas, wasm.id());
+		native->name = wasmToNativeString(arenas, wasm.name());
+		native->vendor = wasmToNativeString(arenas, wasm.vendor());
+		native->url = wasmToNativeString(arenas, wasm.url());
+		native->manual_url = wasmToNativeString(arenas, wasm.manual_url());
+		native->support_url = wasmToNativeString(arenas, wasm.support_url());
+		native->version = wasmToNativeString(arenas, wasm.version());
+		native->description = wasmToNativeString(arenas, wasm.description());
+		
+		// Null-terminated array of strings
+		size_t count = 0;
+		WasmP *wasmStrArray = (WasmP *)arenas.wasmMemory(wasm.features());
+		while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
+			++count;
+		}
+		auto *nativeStrArray = (const char **)arenas.nativeBytes(sizeof(char *)*(count + 1));
+		for (size_t i = 0; i < count; ++i) {
+			nativeStrArray[i] = wasmToNativeString(arenas, wasmStrArray[count]);
+		}
+		nativeStrArray[count] = nullptr;
+		native->features = nativeStrArray;
+		return native;
+	}
+	
 	bool triedPluginFactory = false;
 	std::unique_ptr<plugin_factory> pluginFactory;
 
@@ -72,7 +143,7 @@ struct WclapMethods {
 		WasmP factoryP;
 		{
 			auto reset = scoped.thread.translationScope->scopedWasmReset();
-			auto wasmStr = scoped.thread.translationScope->copyStringToWasm<WasmP>(factory_id);
+			auto wasmStr = nativeToWasm(*scoped.thread.translationScope, factory_id);
 			factoryP = scoped.thread.callWasm_P(getFactoryFn, wasmStr);
 		}
 		if (!factoryP) return nullptr;

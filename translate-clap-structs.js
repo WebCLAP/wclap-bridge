@@ -189,6 +189,10 @@ using ${wclapClass} = ${name};`;
 
 struct ${wclapClass} {
 	${wclapClass}(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 `;
 				structFields.forEach(field => {
 					let fieldType = getType(field.type);

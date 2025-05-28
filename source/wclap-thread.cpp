@@ -279,13 +279,13 @@ void WclapThread::initEntry() {
 		auto wasmEntry = wclap.view<wclap64::wclap_plugin_entry>(clapEntryP64);
 		auto initFn = wasmEntry.init();
 		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = translationScope->copyStringToWasm<wclap64::WasmP>("/plugin/");
+		auto wasmStr = wclap64::WclapMethods::nativeToWasm(*translationScope, "/plugin/");
 		success = callWasm_I(initFn, wasmStr);
 	} else {
 		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(uint32_t(clapEntryP64));
 		auto initFn = wasmEntry.init();
 		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = translationScope->copyStringToWasm<wclap32::WasmP>("/plugin/");
+		auto wasmStr = wclap32::WclapMethods::nativeToWasm(*translationScope, "/plugin/");
 		success = callWasm_I(initFn, wasmStr);
 	}
 	if (trap) {

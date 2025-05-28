@@ -42,6 +42,10 @@ struct WclapArenas {
 		}
 		return result;
 	}
+	template<class T>
+	T * nativeTyped() {
+		return (T *)nativeBytes(sizeof(T), alignof(T));
+	}
 
 	size_t wasmArena, wasmArenaEnd, wasmArenaPos;
 	size_t wasmBytes(size_t size, size_t align=1) {
@@ -54,10 +58,9 @@ struct WclapArenas {
 		}
 		return result;
 	}
-
-	template<typename WasmP>
-	WasmP copyStringToWasm(const char *str);
 	
+	uint8_t * wasmMemory(uint64_t wasmP);
+
 	// Object that resets the arena position when it goes out of scope
 	struct ScopedWasmPosReset {
 		ScopedWasmPosReset(WclapArenas &arena, size_t pos) : arena(arena), pos(pos) {}

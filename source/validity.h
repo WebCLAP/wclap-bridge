@@ -8,6 +8,7 @@ struct ValidityChecks {
 	bool lengths = false;
 	unsigned int maxPlugins = 1000;
 	unsigned int maxStringLength = 16384; // 16k strings
+	unsigned int maxFeaturesLength = 100;  // clap_plugin_descriptor.features
 	
 	bool filterOnlyWorking = false;
 	

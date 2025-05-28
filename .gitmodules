@@ -1,6 +1,3 @@
 [submodule "modules/clap"]
 	path = modules/clap
 	url = https://github.com/free-audio/clap
-[submodule "modules/wasm-c-api"]
-	path = modules/wasm-c-api
-	url = https://github.com/WebAssembly/wasm-c-api.git

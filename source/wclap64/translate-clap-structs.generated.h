@@ -7,6 +7,10 @@ using wclap_version = clap_version_t;
 
 struct wclap_process {
 	wclap_process(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 
 	int64_t & steady_time() {
 		return *(int64_t *)pointerInWasm;
@@ -41,6 +45,10 @@ private:
 
 struct wclap_plugin_descriptor {
 	wclap_plugin_descriptor(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;
@@ -78,6 +86,10 @@ private:
 
 struct wclap_plugin {
 	wclap_plugin(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 
 	WasmP & desc() {
 		return *(WasmP *)pointerInWasm;
@@ -121,6 +133,10 @@ private:
 
 struct wclap_plugin_factory {
 	wclap_plugin_factory(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 
 	WasmP & get_plugin_count() {
 		return *(WasmP *)pointerInWasm;
@@ -137,6 +153,10 @@ private:
 
 struct wclap_plugin_entry {
 	wclap_plugin_entry(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
 
 	clap_version_t & clap_version() {
 		return *(clap_version_t *)pointerInWasm;

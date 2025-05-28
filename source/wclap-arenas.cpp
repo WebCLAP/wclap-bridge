@@ -1,14 +1,10 @@
-/// NO #pragma once or include guard - this is included twice from within two different namespaces
-#ifndef WCLAP_MULTIPLE_INCLUDES_NAMESPACE
-#	error must not be included directly
-#endif
+#include "./wclap-arenas.h"
 
-#include "../validity.h"
-#include "../wclap-thread.h"
-#include "../wclap.h"
+#include "./validity.h"
+#include "./wclap-thread.h"
+#include "./wclap.h"
 
 namespace wclap {
-namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
 WclapTranslationScope::WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
 	nativeArena = nativeArenaPos = (unsigned char *)malloc(arenaBytes);
@@ -21,7 +17,7 @@ WclapTranslationScope::~WclapTranslationScope() {
 	if (nativeArena) free(nativeArena);
 }
 
-WasmP WclapTranslationScope::copyStringToWasm(const char *str) {
+size_t WclapTranslationScope::copyStringToWasm(const char *str) {
 	size_t length = std::strlen(str);
 	if (validity.lengths && length > validity.maxStringLength) {
 		length = validity.maxStringLength;
@@ -35,4 +31,4 @@ WasmP WclapTranslationScope::copyStringToWasm(const char *str) {
 	return wasmTmp;
 }
 
-}} // namespace
+} // namespace

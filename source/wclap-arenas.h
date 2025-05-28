@@ -1,7 +1,4 @@
-/// NO #pragma once or include guard - this is included twice from within two different namespaces
-#ifndef WCLAP_MULTIPLE_INCLUDES_NAMESPACE
-#	error must not be included directly
-#endif
+#pragma once
 
 #ifndef LOG_EXPR
 #	include <iostream>
@@ -14,15 +11,18 @@
 #include <unordered_map>
 
 namespace wclap {
-struct Wclap;
-struct WclapThread;
+
+namespace wclap32 {
+	using WasmP = uint32_t;
+	struct WclapMethods;
+}
+namespace wclap64 {
+	using WasmP = uint64_t;
+	struct WclapMethods;
 }
 
-namespace wclap {namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
-
-using WasmP = WCLAP_MULTIPLE_INCLUDES_WASMP;
-
-struct WclapMethods;
+struct Wclap;
+struct WclapThread;
 
 /* Manages two arena allocators, used for (temporary) translation of function arguments.
 
@@ -52,10 +52,10 @@ struct WclapTranslationScope {
 		return result;
 	}
 
-	WasmP wasmArena, wasmArenaEnd, wasmArenaPos;
-	WasmP wasmBytes(WasmP size, WasmP align=1) {
+	size_t wasmArena, wasmArenaEnd, wasmArenaPos;
+	size_t wasmBytes(size_t size, size_t align=1) {
 		while (wasmArenaPos%align) ++wasmArenaPos;
-		WasmP result = wasmArenaPos;
+		size_t result = wasmArenaPos;
 		wasmArenaPos += size;
 		if (wasmArenaPos > wasmArenaEnd) {
 			LOG_EXPR(wasmArenaPos > wasmArenaEnd);
@@ -64,10 +64,10 @@ struct WclapTranslationScope {
 		return result;
 	}
 
-	WasmP copyStringToWasm(const char *str);
+	size_t copyStringToWasm(const char *str);
 
 private:
-	unsigned char * nativeInWasm(WasmP wasmP);
+	unsigned char * nativeInWasm(size_t wasmP);
 };
 
-}} // namespace
+} // namespace

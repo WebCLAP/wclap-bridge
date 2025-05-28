@@ -5,7 +5,6 @@
 
 #include "./wclap.h"
 #include "./wclap-thread.h"
-#include "./wclap32/wclap-arenas.h"
 #include "./wclap32/wclap-translation.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
@@ -57,13 +56,6 @@ Wclap::~Wclap() {
 	if (module) wasmtime_module_delete(module);
 }
 
-uint8_t * Wclap::wasmMemory(uint32_t wasmP) {
-	if (sharedMemory) {
-		return wasmtime_sharedmemory_data(sharedMemory) + wasmP;
-	} else {
-		return wasmtime_memory_data(singleThread->context, &singleThread->memory) + wasmP;
-	}
-}
 uint8_t * Wclap::wasmMemory(uint64_t wasmP) {
 	if (sharedMemory) {
 		wasmP = std::min<uint64_t>(wasmP, wasmtime_sharedmemory_data_size(sharedMemory));

@@ -8,7 +8,7 @@
 #include <shared_mutex>
 #include <string>
 
-#include "./wclap32/wclap-arenas.h"
+#include "./wclap-arenas.h"
 
 namespace wclap {
 
@@ -35,7 +35,6 @@ struct Wclap {
 	bool wasm64 = false;
 	wasmtime_sharedmemory_t *sharedMemory = nullptr;
 	
-	uint8_t * wasmMemory(uint32_t wasmP);
 	uint8_t * wasmMemory(uint64_t wasmP);
 
 	template<class AutoTranslatedStruct>

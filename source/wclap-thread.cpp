@@ -206,14 +206,9 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 	
 	if (andInitModule) initModule();
 	
-	if (wclap.wasm64) {
-		LOG_EXPR("WclapThread::WclapThread");
-		abort();
-	} else {
-		translationScope32 = std::unique_ptr<wclap32::WclapTranslationScope>{
-			new wclap32::WclapTranslationScope(wclap, *this)
-		};
-	}
+	translationScope = std::unique_ptr<WclapTranslationScope>{
+		new WclapTranslationScope(wclap, *this)
+	};
 }
 
 WclapThread::~WclapThread() {
@@ -333,11 +328,11 @@ void WclapThread::callWasmFnP32(wclap32::WasmP fnP, wasmtime_val_raw *argsAndRes
 		return;
 	}
 
-	auto pos = translationScope32->wasmArenaPos;
+	auto pos = translationScope->wasmArenaPos;
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
 	if (trap) wclap.errorMessage = "function call threw (trapped)";
 	if (error) wclap.errorMessage = "calling function failed";
-	translationScope32->wasmArenaPos = pos;
+	translationScope->wasmArenaPos = pos;
 }
 
 } // namespace

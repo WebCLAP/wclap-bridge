@@ -7,7 +7,7 @@
 #include <vector>
 #include <mutex>
 
-#include "./wclap32/wclap-arenas.h"
+#include "./wclap-arenas.h"
 
 namespace wclap {
 
@@ -15,7 +15,7 @@ struct Wclap;
 
 struct WclapThread {
 	Wclap &wclap;
-	std::unique_ptr<wclap32::WclapTranslationScope> translationScope32;
+	std::unique_ptr<WclapTranslationScope> translationScope;
 	std::mutex mutex;
 
 	// We should delete these (in reverse order) if they're defined
@@ -59,13 +59,13 @@ struct WclapThread {
 	}
 
 	int32_t callWasm_IS(wclap32::WasmP fnP, const char *str) {
-		auto wasmStr = translationScope32->copyStringToWasm(str);
+		auto wasmStr = translationScope->copyStringToWasm(str);
 		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);
 		return values[0].i32;
 	}
 	wclap32::WasmP callWasm_PS(wclap32::WasmP fnP, const char *str) {
-		auto wasmStr = translationScope32->copyStringToWasm(str);
+		auto wasmStr = translationScope->copyStringToWasm(str);
 		wasmtime_val_raw values[] = {{.i32=int32_t(wasmStr)}};
 		callWasmFnP32(fnP, values, 1);
 		return uint32_t(values[0].i32);

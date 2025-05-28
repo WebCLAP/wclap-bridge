@@ -8,8 +8,6 @@
 #include <shared_mutex>
 #include <string>
 
-#include "./wclap-arenas.h"
-
 namespace wclap {
 
 extern wasm_engine_t *global_wasm_engine;
@@ -25,6 +23,12 @@ static bool nameEquals(const wasm_name_t *name, const char *cName) {
 }
 
 struct WclapThread;
+namespace wclap32 {
+	struct WclapMethods;
+}
+namespace wclap64 {
+	struct WclapMethods;
+}
 
 struct Wclap {
 	clap_version clapVersion;

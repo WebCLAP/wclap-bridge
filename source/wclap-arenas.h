@@ -12,15 +12,6 @@
 
 namespace wclap {
 
-namespace wclap32 {
-	using WasmP = uint32_t;
-	struct WclapMethods;
-}
-namespace wclap64 {
-	using WasmP = uint64_t;
-	struct WclapMethods;
-}
-
 struct Wclap;
 struct WclapThread;
 
@@ -28,13 +19,13 @@ struct WclapThread;
 
 	Since free() isn't exposed from the WCLAP, this object should be active until the WASM memory is destroyed.  If a thread is destroyed (does this ever happen?) this object should be returned to the Wclap's pool.
 */
-struct WclapTranslationScope {
+struct WclapArenas {
 	const size_t arenaBytes = 65536;
 
 	Wclap &wclap;
 	
-	WclapTranslationScope(Wclap &wclap, WclapThread &currentThread);
-	~WclapTranslationScope();
+	WclapArenas(Wclap &wclap, WclapThread &currentThread);
+	~WclapArenas();
 	
 	void mallocIfNeeded();
 	

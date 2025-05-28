@@ -11,11 +11,19 @@
 
 namespace wclap {
 
+// TODO: remove this and make the callWasm_* methods only have a return value, inferring bit-depth from the function pointer type and everything else from type overloads
+namespace wclap32 {
+	using WasmP = uint32_t;
+}
+namespace wclap64 {
+	using WasmP = uint64_t;
+}
+
 struct Wclap;
 
 struct WclapThread {
 	Wclap &wclap;
-	std::unique_ptr<WclapTranslationScope> translationScope;
+	std::unique_ptr<WclapArenas> translationScope;
 	std::mutex mutex;
 
 	// We should delete these (in reverse order) if they're defined

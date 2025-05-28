@@ -6,18 +6,18 @@
 
 namespace wclap {
 
-WclapTranslationScope::WclapTranslationScope(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
+WclapArenas::WclapArenas(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
 	nativeArena = nativeArenaPos = (unsigned char *)malloc(arenaBytes);
 	nativeArenaEnd = nativeArena + arenaBytes;
 	wasmArena = wasmArenaPos = currentThread.wasmMalloc(arenaBytes);
 	wasmArenaEnd = wasmArena + arenaBytes;
 }
 
-WclapTranslationScope::~WclapTranslationScope() {
+WclapArenas::~WclapArenas() {
 	if (nativeArena) free(nativeArena);
 }
 
-size_t WclapTranslationScope::copyStringToWasm(const char *str) {
+size_t WclapArenas::copyStringToWasm(const char *str) {
 	size_t length = std::strlen(str);
 	if (validity.lengths && length > validity.maxStringLength) {
 		length = validity.maxStringLength;

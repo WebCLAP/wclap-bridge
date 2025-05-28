@@ -206,8 +206,8 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 	
 	if (andInitModule) initModule();
 	
-	translationScope = std::unique_ptr<WclapTranslationScope>{
-		new WclapTranslationScope(wclap, *this)
+	translationScope = std::unique_ptr<WclapArenas>{
+		new WclapArenas(wclap, *this)
 	};
 }
 

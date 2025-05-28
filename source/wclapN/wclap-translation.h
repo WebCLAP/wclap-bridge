@@ -18,9 +18,8 @@ struct WclapContext {
 
 struct WclapMethods {
 	Wclap &wclap;
-	//WclapTranslationScope translationScope;
 	
-	WclapMethods(Wclap &wclap) : wclap(wclap) /*, translationScope(wclap)*/ {}
+	WclapMethods(Wclap &wclap) : wclap(wclap) {}
 
 	struct plugin_factory : public clap_plugin_factory {
 		WclapContext context;

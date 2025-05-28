@@ -5,7 +5,7 @@
 
 #include "./wclap.h"
 #include "./wclap-thread.h"
-#include "./wclap32/wclap-translation-scope.h"
+#include "./wclap32/wclap-arenas.h"
 #include "./wclap32/wclap-translation.h"
 
 std::ostream & operator<<(std::ostream &s, const wasm_byte_vec_t &bytes) {
@@ -187,12 +187,10 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 	return std::unique_ptr<WclapThread>(new WclapThread(*this));
 }
 
-/*
 void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
 	auto lock = writeLock();
 	realtimeThreadPool.emplace_back(std::move(ptr));
 }
-*/
 
 Wclap::ScopedThread::~ScopedThread() {
 	if (locked) thread.mutex.unlock();

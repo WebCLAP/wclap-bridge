@@ -7,7 +7,7 @@
 #include <vector>
 #include <mutex>
 
-#include "./wclap32/wclap-translation-scope.h"
+#include "./wclap32/wclap-arenas.h"
 
 namespace wclap {
 

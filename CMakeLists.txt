@@ -7,7 +7,7 @@ target_sources(wclap-bridge PRIVATE
 	source/wclap-bridge.cpp
 	source/wclap.cpp
 	source/wclap-thread.cpp
-	source/wclap32/wclap-translation-scope.cpp
+	source/wclap32/wclap-arenas.cpp
 	source/validity.cpp
 )
 target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)

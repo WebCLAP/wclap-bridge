@@ -8,7 +8,7 @@
 #include <shared_mutex>
 #include <string>
 
-#include "./wclap32/wclap-translation-scope.h"
+#include "./wclap32/wclap-arenas.h"
 
 namespace wclap {
 
@@ -64,9 +64,7 @@ struct Wclap {
 
 	// obtains a thread for realtime calls by removing from the pool, or creating if needed
 	std::unique_ptr<WclapThread> claimRealtimeThread();
-	/*
 	void returnRealtimeThread(std::unique_ptr<WclapThread> &ptr);
-	*/
 	
 	// borrows a locked non-realtime thread, adding to the pool if necessary
 	struct ScopedThread {

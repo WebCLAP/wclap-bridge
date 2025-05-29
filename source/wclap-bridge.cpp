@@ -79,7 +79,11 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 
 	std::ifstream wasmFile{ensureTrailingSlash(wclapDir) + "module.wasm", std::ios::binary};
 	if (!wasmFile) {
-		wclap::wclap_error_message = "Couldn't open plugin/module.wasm file";
+		wasmFile = std::ifstream{wclapDir, std::ios::binary};
+		if (wasmFile) wclapDir = nullptr; // if it's not a bundle, don't provide /plugin/
+	}
+	if (!wasmFile) {
+		wclap::wclap_error_message = "Couldn't open ?.wclap/module.wasm or ?.wclap";
 		return nullptr;
 	}
 	std::vector<char> wasmBytes{std::istreambuf_iterator<char>{wasmFile}, {}};

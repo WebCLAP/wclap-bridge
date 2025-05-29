@@ -15,9 +15,9 @@ struct ValidityChecks {
 	bool executionDeadlines = false;
 	// various deadlines in ms - epoch ticks are every 10ms so it could be longer than this
 	struct {
-		unsigned int initModule = 100;
-		unsigned int malloc = 10;
-		unsigned int other = 10;
+		unsigned int initModule = 500;
+		unsigned int malloc = 50;
+		unsigned int other = 500;
 	} deadlines;
 	
 	ValidityChecks(unsigned int level) {
@@ -31,13 +31,14 @@ struct ValidityChecks {
 		}
 		
 		if (level >= 100) {
-			// semantic = true
+			filterOnlyWorking = true;
 		}
 		
 		// opinionated checks
 		if (level >= 200) {
+			deadlines.initModule = 150;
+			deadlines.other = 50;
 			lengths = true;
-			filterOnlyWorking = true;
 		}
 	}
 };

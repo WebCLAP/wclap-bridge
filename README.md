@@ -74,16 +74,22 @@ There are also `WclapTranslationScope`s associated with long-lived host structur
 
 ### Validity checking
 
-Since a native CLAP plugin is loaded as a dynamic library into the host process, the plugin is implicitly trusted.  Hosts might (completely reasonably!) protect against buggy behaviour, but not malicious behaviour, since that's impossible.
+Since a native CLAP plugin is loaded as a dynamic library into the host process, the plugin is implicitly trusted.  Hosts might (completely reasonably!) only protect against buggy behaviour, but not malicious behaviour since that's impossible.
 
 However, untrusted WCLAPs _should_ be safe to run.  Much like opening a webpage in a browser, at worst they should be annoying, but not crash the system or leak user data.  WCLAPs are sandboxed by the WebAssembly engine (including system access via WASI), but could still return values which aim to cause misbehaviour or crashes in the host.
 
 `wclap_global_init()` therefore has a `validityCheckLevel` argument, where `0` means the host (not this bridge) is responsible for validating all values, preventing crashes or unsafe behaviour.  Here are other thresholds, and the assumptions they check/enforce:
 
+* `1` - limits execution time
+	* 500ms deadline for most function calls, exceeding the deadline once halts the entire WCLAP with an error
 * `10` - basic range/type checks
 * `100` - semantic validity checks
+	* only list plugins which return a non-`NULL` descriptor
 * `200` - opinionated safety checks
-	* no more than 1000 plugins per module
+	* 50ms deadline for most function calls
+	* maximum string length, number of plugins, features per plugin
+	
+See [`validity.h`](source/validity.h) for exact details.
 
 ## Known issues
 

@@ -289,7 +289,7 @@ void WclapThread::initEntry() {
 		success = callWasm_I(initFn, wasmStr);
 	}
 	if (trap) {
-		wclap.errorMessage = "clap_entry.init() threw (trapped)";
+		wclap.errorMessage = (trapIsTimeout(trap) ? "clap_entry.init() timeout" : "clap_entry.init() threw (trapped)");
 		return;
 	}
 	if (!success) {
@@ -318,7 +318,7 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 		return 0;
 	}
 	if (trap) {
-		wclap.errorMessage = "calling malloc() threw (trapped)";
+		wclap.errorMessage = (trapIsTimeout(trap) ? "malloc() timeout" : "malloc() threw (trapped)");
 		return 0;
 	}
 	if (wclap.wasm64) {
@@ -343,7 +343,7 @@ void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, si
 
 	setWasmDeadline(validity.deadlines.other);
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
-	if (trap) wclap.errorMessage = "function call threw (trapped)";
+	if (trap) wclap.errorMessage = (trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
 	if (error) wclap.errorMessage = "calling function failed";
 }
 

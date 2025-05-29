@@ -14,6 +14,11 @@ namespace wclap {
 
 struct Wclap;
 
+inline bool trapIsTimeout(const wasm_trap_t *trap) {
+	wasmtime_trap_code_t code;
+	return wasmtime_trap_code(trap, &code) && code == WASMTIME_TRAP_CODE_INTERRUPT;
+}
+
 struct WclapThread {
 	Wclap &wclap;
 	std::unique_ptr<WclapArenas> translationScope;

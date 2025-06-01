@@ -21,7 +21,7 @@ inline bool trapIsTimeout(const wasm_trap_t *trap) {
 
 struct WclapThread {
 	Wclap &wclap;
-	std::unique_ptr<WclapArenas> translationScope;
+	std::unique_ptr<WclapArenas> arenas;
 	std::mutex mutex;
 
 	// We should delete these (in reverse order) if they're defined
@@ -67,12 +67,28 @@ struct WclapThread {
 	void callWasm_V(uint64_t fnP) {
 		callWasmFnP(fnP, nullptr, 0);
 	}
+	template<typename ...Args>
+	void callWasm_V(uint64_t fnP, Args ...args) {
+		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
+		callWasmFnP(fnP, values, sizeof...(args));
+	}
 
+	int32_t callWasm_I(uint64_t fnP) {
+		wasmtime_val_raw values[1];
+		callWasmFnP(fnP, values, 1);
+		return values[0].i32;
+	}
 	template<typename ...Args>
 	int32_t callWasm_I(uint64_t fnP, Args ...args) {
 		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
 		callWasmFnP(fnP, values, sizeof...(args));
 		return values[0].i32;
+	}
+	
+	int64_t callWasm_L(uint64_t fnP) {
+		wasmtime_val_raw values[1];
+		callWasmFnP(fnP, values, 1);
+		return values[0].i64;
 	}
 	template<typename ...Args>
 	int64_t callWasm_L(uint64_t fnP, Args ...args) {
@@ -81,28 +97,29 @@ struct WclapThread {
 		return values[0].i32;
 	}
 
-	/*
-	int32_t callWasm_I(uint64_t fnP, uint32_t arg1) {
-		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
+	float callWasm_F(uint64_t fnP) {
+		wasmtime_val_raw values[1];
 		callWasmFnP(fnP, values, 1);
-		return values[0].i32;
+		return values[0].f32;
 	}
-	int32_t callWasm_I(uint64_t fnP, uint64_t arg1) {
-		wasmtime_val_raw values[] = {{.i64=int64_t(arg1)}};
+	template<typename ...Args>
+	float callWasm_F(uint64_t fnP, Args ...args) {
+		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
+		callWasmFnP(fnP, values, sizeof...(args));
+		return values[0].f32;
+	}
+
+	double callWasm_D(uint64_t fnP) {
+		wasmtime_val_raw values[1];
 		callWasmFnP(fnP, values, 1);
-		return values[0].i32;
+		return values[0].f64;
 	}
-	int64_t callWasm_L(uint64_t fnP, uint32_t arg1) {
-		wasmtime_val_raw values[] = {{.i32=int32_t(arg1)}};
-		callWasmFnP(fnP, values, 1);
-		return values[0].i64;
+	template<typename ...Args>
+	double callWasm_D(uint64_t fnP, Args ...args) {
+		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
+		callWasmFnP(fnP, values, sizeof...(args));
+		return values[0].f64;
 	}
-	int64_t callWasm_L(uint64_t fnP, uint64_t arg1) {
-		wasmtime_val_raw values[] = {{.i64=int64_t(arg1)}};
-		callWasmFnP(fnP, values, 1);
-		return values[0].i64;
-	}
-	*/
 
 	template<class ...Args>
 	uint32_t callWasm_P(uint32_t fnP, Args ...args) {

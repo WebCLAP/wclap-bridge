@@ -210,7 +210,7 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 	if (andInitModule) initModule();
 	
 	if (!wclap.errorMessage) {
-		translationScope = std::unique_ptr<WclapArenas>{
+		arenas = std::unique_ptr<WclapArenas>{
 			new WclapArenas(wclap, *this)
 		};
 	}
@@ -278,14 +278,16 @@ void WclapThread::initEntry() {
 	if (wclap.wasm64) {
 		auto wasmEntry = wclap.view<wclap64::wclap_plugin_entry>(clapEntryP64);
 		auto initFn = wasmEntry.init();
-		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = wclap64::WclapMethods::nativeToWasm(*translationScope, "/plugin/");
+		auto reset = arenas->scopedWasmReset();
+		wclap64::WasmP wasmStr;
+		wclap64::nativeToWasm(*arenas, "/plugin/", wasmStr);
 		success = callWasm_I(initFn, wasmStr);
 	} else {
 		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(uint32_t(clapEntryP64));
 		auto initFn = wasmEntry.init();
-		auto reset = translationScope->scopedWasmReset();
-		auto wasmStr = wclap32::WclapMethods::nativeToWasm(*translationScope, "/plugin/");
+		auto reset = arenas->scopedWasmReset();
+		wclap32::WasmP wasmStr;
+		wclap32::nativeToWasm(*arenas, "/plugin/", wasmStr);
 		success = callWasm_I(initFn, wasmStr);
 	}
 	if (trap) {

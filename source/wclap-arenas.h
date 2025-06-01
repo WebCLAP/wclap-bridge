@@ -46,6 +46,9 @@ struct WclapArenas {
 	T * nativeTyped() {
 		return (T *)nativeBytes(sizeof(T), alignof(T));
 	}
+	void nativeReset() {
+		nativeArenaPos = nativeArena;
+	}
 
 	size_t wasmArena, wasmArenaEnd, wasmArenaPos;
 	size_t wasmBytes(size_t size, size_t align=1) {
@@ -79,6 +82,18 @@ struct WclapArenas {
 		return {*this, wasmArenaPos};
 	}
 
+	// Like a pointer into the WASM object
+	template<class AutoTranslatedStruct>
+	AutoTranslatedStruct view(uint64_t wasmP) {
+		return wclap.view<AutoTranslatedStruct>(wasmP);
+	}
+	
+	template<class AutoTranslatedStruct, typename WasmP>
+	AutoTranslatedStruct create(WasmP &wasmP) {
+		wasmP = (WasmP)wasmBytes(sizeof(AutoTranslatedStruct), alignof(AutoTranslatedStruct));
+		return wclap.view<AutoTranslatedStruct>(wasmP);
+	}
+	
 private:
 	unsigned char * nativeInWasm(size_t wasmP);
 };

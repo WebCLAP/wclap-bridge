@@ -77,6 +77,7 @@ struct Wclap {
 		bool locked = true;
 	};
 	ScopedThread lockRelaxedThread();
+	static ScopedThread lockThread(WclapThread *ptr);
 
 	const void * getFactory(const char *factory_id);
 private:

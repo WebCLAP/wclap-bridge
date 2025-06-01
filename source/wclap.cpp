@@ -213,6 +213,10 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 	relaxedThreadPool.emplace_back(rawPtr);
 	return {*rawPtr};
 }
+Wclap::ScopedThread Wclap::lockThread(WclapThread *ptr) {
+	ptr->mutex.lock();
+	return {*ptr};
+}
 
 const void * Wclap::getFactory(const char *factory_id) {
 	if (wasm64) {

@@ -2,6 +2,7 @@
 #ifndef WCLAP_MULTIPLE_INCLUDES_NAMESPACE
 #	error must not be included directly
 #endif
+// The matching `translate-clap-structs.generated.h` (defining `WasmP` and the `wclap_*` structs) will already have been included
 
 #include "../validity.h"
 #include "../wclap-thread.h"
@@ -16,6 +17,86 @@ struct WclapContext {
 	Wclap *wclap = nullptr;
 };
 
+inline void nativeToWasm(WclapArenas &arenas, const char *str, WasmP &wasmP) {
+	if (!str) {
+		wasmP = 0;
+		return;
+	}
+	size_t length = std::strlen(str);
+	if (validity.lengths && length > validity.maxStringLength) {
+		length = validity.maxStringLength;
+	}
+	wasmP = arenas.wasmBytes(length + 1);
+	auto *nativeTmp = (char *)arenas.wasmMemory(wasmP);
+	for (size_t i = 0; i < length; ++i) {
+		nativeTmp[i] = str[i];
+	}
+	nativeTmp[length] = 0;
+}
+
+inline void wasmToNative(WclapArenas &arenas, WasmP wasmStr, const char *&str) {
+	if (!wasmStr) {
+		str = nullptr;
+		return;
+	}
+	auto *nativeInWasm = (char *)arenas.wasmMemory(wasmStr);
+	size_t length = std::strlen(nativeInWasm);
+	if (validity.lengths && length > validity.maxStringLength) {
+		length = validity.maxStringLength;
+	}
+	auto *nativeTmp = (char *)arenas.nativeBytes(length + 1);
+	for (size_t i = 0; i < length; ++i) {
+		nativeTmp[i] = nativeInWasm[i];
+	}
+	nativeTmp[length] = 0;
+	str = nativeTmp;
+}
+
+inline void wasmToNative(WclapArenas &arenas, WasmP stringList, const char * const * &features) {
+	if (!stringList) {
+		features = nullptr;
+		return;
+	}
+	// Null-terminated array of strings
+	size_t count = 0;
+	WasmP *wasmStrArray = (WasmP *)arenas.wasmMemory(stringList);
+	while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
+		++count;
+	}
+	auto *nativeStrArray = (const char **)arenas.nativeBytes(sizeof(char *)*(count + 1));
+	for (size_t i = 0; i < count; ++i) {
+		wasmToNative(arenas, wasmStrArray[count], nativeStrArray[i]);
+	}
+	nativeStrArray[count] = nullptr;
+	features = nativeStrArray;
+}
+
+/*
+template<>
+void wclap_host::toNative<void>(WclapArenas &arenas, const clap_host_t *&cNative) {
+	static_assert(false, "host shouldn't be translated from WASM to native");
+	// shouldn't ever happen
+	abort();
+}
+*/
+
+/*
+inline void wasmToNative(WclapArenas &arenas, wclap_plugin_descriptor &wasm, const clap_plugin_descriptor *&desc) {
+	auto *native = arenas.nativeTyped<clap_plugin_descriptor>();
+	native->clap_version = wasm.clap_version();
+	wasmToNative(arenas, wasm.id(), native->id);
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+	wasmToNative(arenas, wasm.url(), native->url);
+	wasmToNative(arenas, wasm.manual_url(), native->manual_url);
+	wasmToNative(arenas, wasm.support_url(), native->support_url);
+	wasmToNative(arenas, wasm.version(), native->version);
+	wasmToNative(arenas, wasm.description(), native->description);
+	wasmToNative(arenas, wasm.features(), native->features);
+	desc = native;
+}
+*/
+
 struct WclapMethods {
 	Wclap &wclap;
 	
@@ -25,7 +106,7 @@ struct WclapMethods {
 		WclapContext context;
 		std::unique_ptr<WclapArenas> arenas;
 		
-		std::vector<clap_plugin_descriptor *> descriptorPointers;
+		std::vector<const clap_plugin_descriptor *> descriptorPointers;
 		
 		void assign(const WclapContext &c, WclapThread &thread, wclap_plugin_factory wasmFactory) {
 			this->get_plugin_count = native_get_plugin_count;
@@ -48,12 +129,11 @@ struct WclapMethods {
 			for (uint32_t i = 0; i < count; ++i) {
 				auto wasmP = thread.callWasm_P(wasmFactory.get_plugin_descriptor(), context.wasmP, i);
 				if (wasmP) {
-					auto view = c.wclap->view<wclap_plugin_descriptor>(wasmP);
-					if (view) {
-						descriptorPointers.push_back(wasmToNative(*arenas, view));
-					} else if (!validity.filterOnlyWorking) {
-						descriptorPointers.push_back(nullptr);
-					}
+					const clap_plugin_descriptor *desc;
+					wasmToNative(*arenas, wasmP, desc);
+					descriptorPointers.push_back(desc);
+				} else if (!validity.filterOnlyWorking) {
+					descriptorPointers.push_back(nullptr);
 				}
 			}
 		}
@@ -73,63 +153,6 @@ struct WclapMethods {
 			return nullptr;
 		}
 	};
-
-	static WasmP nativeToWasm(WclapArenas &arenas, const char *str) {
-		if (!str) return 0;
-		size_t length = std::strlen(str);
-		if (validity.lengths && length > validity.maxStringLength) {
-			length = validity.maxStringLength;
-		}
-		auto wasmTmp = arenas.wasmBytes(length + 1);
-		auto *nativeTmp = (char *)arenas.wasmMemory(wasmTmp);
-		for (size_t i = 0; i < length; ++i) {
-			nativeTmp[i] = str[i];
-		}
-		nativeTmp[length] = 0;
-		return wasmTmp;
-	}
-
-	static const char * wasmToNativeString(WclapArenas &arenas, WasmP wasmStr) {
-		if (!wasmStr) return nullptr;
-		auto *nativeInWasm = (char *)arenas.wasmMemory(wasmStr);
-		size_t length = std::strlen(nativeInWasm);
-		if (validity.lengths && length > validity.maxStringLength) {
-			length = validity.maxStringLength;
-		}
-		auto *nativeTmp = (char *)arenas.nativeBytes(length + 1);
-		for (size_t i = 0; i < length; ++i) {
-			nativeTmp[i] = nativeInWasm[i];
-		}
-		nativeTmp[length] = 0;
-		return nativeTmp;
-	}
-
-	static clap_plugin_descriptor * wasmToNative(WclapArenas &arenas, wclap_plugin_descriptor &wasm) {
-		auto *native = arenas.nativeTyped<clap_plugin_descriptor>();
-		native->clap_version = wasm.clap_version();
-		native->id = wasmToNativeString(arenas, wasm.id());
-		native->name = wasmToNativeString(arenas, wasm.name());
-		native->vendor = wasmToNativeString(arenas, wasm.vendor());
-		native->url = wasmToNativeString(arenas, wasm.url());
-		native->manual_url = wasmToNativeString(arenas, wasm.manual_url());
-		native->support_url = wasmToNativeString(arenas, wasm.support_url());
-		native->version = wasmToNativeString(arenas, wasm.version());
-		native->description = wasmToNativeString(arenas, wasm.description());
-		
-		// Null-terminated array of strings
-		size_t count = 0;
-		WasmP *wasmStrArray = (WasmP *)arenas.wasmMemory(wasm.features());
-		while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
-			++count;
-		}
-		auto *nativeStrArray = (const char **)arenas.nativeBytes(sizeof(char *)*(count + 1));
-		for (size_t i = 0; i < count; ++i) {
-			nativeStrArray[i] = wasmToNativeString(arenas, wasmStrArray[count]);
-		}
-		nativeStrArray[count] = nullptr;
-		native->features = nativeStrArray;
-		return native;
-	}
 	
 	bool triedPluginFactory = false;
 	std::unique_ptr<plugin_factory> pluginFactory;
@@ -142,8 +165,9 @@ struct WclapMethods {
 		auto getFactoryFn = wasmEntry.get_factory();
 		WasmP factoryP;
 		{
-			auto reset = scoped.thread.translationScope->scopedWasmReset();
-			auto wasmStr = nativeToWasm(*scoped.thread.translationScope, factory_id);
+			auto reset = scoped.thread.arenas->scopedWasmReset();
+			WasmP wasmStr;
+			nativeToWasm(*scoped.thread.arenas, factory_id, wasmStr);
 			factoryP = scoped.thread.callWasm_P(getFactoryFn, wasmStr);
 		}
 		if (!factoryP) return nullptr;

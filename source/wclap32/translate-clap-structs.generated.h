@@ -3,10 +3,453 @@ namespace wclap { namespace wclap32 {
 
 using WasmP = uint32_t;
 
+template<class NativeT>
+void wasmToNative(WclapArenas &arenas, WasmP wasmP, NativeT *&native) {
+	//static_assert(false, "generic template should not be used");
+	native->generic_wasmToNative_should_not_be_used();
+}
+template<class NativeT>
+void nativeToWasm(WclapArenas &arenas, NativeT *native, WasmP &wasmP) {
+	//static_assert(false, "generic template should not be used");
+	native->generic_nativeToWasm_should_not_be_used();
+}
+
+struct NativeProxyContext {
+	Wclap &wclap;
+	WasmP wasmObjP;
+	std::unique_ptr<WclapThread> realtimeThread = nullptr;
+	
+	NativeProxyContext(Wclap &wclap, WasmP wasmObjP) : wclap(wclap), wasmObjP(wasmObjP) {}
+};
+template<class NativeT>
+NativeProxyContext getNativeProxyContext(const NativeT *native) {
+	//static_assert(false, "generic template should not be used");
+	native->generic_getNativeProxyContext_should_not_be_used();
+}
+
 using wclap_version = clap_version_t;
 
+struct wclap_host {
+	wclap_host(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_version_t & clap_version() {
+		return *(clap_version_t *)pointerInWasm;
+	}
+	WasmP & host_data() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & name() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & vendor() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	WasmP & url() {
+		return *(WasmP *)(pointerInWasm + 24);
+	}
+	WasmP & version() {
+		return *(WasmP *)(pointerInWasm + 28);
+	}
+	WasmP & get_extension() {
+		return *(WasmP *)(pointerInWasm + 32);
+	}
+	WasmP & request_restart() {
+		return *(WasmP *)(pointerInWasm + 36);
+	}
+	WasmP & request_process() {
+		return *(WasmP *)(pointerInWasm + 40);
+	}
+	WasmP & request_callback() {
+		return *(WasmP *)(pointerInWasm + 44);
+	}
+
+	static const void * nativeProxy_get_extension(const struct clap_host *host, const char *extension_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host>(context.wasmObjP).get_extension();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_extension_id;
+		nativeToWasm(arenas, extension_id, wasm_extension_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
+
+		arenas.nativeReset();
+		const void *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+	static void nativeProxy_request_restart(const struct clap_host *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host>(context.wasmObjP).request_restart();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static void nativeProxy_request_process(const struct clap_host *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host>(context.wasmObjP).request_process();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static void nativeProxy_request_callback(const struct clap_host *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host>(context.wasmObjP).request_callback();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_t *&cNative) {
+	auto wasm = arenas.view<wclap_host>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_t>();
+	cNative = native;
+	native->clap_version = wasm.clap_version();
+	wasmToNative(arenas, wasm.host_data(), native->host_data);
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+	wasmToNative(arenas, wasm.url(), native->url);
+	wasmToNative(arenas, wasm.version(), native->version);
+	native->get_extension = wclap_host::nativeProxy_get_extension;
+	native->request_restart = wclap_host::nativeProxy_request_restart;
+	native->request_process = wclap_host::nativeProxy_request_process;
+	native->request_callback = wclap_host::nativeProxy_request_callback;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_t");
+	abort();
+//	arenas.create<wclap_host>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_event_header = clap_event_header_t;
+
+using wclap_event_note = clap_event_note_t;
+
+using wclap_event_note_expression = clap_event_note_expression_t;
+
+struct wclap_event_param_value {
+	wclap_event_param_value(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_event_header_t & header() {
+		return *(clap_event_header_t *)pointerInWasm;
+	}
+	uint32_t & param_id() {
+		return *(uint32_t *)(pointerInWasm + 16);
+	}
+	WasmP & cookie() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	int32_t & note_id() {
+		return *(int32_t *)(pointerInWasm + 24);
+	}
+	int16_t & port_index() {
+		return *(int16_t *)(pointerInWasm + 28);
+	}
+	int16_t & channel() {
+		return *(int16_t *)(pointerInWasm + 30);
+	}
+	int16_t & key() {
+		return *(int16_t *)(pointerInWasm + 32);
+	}
+	double & value() {
+		return *(double *)(pointerInWasm + 40);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_event_param_value_t *&cNative) {
+	auto wasm = arenas.view<wclap_event_param_value>(wasmP);
+	auto *native = arenas.nativeTyped<clap_event_param_value_t>();
+	cNative = native;
+	native->header = wasm.header();
+	native->param_id = wasm.param_id();
+	wasmToNative(arenas, wasm.cookie(), native->cookie);
+	native->note_id = wasm.note_id();
+	native->port_index = wasm.port_index();
+	native->channel = wasm.channel();
+	native->key = wasm.key();
+	native->value = wasm.value();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_event_param_value_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_event_param_value_t");
+	abort();
+//	arenas.create<wclap_event_param_value>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_event_param_mod {
+	wclap_event_param_mod(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_event_header_t & header() {
+		return *(clap_event_header_t *)pointerInWasm;
+	}
+	uint32_t & param_id() {
+		return *(uint32_t *)(pointerInWasm + 16);
+	}
+	WasmP & cookie() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	int32_t & note_id() {
+		return *(int32_t *)(pointerInWasm + 24);
+	}
+	int16_t & port_index() {
+		return *(int16_t *)(pointerInWasm + 28);
+	}
+	int16_t & channel() {
+		return *(int16_t *)(pointerInWasm + 30);
+	}
+	int16_t & key() {
+		return *(int16_t *)(pointerInWasm + 32);
+	}
+	double & amount() {
+		return *(double *)(pointerInWasm + 40);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_event_param_mod_t *&cNative) {
+	auto wasm = arenas.view<wclap_event_param_mod>(wasmP);
+	auto *native = arenas.nativeTyped<clap_event_param_mod_t>();
+	cNative = native;
+	native->header = wasm.header();
+	native->param_id = wasm.param_id();
+	wasmToNative(arenas, wasm.cookie(), native->cookie);
+	native->note_id = wasm.note_id();
+	native->port_index = wasm.port_index();
+	native->channel = wasm.channel();
+	native->key = wasm.key();
+	native->amount = wasm.amount();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_event_param_mod_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_event_param_mod_t");
+	abort();
+//	arenas.create<wclap_event_param_mod>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_event_param_gesture = clap_event_param_gesture_t;
+
+using wclap_event_transport = clap_event_transport_t;
+
+using wclap_event_midi = clap_event_midi_t;
+
+struct wclap_event_midi_sysex {
+	wclap_event_midi_sysex(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_event_header_t & header() {
+		return *(clap_event_header_t *)pointerInWasm;
+	}
+	uint16_t & port_index() {
+		return *(uint16_t *)(pointerInWasm + 16);
+	}
+	WasmP & buffer() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	uint32_t & size() {
+		return *(uint32_t *)(pointerInWasm + 24);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_event_midi_sysex_t *&cNative) {
+	auto wasm = arenas.view<wclap_event_midi_sysex>(wasmP);
+	auto *native = arenas.nativeTyped<clap_event_midi_sysex_t>();
+	cNative = native;
+	native->header = wasm.header();
+	native->port_index = wasm.port_index();
+	wasmToNative(arenas, wasm.buffer(), native->buffer);
+	native->size = wasm.size();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_event_midi_sysex_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_event_midi_sysex_t");
+	abort();
+//	arenas.create<wclap_event_midi_sysex>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_event_midi2 = clap_event_midi2_t;
+
+struct wclap_input_events {
+	wclap_input_events(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & ctx() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & size() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+
+	static uint32_t nativeProxy_size(const struct clap_input_events *list) {
+		auto context = getNativeProxyContext(list);
+		WasmP wasmFn = context.wclap.view<wclap_input_events>(context.wasmObjP).size();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static const clap_event_header_t * nativeProxy_get(const struct clap_input_events *list, uint32_t index) {
+		auto context = getNativeProxyContext(list);
+		WasmP wasmFn = context.wclap.view<wclap_input_events>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+
+		arenas.nativeReset();
+		const clap_event_header_t *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_input_events_t *&cNative) {
+	auto wasm = arenas.view<wclap_input_events>(wasmP);
+	auto *native = arenas.nativeTyped<clap_input_events_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.ctx(), native->ctx);
+	native->size = wclap_input_events::nativeProxy_size;
+	native->get = wclap_input_events::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_input_events_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_input_events_t");
+	abort();
+//	arenas.create<wclap_input_events>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_output_events {
+	wclap_output_events(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & ctx() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & try_push() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_try_push(const struct clap_output_events *list, const clap_event_header_t       *event) {
+		auto context = getNativeProxyContext(list);
+		WasmP wasmFn = context.wclap.view<wclap_output_events>(context.wasmObjP).try_push();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_event;
+		nativeToWasm(arenas, event, wasm_event);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_event);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_output_events_t *&cNative) {
+	auto wasm = arenas.view<wclap_output_events>(wasmP);
+	auto *native = arenas.nativeTyped<clap_output_events_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.ctx(), native->ctx);
+	native->try_push = wclap_output_events::nativeProxy_try_push;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_output_events_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_output_events_t");
+	abort();
+//	arenas.create<wclap_output_events>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_audio_buffer {
+	wclap_audio_buffer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & data32() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & data64() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	uint32_t & channel_count() {
+		return *(uint32_t *)(pointerInWasm + 8);
+	}
+	uint32_t & latency() {
+		return *(uint32_t *)(pointerInWasm + 12);
+	}
+	uint64_t & constant_mask() {
+		return *(uint64_t *)(pointerInWasm + 16);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_audio_buffer_t *&cNative) {
+	auto wasm = arenas.view<wclap_audio_buffer>(wasmP);
+	auto *native = arenas.nativeTyped<clap_audio_buffer_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.data32(), native->data32);
+	wasmToNative(arenas, wasm.data64(), native->data64);
+	native->channel_count = wasm.channel_count();
+	native->latency = wasm.latency();
+	native->constant_mask = wasm.constant_mask();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_audio_buffer_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_audio_buffer_t");
+	abort();
+//	arenas.create<wclap_audio_buffer>(wasmP).fromNative(arenas, native);
+}
+*/
+
 struct wclap_process {
-	wclap_process(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	wclap_process(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -40,11 +483,34 @@ struct wclap_process {
 		return *(WasmP *)(pointerInWasm + 36);
 	}
 private:
-	unsigned char * pointerInWasm;
+	unsigned char *pointerInWasm;
 };
 
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_process_t *&cNative) {
+	auto wasm = arenas.view<wclap_process>(wasmP);
+	auto *native = arenas.nativeTyped<clap_process_t>();
+	cNative = native;
+	native->steady_time = wasm.steady_time();
+	native->frames_count = wasm.frames_count();
+	wasmToNative(arenas, wasm.transport(), native->transport);
+	wasmToNative(arenas, wasm.audio_inputs(), native->audio_inputs);
+	wasmToNative(arenas, wasm.audio_outputs(), native->audio_outputs);
+	native->audio_inputs_count = wasm.audio_inputs_count();
+	native->audio_outputs_count = wasm.audio_outputs_count();
+	wasmToNative(arenas, wasm.in_events(), native->in_events);
+	wasmToNative(arenas, wasm.out_events(), native->out_events);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_process_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_process_t");
+	abort();
+//	arenas.create<wclap_process>(wasmP).fromNative(arenas, native);
+}
+*/
+
 struct wclap_plugin_descriptor {
-	wclap_plugin_descriptor(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	wclap_plugin_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -81,11 +547,35 @@ struct wclap_plugin_descriptor {
 		return *(WasmP *)(pointerInWasm + 44);
 	}
 private:
-	unsigned char * pointerInWasm;
+	unsigned char *pointerInWasm;
 };
 
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_descriptor_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_descriptor>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_descriptor_t>();
+	cNative = native;
+	native->clap_version = wasm.clap_version();
+	wasmToNative(arenas, wasm.id(), native->id);
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+	wasmToNative(arenas, wasm.url(), native->url);
+	wasmToNative(arenas, wasm.manual_url(), native->manual_url);
+	wasmToNative(arenas, wasm.support_url(), native->support_url);
+	wasmToNative(arenas, wasm.version(), native->version);
+	wasmToNative(arenas, wasm.description(), native->description);
+	wasmToNative(arenas, wasm.features(), native->features);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_descriptor_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_descriptor_t");
+	abort();
+//	arenas.create<wclap_plugin_descriptor>(wasmP).fromNative(arenas, native);
+}
+*/
+
 struct wclap_plugin {
-	wclap_plugin(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	wclap_plugin(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -127,12 +617,118 @@ struct wclap_plugin {
 	WasmP & on_main_thread() {
 		return *(WasmP *)(pointerInWasm + 44);
 	}
+
+	static bool nativeProxy_init(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).init();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static void nativeProxy_destroy(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).destroy();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}   
+	static bool nativeProxy_activate(const struct clap_plugin *plugin, double                    sample_rate, uint32_t                  min_frames_count, uint32_t                  max_frames_count) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).activate();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, sample_rate, min_frames_count, max_frames_count);
+		return wasmResult;
+	}
+	static void nativeProxy_deactivate(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).deactivate();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static bool nativeProxy_start_processing(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).start_processing();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static void nativeProxy_stop_processing(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).stop_processing();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static void nativeProxy_reset(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).reset();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static clap_process_status nativeProxy_process(const struct clap_plugin *plugin, const clap_process_t     *process) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).process();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_process;
+		nativeToWasm(arenas, process, wasm_process);
+		int32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_process);
+		return wasmResult;
+	}
+	static const void * nativeProxy_get_extension(const struct clap_plugin *plugin, const char *id) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).get_extension();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_id;
+		nativeToWasm(arenas, id, wasm_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_id);
+
+		arenas.nativeReset();
+		const void *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+	static void nativeProxy_on_main_thread(const struct clap_plugin *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin>(context.wasmObjP).on_main_thread();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
 private:
-	unsigned char * pointerInWasm;
+	unsigned char *pointerInWasm;
 };
 
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.desc(), native->desc);
+	wasmToNative(arenas, wasm.plugin_data(), native->plugin_data);
+	native->init = wclap_plugin::nativeProxy_init;
+	native->destroy = wclap_plugin::nativeProxy_destroy;
+	native->activate = wclap_plugin::nativeProxy_activate;
+	native->deactivate = wclap_plugin::nativeProxy_deactivate;
+	native->start_processing = wclap_plugin::nativeProxy_start_processing;
+	native->stop_processing = wclap_plugin::nativeProxy_stop_processing;
+	native->reset = wclap_plugin::nativeProxy_reset;
+	native->process = wclap_plugin::nativeProxy_process;
+	native->get_extension = wclap_plugin::nativeProxy_get_extension;
+	native->on_main_thread = wclap_plugin::nativeProxy_on_main_thread;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_t");
+	abort();
+//	arenas.create<wclap_plugin>(wasmP).fromNative(arenas, native);
+}
+*/
+
 struct wclap_plugin_factory {
-	wclap_plugin_factory(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	wclap_plugin_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -147,12 +743,741 @@ struct wclap_plugin_factory {
 	WasmP & create_plugin() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
+
+	static uint32_t nativeProxy_get_plugin_count(const struct clap_plugin_factory *factory) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_factory>(context.wasmObjP).get_plugin_count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static const clap_plugin_descriptor_t * nativeProxy_get_plugin_descriptor(const struct clap_plugin_factory *factory, uint32_t index) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_factory>(context.wasmObjP).get_plugin_descriptor();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+
+		arenas.nativeReset();
+		const clap_plugin_descriptor_t *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+	static const clap_plugin_t * nativeProxy_create_plugin(const struct clap_plugin_factory *factory, const clap_host_t                *host, const char                       *plugin_id) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_factory>(context.wasmObjP).create_plugin();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_host;
+		nativeToWasm(arenas, host, wasm_host);
+		WasmP wasm_plugin_id;
+		nativeToWasm(arenas, plugin_id, wasm_plugin_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_host, wasm_plugin_id);
+
+		arenas.nativeReset();
+		const clap_plugin_t *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
 private:
-	unsigned char * pointerInWasm;
+	unsigned char *pointerInWasm;
 };
 
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_factory_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_factory>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_factory_t>();
+	cNative = native;
+	native->get_plugin_count = wclap_plugin_factory::nativeProxy_get_plugin_count;
+	native->get_plugin_descriptor = wclap_plugin_factory::nativeProxy_get_plugin_descriptor;
+	native->create_plugin = wclap_plugin_factory::nativeProxy_create_plugin;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_factory_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_factory_t");
+	abort();
+//	arenas.create<wclap_plugin_factory>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_universal_plugin_id {
+	wclap_universal_plugin_id(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & abi() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & id() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_universal_plugin_id_t *&cNative) {
+	auto wasm = arenas.view<wclap_universal_plugin_id>(wasmP);
+	auto *native = arenas.nativeTyped<clap_universal_plugin_id_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.abi(), native->abi);
+	wasmToNative(arenas, wasm.id(), native->id);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_universal_plugin_id_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_universal_plugin_id_t");
+	abort();
+//	arenas.create<wclap_universal_plugin_id>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_metadata_receiver {
+	wclap_preset_discovery_metadata_receiver(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & receiver_data() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & on_error() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & begin_preset() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & add_plugin_id() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & set_soundpack_id() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & set_flags() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	WasmP & add_creator() {
+		return *(WasmP *)(pointerInWasm + 24);
+	}
+	WasmP & set_description() {
+		return *(WasmP *)(pointerInWasm + 28);
+	}
+	WasmP & set_timestamps() {
+		return *(WasmP *)(pointerInWasm + 32);
+	}
+	WasmP & add_feature() {
+		return *(WasmP *)(pointerInWasm + 36);
+	}
+	WasmP & add_extra_info() {
+		return *(WasmP *)(pointerInWasm + 40);
+	}
+ 
+	static void nativeProxy_on_error(const struct clap_preset_discovery_metadata_receiver *receiver, int32_t                                               os_error, const char                                           *error_message) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).on_error();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_error_message;
+		nativeToWasm(arenas, error_message, wasm_error_message);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, os_error, wasm_error_message);
+	}
+	static bool nativeProxy_begin_preset(const struct clap_preset_discovery_metadata_receiver *receiver, const char                                           *name, const char                                           *load_key) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).begin_preset();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_name;
+		nativeToWasm(arenas, name, wasm_name);
+		WasmP wasm_load_key;
+		nativeToWasm(arenas, load_key, wasm_load_key);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_name, wasm_load_key);
+		return wasmResult;
+	}
+	static void nativeProxy_add_plugin_id(const struct clap_preset_discovery_metadata_receiver *receiver, const clap_universal_plugin_id_t                     *plugin_id) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_plugin_id();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_plugin_id;
+		nativeToWasm(arenas, plugin_id, wasm_plugin_id);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_plugin_id);
+	}
+	static void nativeProxy_set_soundpack_id(const struct clap_preset_discovery_metadata_receiver *receiver, const char *soundpack_id) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_soundpack_id();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_soundpack_id;
+		nativeToWasm(arenas, soundpack_id, wasm_soundpack_id);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_soundpack_id);
+	} 
+	static void nativeProxy_set_flags(const struct clap_preset_discovery_metadata_receiver *receiver, uint32_t                                              flags) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_flags();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
+	}
+	static void nativeProxy_add_creator(const struct clap_preset_discovery_metadata_receiver *receiver, const char                                           *creator) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_creator();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_creator;
+		nativeToWasm(arenas, creator, wasm_creator);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_creator);
+	}
+	static void nativeProxy_set_description(const struct clap_preset_discovery_metadata_receiver *receiver, const char *description) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_description();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_description;
+		nativeToWasm(arenas, description, wasm_description);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_description);
+	}  
+	static void nativeProxy_set_timestamps(const struct clap_preset_discovery_metadata_receiver *receiver, clap_timestamp creation_time, clap_timestamp modification_time) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_timestamps();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, creation_time, modification_time);
+	}
+	static void nativeProxy_add_feature(const struct clap_preset_discovery_metadata_receiver *receiver, const char                                           *feature) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_feature();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_feature;
+		nativeToWasm(arenas, feature, wasm_feature);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_feature);
+	}
+	static void nativeProxy_add_extra_info(const struct clap_preset_discovery_metadata_receiver *receiver, const char                                           *key, const char                                           *value) {
+		auto context = getNativeProxyContext(receiver);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_extra_info();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_key;
+		nativeToWasm(arenas, key, wasm_key);
+		WasmP wasm_value;
+		nativeToWasm(arenas, value, wasm_value);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_key, wasm_value);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_metadata_receiver_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_metadata_receiver>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_metadata_receiver_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.receiver_data(), native->receiver_data);
+	native->on_error = wclap_preset_discovery_metadata_receiver::nativeProxy_on_error;
+	native->begin_preset = wclap_preset_discovery_metadata_receiver::nativeProxy_begin_preset;
+	native->add_plugin_id = wclap_preset_discovery_metadata_receiver::nativeProxy_add_plugin_id;
+	native->set_soundpack_id = wclap_preset_discovery_metadata_receiver::nativeProxy_set_soundpack_id;
+	native->set_flags = wclap_preset_discovery_metadata_receiver::nativeProxy_set_flags;
+	native->add_creator = wclap_preset_discovery_metadata_receiver::nativeProxy_add_creator;
+	native->set_description = wclap_preset_discovery_metadata_receiver::nativeProxy_set_description;
+	native->set_timestamps = wclap_preset_discovery_metadata_receiver::nativeProxy_set_timestamps;
+	native->add_feature = wclap_preset_discovery_metadata_receiver::nativeProxy_add_feature;
+	native->add_extra_info = wclap_preset_discovery_metadata_receiver::nativeProxy_add_extra_info;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_metadata_receiver_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_metadata_receiver_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_metadata_receiver>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_filetype {
+	wclap_preset_discovery_filetype(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & name() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & description() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & file_extension() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_filetype_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_filetype>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_filetype_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.description(), native->description);
+	wasmToNative(arenas, wasm.file_extension(), native->file_extension);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_filetype_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_filetype_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_filetype>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_location {
+	wclap_preset_discovery_location(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint32_t & flags() {
+		return *(uint32_t *)pointerInWasm;
+	}
+	WasmP & name() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	uint32_t & kind() {
+		return *(uint32_t *)(pointerInWasm + 8);
+	}
+	WasmP & location() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_location_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_location>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_location_t>();
+	cNative = native;
+	native->flags = wasm.flags();
+	wasmToNative(arenas, wasm.name(), native->name);
+	native->kind = wasm.kind();
+	wasmToNative(arenas, wasm.location(), native->location);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_location_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_location_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_location>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_soundpack {
+	wclap_preset_discovery_soundpack(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint32_t & flags() {
+		return *(uint32_t *)pointerInWasm;
+	}
+	WasmP & id() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & name() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & description() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & homepage_url() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & vendor() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	WasmP & image_path() {
+		return *(WasmP *)(pointerInWasm + 24);
+	}
+	uint64_t & release_timestamp() {
+		return *(uint64_t *)(pointerInWasm + 32);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_soundpack_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_soundpack>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_soundpack_t>();
+	cNative = native;
+	native->flags = wasm.flags();
+	wasmToNative(arenas, wasm.id(), native->id);
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.description(), native->description);
+	wasmToNative(arenas, wasm.homepage_url(), native->homepage_url);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+	wasmToNative(arenas, wasm.image_path(), native->image_path);
+	native->release_timestamp = wasm.release_timestamp();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_soundpack_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_soundpack_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_soundpack>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_provider_descriptor {
+	wclap_preset_discovery_provider_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_version_t & clap_version() {
+		return *(clap_version_t *)pointerInWasm;
+	}
+	WasmP & id() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & name() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & vendor() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_provider_descriptor_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_provider_descriptor>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_provider_descriptor_t>();
+	cNative = native;
+	native->clap_version = wasm.clap_version();
+	wasmToNative(arenas, wasm.id(), native->id);
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_provider_descriptor_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_provider_descriptor_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_provider_descriptor>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_provider {
+	wclap_preset_discovery_provider(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & desc() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & provider_data() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & init() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & destroy() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & get_metadata() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & get_extension() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+
+	static bool nativeProxy_init(const struct clap_preset_discovery_provider *provider) {
+		auto context = getNativeProxyContext(provider);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_provider>(context.wasmObjP).init();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static void nativeProxy_destroy(const struct clap_preset_discovery_provider *provider) {
+		auto context = getNativeProxyContext(provider);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_provider>(context.wasmObjP).destroy();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	} 
+	static bool nativeProxy_get_metadata(const struct clap_preset_discovery_provider     *provider, uint32_t                                         location_kind, const char                                      *location, const clap_preset_discovery_metadata_receiver_t *metadata_receiver) {
+		auto context = getNativeProxyContext(provider);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_provider>(context.wasmObjP).get_metadata();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_location;
+		nativeToWasm(arenas, location, wasm_location);
+		WasmP wasm_metadata_receiver;
+		nativeToWasm(arenas, metadata_receiver, wasm_metadata_receiver);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_metadata_receiver);
+		return wasmResult;
+	}
+	static const void * nativeProxy_get_extension(const struct clap_preset_discovery_provider *provider, const char                                  *extension_id) {
+		auto context = getNativeProxyContext(provider);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_provider>(context.wasmObjP).get_extension();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_extension_id;
+		nativeToWasm(arenas, extension_id, wasm_extension_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
+
+		arenas.nativeReset();
+		const void *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_provider_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_provider>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_provider_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.desc(), native->desc);
+	wasmToNative(arenas, wasm.provider_data(), native->provider_data);
+	native->init = wclap_preset_discovery_provider::nativeProxy_init;
+	native->destroy = wclap_preset_discovery_provider::nativeProxy_destroy;
+	native->get_metadata = wclap_preset_discovery_provider::nativeProxy_get_metadata;
+	native->get_extension = wclap_preset_discovery_provider::nativeProxy_get_extension;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_provider_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_provider_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_provider>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_indexer {
+	wclap_preset_discovery_indexer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	clap_version_t & clap_version() {
+		return *(clap_version_t *)pointerInWasm;
+	}
+	WasmP & name() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & vendor() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & url() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	WasmP & version() {
+		return *(WasmP *)(pointerInWasm + 24);
+	}
+	WasmP & indexer_data() {
+		return *(WasmP *)(pointerInWasm + 28);
+	}
+	WasmP & declare_filetype() {
+		return *(WasmP *)(pointerInWasm + 32);
+	}
+	WasmP & declare_location() {
+		return *(WasmP *)(pointerInWasm + 36);
+	}
+	WasmP & declare_soundpack() {
+		return *(WasmP *)(pointerInWasm + 40);
+	}
+	WasmP & get_extension() {
+		return *(WasmP *)(pointerInWasm + 44);
+	}
+
+	static bool nativeProxy_declare_filetype(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_filetype_t     *filetype) {
+		auto context = getNativeProxyContext(indexer);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_filetype();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_filetype;
+		nativeToWasm(arenas, filetype, wasm_filetype);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_filetype);
+		return wasmResult;
+	}
+	static bool nativeProxy_declare_location(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_location_t     *location) {
+		auto context = getNativeProxyContext(indexer);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_location();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_location;
+		nativeToWasm(arenas, location, wasm_location);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_location);
+		return wasmResult;
+	}
+	static bool nativeProxy_declare_soundpack(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_soundpack_t    *soundpack) {
+		auto context = getNativeProxyContext(indexer);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_soundpack();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_soundpack;
+		nativeToWasm(arenas, soundpack, wasm_soundpack);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_soundpack);
+		return wasmResult;
+	}
+	static const void * nativeProxy_get_extension(const struct clap_preset_discovery_indexer *indexer, const char                                 *extension_id) {
+		auto context = getNativeProxyContext(indexer);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_indexer>(context.wasmObjP).get_extension();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_extension_id;
+		nativeToWasm(arenas, extension_id, wasm_extension_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
+
+		arenas.nativeReset();
+		const void *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_indexer_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_indexer>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_indexer_t>();
+	cNative = native;
+	native->clap_version = wasm.clap_version();
+	wasmToNative(arenas, wasm.name(), native->name);
+	wasmToNative(arenas, wasm.vendor(), native->vendor);
+	wasmToNative(arenas, wasm.url(), native->url);
+	wasmToNative(arenas, wasm.version(), native->version);
+	wasmToNative(arenas, wasm.indexer_data(), native->indexer_data);
+	native->declare_filetype = wclap_preset_discovery_indexer::nativeProxy_declare_filetype;
+	native->declare_location = wclap_preset_discovery_indexer::nativeProxy_declare_location;
+	native->declare_soundpack = wclap_preset_discovery_indexer::nativeProxy_declare_soundpack;
+	native->get_extension = wclap_preset_discovery_indexer::nativeProxy_get_extension;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_indexer_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_indexer_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_indexer>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_preset_discovery_factory {
+	wclap_preset_discovery_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get_descriptor() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & create() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+
+	static uint32_t nativeProxy_count(const struct clap_preset_discovery_factory *factory) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_factory>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static const clap_preset_discovery_provider_descriptor_t * nativeProxy_get_descriptor(const struct clap_preset_discovery_factory *factory, uint32_t index) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_factory>(context.wasmObjP).get_descriptor();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+
+		arenas.nativeReset();
+		const clap_preset_discovery_provider_descriptor_t *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+	static const clap_preset_discovery_provider_t * nativeProxy_create(const struct clap_preset_discovery_factory *factory, const clap_preset_discovery_indexer_t      *indexer, const char                                 *provider_id) {
+		auto context = getNativeProxyContext(factory);
+		WasmP wasmFn = context.wclap.view<wclap_preset_discovery_factory>(context.wasmObjP).create();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_indexer;
+		nativeToWasm(arenas, indexer, wasm_indexer);
+		WasmP wasm_provider_id;
+		nativeToWasm(arenas, provider_id, wasm_provider_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_indexer, wasm_provider_id);
+
+		arenas.nativeReset();
+		const clap_preset_discovery_provider_t *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_preset_discovery_factory_t *&cNative) {
+	auto wasm = arenas.view<wclap_preset_discovery_factory>(wasmP);
+	auto *native = arenas.nativeTyped<clap_preset_discovery_factory_t>();
+	cNative = native;
+	native->count = wclap_preset_discovery_factory::nativeProxy_count;
+	native->get_descriptor = wclap_preset_discovery_factory::nativeProxy_get_descriptor;
+	native->create = wclap_preset_discovery_factory::nativeProxy_create;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_factory_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_preset_discovery_factory_t");
+	abort();
+//	arenas.create<wclap_preset_discovery_factory>(wasmP).fromNative(arenas, native);
+}
+*/
+
 struct wclap_plugin_entry {
-	wclap_plugin_entry(unsigned char * pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	wclap_plugin_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -170,7 +1495,3068 @@ struct wclap_plugin_entry {
 	WasmP & get_factory() {
 		return *(WasmP *)(pointerInWasm + 20);
 	}
+
+	static bool nativeProxy_init(const char *plugin_path) {
+		auto context = getNativeProxyContext(plugin_path);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_entry>(context.wasmObjP).init();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static void nativeProxy_deinit() {
+		auto context = getNativeProxyContext((clap_plugin_entry_t *)nullptr);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_entry>(context.wasmObjP).deinit();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+	static const void * nativeProxy_get_factory(const char *factory_id) {
+		auto context = getNativeProxyContext(factory_id);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_entry>(context.wasmObjP).get_factory();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP);
+
+		arenas.nativeReset();
+		const void *nativeResult;
+		wasmToNative(arenas, wasmResult, nativeResult);
+		return nativeResult;
+	}
 private:
-	unsigned char * pointerInWasm;
+	unsigned char *pointerInWasm;
 };
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_entry_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_entry>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_entry_t>();
+	cNative = native;
+	native->clap_version = wasm.clap_version();
+	native->init = wclap_plugin_entry::nativeProxy_init;
+	native->deinit = wclap_plugin_entry::nativeProxy_deinit;
+	native->get_factory = wclap_plugin_entry::nativeProxy_get_factory;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_entry_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_entry_t");
+	abort();
+//	arenas.create<wclap_plugin_entry>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_color = clap_color_t;
+
+struct wclap_istream {
+	wclap_istream(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & ctx() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & read() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static int64_t nativeProxy_read(const struct clap_istream *stream, void *buffer, uint64_t size) {
+		auto context = getNativeProxyContext(stream);
+		WasmP wasmFn = context.wclap.view<wclap_istream>(context.wasmObjP).read();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_buffer;
+		nativeToWasm(arenas, buffer, wasm_buffer);
+		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmObjP, wasm_buffer, size);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_istream_t *&cNative) {
+	auto wasm = arenas.view<wclap_istream>(wasmP);
+	auto *native = arenas.nativeTyped<clap_istream_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.ctx(), native->ctx);
+	native->read = wclap_istream::nativeProxy_read;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_istream_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_istream_t");
+	abort();
+//	arenas.create<wclap_istream>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_ostream {
+	wclap_ostream(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & ctx() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & write() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static int64_t nativeProxy_write(const struct clap_ostream *stream, const void *buffer, uint64_t size) {
+		auto context = getNativeProxyContext(stream);
+		WasmP wasmFn = context.wclap.view<wclap_ostream>(context.wasmObjP).write();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_buffer;
+		nativeToWasm(arenas, buffer, wasm_buffer);
+		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmObjP, wasm_buffer, size);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_ostream_t *&cNative) {
+	auto wasm = arenas.view<wclap_ostream>(wasmP);
+	auto *native = arenas.nativeTyped<clap_ostream_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.ctx(), native->ctx);
+	native->write = wclap_ostream::nativeProxy_write;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_ostream_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_ostream_t");
+	abort();
+//	arenas.create<wclap_ostream>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_ambisonic_config = clap_ambisonic_config_t;
+
+struct wclap_plugin_ambisonic {
+	wclap_plugin_ambisonic(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & is_config_supported() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get_config() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_is_config_supported(const clap_plugin_t           *plugin, const clap_ambisonic_config_t *config) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_ambisonic>(context.wasmObjP).is_config_supported();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_config;
+		nativeToWasm(arenas, config, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_config);
+		return wasmResult;
+	}  
+	static bool nativeProxy_get_config(const clap_plugin_t     *plugin, bool                     is_input, uint32_t                 port_index, clap_ambisonic_config_t *config) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_ambisonic>(context.wasmObjP).get_config();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_config;
+		nativeToWasm(arenas, config, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, wasm_config);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_ambisonic_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_ambisonic>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_ambisonic_t>();
+	cNative = native;
+	native->is_config_supported = wclap_plugin_ambisonic::nativeProxy_is_config_supported;
+	native->get_config = wclap_plugin_ambisonic::nativeProxy_get_config;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_ambisonic_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_ambisonic_t");
+	abort();
+//	arenas.create<wclap_plugin_ambisonic>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_ambisonic {
+	wclap_host_ambisonic(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_ambisonic>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_ambisonic_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_ambisonic>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_ambisonic_t>();
+	cNative = native;
+	native->changed = wclap_host_ambisonic::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_ambisonic_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_ambisonic_t");
+	abort();
+//	arenas.create<wclap_host_ambisonic>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_audio_port_info {
+	wclap_audio_port_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint32_t & id() {
+		return *(uint32_t *)pointerInWasm;
+	}
+	char & name(size_t index) {
+		return *(char *)(pointerInWasm + 4 + index);
+	}
+	uint32_t & flags() {
+		return *(uint32_t *)(pointerInWasm + 260);
+	}
+	uint32_t & channel_count() {
+		return *(uint32_t *)(pointerInWasm + 264);
+	}
+	WasmP & port_type() {
+		return *(WasmP *)(pointerInWasm + 268);
+	}
+	uint32_t & in_place_pair() {
+		return *(uint32_t *)(pointerInWasm + 272);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_audio_port_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_audio_port_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_audio_port_info_t>();
+	cNative = native;
+	native->id = wasm.id();
+	for (size_t i = 0; i < 256; ++i) {
+		native->name[i] = wasm.name(i);
+	}
+	native->flags = wasm.flags();
+	native->channel_count = wasm.channel_count();
+	wasmToNative(arenas, wasm.port_type(), native->port_type);
+	native->in_place_pair = wasm.in_place_pair();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_audio_port_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_audio_port_info_t");
+	abort();
+//	arenas.create<wclap_audio_port_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_audio_ports {
+	wclap_plugin_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin, bool is_input) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input);
+		return wasmResult;
+	}  
+	static bool nativeProxy_get(const clap_plugin_t    *plugin, uint32_t                index, bool                    is_input, clap_audio_port_info_t *info) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_info;
+		nativeToWasm(arenas, info, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, is_input, wasm_info);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_audio_ports_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_audio_ports>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_audio_ports_t>();
+	cNative = native;
+	native->count = wclap_plugin_audio_ports::nativeProxy_count;
+	native->get = wclap_plugin_audio_ports::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_audio_ports_t");
+	abort();
+//	arenas.create<wclap_plugin_audio_ports>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_audio_ports {
+	wclap_host_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & is_rescan_flag_supported() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & rescan() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static bool nativeProxy_is_rescan_flag_supported(const clap_host_t *host, uint32_t flag) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_audio_ports>(context.wasmObjP).is_rescan_flag_supported();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, flag);
+		return wasmResult;
+	} 
+	static void nativeProxy_rescan(const clap_host_t *host, uint32_t flags) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_audio_ports>(context.wasmObjP).rescan();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_audio_ports_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_audio_ports>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_audio_ports_t>();
+	cNative = native;
+	native->is_rescan_flag_supported = wclap_host_audio_ports::nativeProxy_is_rescan_flag_supported;
+	native->rescan = wclap_host_audio_ports::nativeProxy_rescan;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_audio_ports_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_audio_ports_t");
+	abort();
+//	arenas.create<wclap_host_audio_ports>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_audio_ports_activation {
+	wclap_plugin_audio_ports_activation(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & can_activate_while_processing() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & set_active() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_can_activate_while_processing(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_activation>(context.wasmObjP).can_activate_while_processing();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}    
+	static bool nativeProxy_set_active(const clap_plugin_t *plugin, bool                 is_input, uint32_t             port_index, bool                 is_active, uint32_t             sample_size) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_activation>(context.wasmObjP).set_active();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, is_active, sample_size);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_audio_ports_activation_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_audio_ports_activation>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_audio_ports_activation_t>();
+	cNative = native;
+	native->can_activate_while_processing = wclap_plugin_audio_ports_activation::nativeProxy_can_activate_while_processing;
+	native->set_active = wclap_plugin_audio_ports_activation::nativeProxy_set_active;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_activation_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_audio_ports_activation_t");
+	abort();
+//	arenas.create<wclap_plugin_audio_ports_activation>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_audio_ports_config {
+	wclap_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint32_t & id() {
+		return *(uint32_t *)pointerInWasm;
+	}
+	char & name(size_t index) {
+		return *(char *)(pointerInWasm + 4 + index);
+	}
+	uint32_t & input_port_count() {
+		return *(uint32_t *)(pointerInWasm + 260);
+	}
+	uint32_t & output_port_count() {
+		return *(uint32_t *)(pointerInWasm + 264);
+	}
+	bool & has_main_input() {
+		return *(bool *)(pointerInWasm + 268);
+	}
+	uint32_t & main_input_channel_count() {
+		return *(uint32_t *)(pointerInWasm + 272);
+	}
+	WasmP & main_input_port_type() {
+		return *(WasmP *)(pointerInWasm + 276);
+	}
+	bool & has_main_output() {
+		return *(bool *)(pointerInWasm + 277);
+	}
+	uint32_t & main_output_channel_count() {
+		return *(uint32_t *)(pointerInWasm + 280);
+	}
+	WasmP & main_output_port_type() {
+		return *(WasmP *)(pointerInWasm + 284);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_audio_ports_config_t *&cNative) {
+	auto wasm = arenas.view<wclap_audio_ports_config>(wasmP);
+	auto *native = arenas.nativeTyped<clap_audio_ports_config_t>();
+	cNative = native;
+	native->id = wasm.id();
+	for (size_t i = 0; i < 256; ++i) {
+		native->name[i] = wasm.name(i);
+	}
+	native->input_port_count = wasm.input_port_count();
+	native->output_port_count = wasm.output_port_count();
+	native->has_main_input = wasm.has_main_input();
+	native->main_input_channel_count = wasm.main_input_channel_count();
+	wasmToNative(arenas, wasm.main_input_port_type(), native->main_input_port_type);
+	native->has_main_output = wasm.has_main_output();
+	native->main_output_channel_count = wasm.main_output_channel_count();
+	wasmToNative(arenas, wasm.main_output_port_type(), native->main_output_port_type);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_audio_ports_config_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_audio_ports_config_t");
+	abort();
+//	arenas.create<wclap_audio_ports_config>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_audio_ports_config {
+	wclap_plugin_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & select() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_config>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static bool nativeProxy_get(const clap_plugin_t       *plugin, uint32_t                   index, clap_audio_ports_config_t *config) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_config>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_config;
+		nativeToWasm(arenas, config, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, wasm_config);
+		return wasmResult;
+	} 
+	static bool nativeProxy_select(const clap_plugin_t *plugin, clap_id config_id) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_config>(context.wasmObjP).select();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, config_id);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_audio_ports_config_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_audio_ports_config>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_audio_ports_config_t>();
+	cNative = native;
+	native->count = wclap_plugin_audio_ports_config::nativeProxy_count;
+	native->get = wclap_plugin_audio_ports_config::nativeProxy_get;
+	native->select = wclap_plugin_audio_ports_config::nativeProxy_select;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_config_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_audio_ports_config_t");
+	abort();
+//	arenas.create<wclap_plugin_audio_ports_config>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_audio_ports_config_info {
+	wclap_plugin_audio_ports_config_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & current_config() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static clap_id nativeProxy_current_config(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_config_info>(context.wasmObjP).current_config();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}   
+	static bool nativeProxy_get(const clap_plugin_t    *plugin, clap_id                 config_id, uint32_t                port_index, bool                    is_input, clap_audio_port_info_t *info) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_audio_ports_config_info>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_info;
+		nativeToWasm(arenas, info, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, config_id, port_index, is_input, wasm_info);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_audio_ports_config_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_audio_ports_config_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_audio_ports_config_info_t>();
+	cNative = native;
+	native->current_config = wclap_plugin_audio_ports_config_info::nativeProxy_current_config;
+	native->get = wclap_plugin_audio_ports_config_info::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_config_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_audio_ports_config_info_t");
+	abort();
+//	arenas.create<wclap_plugin_audio_ports_config_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_audio_ports_config {
+	wclap_host_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & rescan() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_rescan(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_audio_ports_config>(context.wasmObjP).rescan();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_audio_ports_config_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_audio_ports_config>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_audio_ports_config_t>();
+	cNative = native;
+	native->rescan = wclap_host_audio_ports_config::nativeProxy_rescan;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_audio_ports_config_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_audio_ports_config_t");
+	abort();
+//	arenas.create<wclap_host_audio_ports_config>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_audio_port_configuration_request {
+	wclap_audio_port_configuration_request(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	bool & is_input() {
+		return *(bool *)pointerInWasm;
+	}
+	uint32_t & port_index() {
+		return *(uint32_t *)(pointerInWasm + 4);
+	}
+	uint32_t & channel_count() {
+		return *(uint32_t *)(pointerInWasm + 8);
+	}
+	WasmP & port_type() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & port_details() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_audio_port_configuration_request_t *&cNative) {
+	auto wasm = arenas.view<wclap_audio_port_configuration_request>(wasmP);
+	auto *native = arenas.nativeTyped<clap_audio_port_configuration_request_t>();
+	cNative = native;
+	native->is_input = wasm.is_input();
+	native->port_index = wasm.port_index();
+	native->channel_count = wasm.channel_count();
+	wasmToNative(arenas, wasm.port_type(), native->port_type);
+	wasmToNative(arenas, wasm.port_details(), native->port_details);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_audio_port_configuration_request_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_audio_port_configuration_request_t");
+	abort();
+//	arenas.create<wclap_audio_port_configuration_request>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_configurable_audio_ports {
+	wclap_plugin_configurable_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & can_apply_configuration() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & apply_configuration() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static bool nativeProxy_can_apply_configuration(const clap_plugin_t                                *plugin, const struct clap_audio_port_configuration_request *requests, uint32_t                                            request_count) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).can_apply_configuration();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_requests;
+		nativeToWasm(arenas, requests, wasm_requests);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_requests, request_count);
+		return wasmResult;
+	} 
+	static bool nativeProxy_apply_configuration(const clap_plugin_t                                *plugin, const struct clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).apply_configuration();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_requests;
+		nativeToWasm(arenas, requests, wasm_requests);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_requests, request_count);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_configurable_audio_ports_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_configurable_audio_ports>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_configurable_audio_ports_t>();
+	cNative = native;
+	native->can_apply_configuration = wclap_plugin_configurable_audio_ports::nativeProxy_can_apply_configuration;
+	native->apply_configuration = wclap_plugin_configurable_audio_ports::nativeProxy_apply_configuration;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_configurable_audio_ports_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_configurable_audio_ports_t");
+	abort();
+//	arenas.create<wclap_plugin_configurable_audio_ports>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_context_menu_target = clap_context_menu_target_t;
+
+struct wclap_context_menu_entry {
+	wclap_context_menu_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & label() {
+		return *(WasmP *)pointerInWasm;
+	}
+	bool & is_enabled() {
+		return *(bool *)(pointerInWasm + 4);
+	}
+	uint32_t & action_id() {
+		return *(uint32_t *)(pointerInWasm + 8);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_context_menu_entry_t *&cNative) {
+	auto wasm = arenas.view<wclap_context_menu_entry>(wasmP);
+	auto *native = arenas.nativeTyped<clap_context_menu_entry_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.label(), native->label);
+	native->is_enabled = wasm.is_enabled();
+	native->action_id = wasm.action_id();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_entry_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_context_menu_entry_t");
+	abort();
+//	arenas.create<wclap_context_menu_entry>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_context_menu_check_entry {
+	wclap_context_menu_check_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & label() {
+		return *(WasmP *)pointerInWasm;
+	}
+	bool & is_enabled() {
+		return *(bool *)(pointerInWasm + 4);
+	}
+	bool & is_checked() {
+		return *(bool *)(pointerInWasm + 5);
+	}
+	uint32_t & action_id() {
+		return *(uint32_t *)(pointerInWasm + 8);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_context_menu_check_entry_t *&cNative) {
+	auto wasm = arenas.view<wclap_context_menu_check_entry>(wasmP);
+	auto *native = arenas.nativeTyped<clap_context_menu_check_entry_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.label(), native->label);
+	native->is_enabled = wasm.is_enabled();
+	native->is_checked = wasm.is_checked();
+	native->action_id = wasm.action_id();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_check_entry_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_context_menu_check_entry_t");
+	abort();
+//	arenas.create<wclap_context_menu_check_entry>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_context_menu_item_title {
+	wclap_context_menu_item_title(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & title() {
+		return *(WasmP *)pointerInWasm;
+	}
+	bool & is_enabled() {
+		return *(bool *)(pointerInWasm + 4);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_context_menu_item_title_t *&cNative) {
+	auto wasm = arenas.view<wclap_context_menu_item_title>(wasmP);
+	auto *native = arenas.nativeTyped<clap_context_menu_item_title_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.title(), native->title);
+	native->is_enabled = wasm.is_enabled();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_item_title_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_context_menu_item_title_t");
+	abort();
+//	arenas.create<wclap_context_menu_item_title>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_context_menu_submenu {
+	wclap_context_menu_submenu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & label() {
+		return *(WasmP *)pointerInWasm;
+	}
+	bool & is_enabled() {
+		return *(bool *)(pointerInWasm + 4);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_context_menu_submenu_t *&cNative) {
+	auto wasm = arenas.view<wclap_context_menu_submenu>(wasmP);
+	auto *native = arenas.nativeTyped<clap_context_menu_submenu_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.label(), native->label);
+	native->is_enabled = wasm.is_enabled();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_submenu_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_context_menu_submenu_t");
+	abort();
+//	arenas.create<wclap_context_menu_submenu>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_context_menu_builder {
+	wclap_context_menu_builder(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & ctx() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & add_item() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & supports() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+ 
+	static bool nativeProxy_add_item(const struct clap_context_menu_builder *builder, clap_context_menu_item_kind_t           item_kind, const void                             *item_data) {
+		auto context = getNativeProxyContext(builder);
+		WasmP wasmFn = context.wclap.view<wclap_context_menu_builder>(context.wasmObjP).add_item();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_item_data;
+		nativeToWasm(arenas, item_data, wasm_item_data);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, item_kind, wasm_item_data);
+		return wasmResult;
+	} 
+	static bool nativeProxy_supports(const struct clap_context_menu_builder *builder, clap_context_menu_item_kind_t           item_kind) {
+		auto context = getNativeProxyContext(builder);
+		WasmP wasmFn = context.wclap.view<wclap_context_menu_builder>(context.wasmObjP).supports();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, item_kind);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_context_menu_builder_t *&cNative) {
+	auto wasm = arenas.view<wclap_context_menu_builder>(wasmP);
+	auto *native = arenas.nativeTyped<clap_context_menu_builder_t>();
+	cNative = native;
+	wasmToNative(arenas, wasm.ctx(), native->ctx);
+	native->add_item = wclap_context_menu_builder::nativeProxy_add_item;
+	native->supports = wclap_context_menu_builder::nativeProxy_supports;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_builder_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_context_menu_builder_t");
+	abort();
+//	arenas.create<wclap_context_menu_builder>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_context_menu {
+	wclap_plugin_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & populate() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & perform() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_populate(const clap_plugin_t               *plugin, const clap_context_menu_target_t  *target, const clap_context_menu_builder_t *builder) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_context_menu>(context.wasmObjP).populate();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_target;
+		nativeToWasm(arenas, target, wasm_target);
+		WasmP wasm_builder;
+		nativeToWasm(arenas, builder, wasm_builder);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, wasm_builder);
+		return wasmResult;
+	} 
+	static bool nativeProxy_perform(const clap_plugin_t              *plugin, const clap_context_menu_target_t *target, clap_id                           action_id) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_context_menu>(context.wasmObjP).perform();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_target;
+		nativeToWasm(arenas, target, wasm_target);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, action_id);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_context_menu_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_context_menu>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_context_menu_t>();
+	cNative = native;
+	native->populate = wclap_plugin_context_menu::nativeProxy_populate;
+	native->perform = wclap_plugin_context_menu::nativeProxy_perform;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_context_menu_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_context_menu_t");
+	abort();
+//	arenas.create<wclap_plugin_context_menu>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_context_menu {
+	wclap_host_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & populate() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & perform() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & can_popup() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & popup() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+
+	static bool nativeProxy_populate(const clap_host_t                 *host, const clap_context_menu_target_t  *target, const clap_context_menu_builder_t *builder) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_context_menu>(context.wasmObjP).populate();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_target;
+		nativeToWasm(arenas, target, wasm_target);
+		WasmP wasm_builder;
+		nativeToWasm(arenas, builder, wasm_builder);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, wasm_builder);
+		return wasmResult;
+	} 
+	static bool nativeProxy_perform(const clap_host_t                *host, const clap_context_menu_target_t *target, clap_id                           action_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_context_menu>(context.wasmObjP).perform();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_target;
+		nativeToWasm(arenas, target, wasm_target);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, action_id);
+		return wasmResult;
+	}
+	static bool nativeProxy_can_popup(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_context_menu>(context.wasmObjP).can_popup();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}   
+	static bool nativeProxy_popup(const clap_host_t                *host, const clap_context_menu_target_t *target, int32_t                           screen_index, int32_t                           x, int32_t                           y) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_context_menu>(context.wasmObjP).popup();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_target;
+		nativeToWasm(arenas, target, wasm_target);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, screen_index, x, y);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_context_menu_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_context_menu>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_context_menu_t>();
+	cNative = native;
+	native->populate = wclap_host_context_menu::nativeProxy_populate;
+	native->perform = wclap_host_context_menu::nativeProxy_perform;
+	native->can_popup = wclap_host_context_menu::nativeProxy_can_popup;
+	native->popup = wclap_host_context_menu::nativeProxy_popup;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_context_menu_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_context_menu_t");
+	abort();
+//	arenas.create<wclap_host_context_menu>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_event_registry {
+	wclap_host_event_registry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & query() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static bool nativeProxy_query(const clap_host_t *host, const char *space_name, uint16_t *space_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_event_registry>(context.wasmObjP).query();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_space_name;
+		nativeToWasm(arenas, space_name, wasm_space_name);
+		WasmP wasm_space_id;
+		nativeToWasm(arenas, space_id, wasm_space_id);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_space_name, wasm_space_id);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_event_registry_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_event_registry>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_event_registry_t>();
+	cNative = native;
+	native->query = wclap_host_event_registry::nativeProxy_query;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_event_registry_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_event_registry_t");
+	abort();
+//	arenas.create<wclap_host_event_registry>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_gui_resize_hints = clap_gui_resize_hints_t;
+
+struct wclap_plugin_gui {
+	wclap_plugin_gui(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & is_api_supported() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get_preferred_api() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & create() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & destroy() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & set_scale() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & get_size() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+	WasmP & can_resize() {
+		return *(WasmP *)(pointerInWasm + 24);
+	}
+	WasmP & get_resize_hints() {
+		return *(WasmP *)(pointerInWasm + 28);
+	}
+	WasmP & adjust_size() {
+		return *(WasmP *)(pointerInWasm + 32);
+	}
+	WasmP & set_size() {
+		return *(WasmP *)(pointerInWasm + 36);
+	}
+	WasmP & set_parent() {
+		return *(WasmP *)(pointerInWasm + 40);
+	}
+	WasmP & set_transient() {
+		return *(WasmP *)(pointerInWasm + 44);
+	}
+	WasmP & suggest_title() {
+		return *(WasmP *)(pointerInWasm + 48);
+	}
+	WasmP & show() {
+		return *(WasmP *)(pointerInWasm + 52);
+	}
+	WasmP & hide() {
+		return *(WasmP *)(pointerInWasm + 56);
+	}
+ 
+	static bool nativeProxy_is_api_supported(const clap_plugin_t *plugin, const char *api, bool is_floating) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).is_api_supported();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_api;
+		nativeToWasm(arenas, api, wasm_api);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, is_floating);
+		return wasmResult;
+	}
+	static bool nativeProxy_get_preferred_api(const clap_plugin_t *plugin, const char         **api, bool                *is_floating) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).get_preferred_api();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_api;
+		nativeToWasm(arenas, api, wasm_api);
+		WasmP wasm_is_floating;
+		nativeToWasm(arenas, is_floating, wasm_is_floating);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, wasm_is_floating);
+		return wasmResult;
+	} 
+	static bool nativeProxy_create(const clap_plugin_t *plugin, const char *api, bool is_floating) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).create();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_api;
+		nativeToWasm(arenas, api, wasm_api);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, is_floating);
+		return wasmResult;
+	}
+	static void nativeProxy_destroy(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).destroy();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	} 
+	static bool nativeProxy_set_scale(const clap_plugin_t *plugin, double scale) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).set_scale();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, scale);
+		return wasmResult;
+	}
+	static bool nativeProxy_get_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).get_size();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_width;
+		nativeToWasm(arenas, width, wasm_width);
+		WasmP wasm_height;
+		nativeToWasm(arenas, height, wasm_height);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_width, wasm_height);
+		return wasmResult;
+	}
+	static bool nativeProxy_can_resize(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).can_resize();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static bool nativeProxy_get_resize_hints(const clap_plugin_t *plugin, clap_gui_resize_hints_t *hints) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).get_resize_hints();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_hints;
+		nativeToWasm(arenas, hints, wasm_hints);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_hints);
+		return wasmResult;
+	}
+	static bool nativeProxy_adjust_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).adjust_size();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_width;
+		nativeToWasm(arenas, width, wasm_width);
+		WasmP wasm_height;
+		nativeToWasm(arenas, height, wasm_height);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_width, wasm_height);
+		return wasmResult;
+	}  
+	static bool nativeProxy_set_size(const clap_plugin_t *plugin, uint32_t width, uint32_t height) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).set_size();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, width, height);
+		return wasmResult;
+	}
+	static bool nativeProxy_set_parent(const clap_plugin_t *plugin, const clap_window_t *window) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).set_parent();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_window;
+		nativeToWasm(arenas, window, wasm_window);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_window);
+		return wasmResult;
+	}
+	static bool nativeProxy_set_transient(const clap_plugin_t *plugin, const clap_window_t *window) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).set_transient();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_window;
+		nativeToWasm(arenas, window, wasm_window);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_window);
+		return wasmResult;
+	}
+	static void nativeProxy_suggest_title(const clap_plugin_t *plugin, const char *title) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).suggest_title();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_title;
+		nativeToWasm(arenas, title, wasm_title);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_title);
+	}
+	static bool nativeProxy_show(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).show();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static bool nativeProxy_hide(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_gui>(context.wasmObjP).hide();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_gui_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_gui>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_gui_t>();
+	cNative = native;
+	native->is_api_supported = wclap_plugin_gui::nativeProxy_is_api_supported;
+	native->get_preferred_api = wclap_plugin_gui::nativeProxy_get_preferred_api;
+	native->create = wclap_plugin_gui::nativeProxy_create;
+	native->destroy = wclap_plugin_gui::nativeProxy_destroy;
+	native->set_scale = wclap_plugin_gui::nativeProxy_set_scale;
+	native->get_size = wclap_plugin_gui::nativeProxy_get_size;
+	native->can_resize = wclap_plugin_gui::nativeProxy_can_resize;
+	native->get_resize_hints = wclap_plugin_gui::nativeProxy_get_resize_hints;
+	native->adjust_size = wclap_plugin_gui::nativeProxy_adjust_size;
+	native->set_size = wclap_plugin_gui::nativeProxy_set_size;
+	native->set_parent = wclap_plugin_gui::nativeProxy_set_parent;
+	native->set_transient = wclap_plugin_gui::nativeProxy_set_transient;
+	native->suggest_title = wclap_plugin_gui::nativeProxy_suggest_title;
+	native->show = wclap_plugin_gui::nativeProxy_show;
+	native->hide = wclap_plugin_gui::nativeProxy_hide;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_gui_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_gui_t");
+	abort();
+//	arenas.create<wclap_plugin_gui>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_gui {
+	wclap_host_gui(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & resize_hints_changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & request_resize() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & request_show() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & request_hide() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & closed() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+
+	static void nativeProxy_resize_hints_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_gui>(context.wasmObjP).resize_hints_changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}  
+	static bool nativeProxy_request_resize(const clap_host_t *host, uint32_t width, uint32_t height) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_gui>(context.wasmObjP).request_resize();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, width, height);
+		return wasmResult;
+	}
+	static bool nativeProxy_request_show(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_gui>(context.wasmObjP).request_show();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static bool nativeProxy_request_hide(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_gui>(context.wasmObjP).request_hide();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static void nativeProxy_closed(const clap_host_t *host, bool was_destroyed) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_gui>(context.wasmObjP).closed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, was_destroyed);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_gui_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_gui>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_gui_t>();
+	cNative = native;
+	native->resize_hints_changed = wclap_host_gui::nativeProxy_resize_hints_changed;
+	native->request_resize = wclap_host_gui::nativeProxy_request_resize;
+	native->request_show = wclap_host_gui::nativeProxy_request_show;
+	native->request_hide = wclap_host_gui::nativeProxy_request_hide;
+	native->closed = wclap_host_gui::nativeProxy_closed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_gui_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_gui_t");
+	abort();
+//	arenas.create<wclap_host_gui>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_latency {
+	wclap_plugin_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & get() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static uint32_t nativeProxy_get(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_latency>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_latency_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_latency>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_latency_t>();
+	cNative = native;
+	native->get = wclap_plugin_latency::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_latency_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_latency_t");
+	abort();
+//	arenas.create<wclap_plugin_latency>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_latency {
+	wclap_host_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_latency>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_latency_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_latency>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_latency_t>();
+	cNative = native;
+	native->changed = wclap_host_latency::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_latency_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_latency_t");
+	abort();
+//	arenas.create<wclap_host_latency>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_log {
+	wclap_host_log(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & log() {
+		return *(WasmP *)pointerInWasm;
+	}
+ 
+	static void nativeProxy_log(const clap_host_t *host, clap_log_severity severity, const char *msg) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_log>(context.wasmObjP).log();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_msg;
+		nativeToWasm(arenas, msg, wasm_msg);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, severity, wasm_msg);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_log_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_log>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_log_t>();
+	cNative = native;
+	native->log = wclap_host_log::nativeProxy_log;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_log_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_log_t");
+	abort();
+//	arenas.create<wclap_host_log>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_note_name = clap_note_name_t;
+
+struct wclap_plugin_note_name {
+	wclap_plugin_note_name(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_note_name>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t index, clap_note_name_t *note_name) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_note_name>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_note_name;
+		nativeToWasm(arenas, note_name, wasm_note_name);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, wasm_note_name);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_note_name_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_note_name>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_note_name_t>();
+	cNative = native;
+	native->count = wclap_plugin_note_name::nativeProxy_count;
+	native->get = wclap_plugin_note_name::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_note_name_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_note_name_t");
+	abort();
+//	arenas.create<wclap_plugin_note_name>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_note_name {
+	wclap_host_note_name(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_note_name>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_note_name_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_note_name>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_note_name_t>();
+	cNative = native;
+	native->changed = wclap_host_note_name::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_note_name_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_note_name_t");
+	abort();
+//	arenas.create<wclap_host_note_name>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_note_port_info = clap_note_port_info_t;
+
+struct wclap_plugin_note_ports {
+	wclap_plugin_note_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin, bool is_input) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_note_ports>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input);
+		return wasmResult;
+	}  
+	static bool nativeProxy_get(const clap_plugin_t   *plugin, uint32_t               index, bool                   is_input, clap_note_port_info_t *info) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_note_ports>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_info;
+		nativeToWasm(arenas, info, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, is_input, wasm_info);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_note_ports_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_note_ports>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_note_ports_t>();
+	cNative = native;
+	native->count = wclap_plugin_note_ports::nativeProxy_count;
+	native->get = wclap_plugin_note_ports::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_note_ports_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_note_ports_t");
+	abort();
+//	arenas.create<wclap_plugin_note_ports>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_note_ports {
+	wclap_host_note_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & supported_dialects() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & rescan() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static uint32_t nativeProxy_supported_dialects(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_note_ports>(context.wasmObjP).supported_dialects();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static void nativeProxy_rescan(const clap_host_t *host, uint32_t flags) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_note_ports>(context.wasmObjP).rescan();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_note_ports_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_note_ports>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_note_ports_t>();
+	cNative = native;
+	native->supported_dialects = wclap_host_note_ports::nativeProxy_supported_dialects;
+	native->rescan = wclap_host_note_ports::nativeProxy_rescan;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_note_ports_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_note_ports_t");
+	abort();
+//	arenas.create<wclap_host_note_ports>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_param_indication {
+	wclap_plugin_param_indication(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & set_mapping() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & set_automation() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+  
+	static void nativeProxy_set_mapping(const clap_plugin_t *plugin, clap_id              param_id, bool                 has_mapping, const clap_color_t  *color, const char          *label, const char          *description) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_param_indication>(context.wasmObjP).set_mapping();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_color;
+		nativeToWasm(arenas, color, wasm_color);
+		WasmP wasm_label;
+		nativeToWasm(arenas, label, wasm_label);
+		WasmP wasm_description;
+		nativeToWasm(arenas, description, wasm_description);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, has_mapping, wasm_color, wasm_label, wasm_description);
+	}  
+	static void nativeProxy_set_automation(const clap_plugin_t *plugin, clap_id              param_id, uint32_t             automation_state, const clap_color_t  *color) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_param_indication>(context.wasmObjP).set_automation();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_color;
+		nativeToWasm(arenas, color, wasm_color);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, automation_state, wasm_color);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_param_indication_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_param_indication>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_param_indication_t>();
+	cNative = native;
+	native->set_mapping = wclap_plugin_param_indication::nativeProxy_set_mapping;
+	native->set_automation = wclap_plugin_param_indication::nativeProxy_set_automation;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_param_indication_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_param_indication_t");
+	abort();
+//	arenas.create<wclap_plugin_param_indication>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_param_info {
+	wclap_param_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint32_t & id() {
+		return *(uint32_t *)pointerInWasm;
+	}
+	uint32_t & flags() {
+		return *(uint32_t *)(pointerInWasm + 4);
+	}
+	WasmP & cookie() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	char & name(size_t index) {
+		return *(char *)(pointerInWasm + 12 + index);
+	}
+	char & module(size_t index) {
+		return *(char *)(pointerInWasm + 268 + index);
+	}
+	double & min_value() {
+		return *(double *)(pointerInWasm + 1296);
+	}
+	double & max_value() {
+		return *(double *)(pointerInWasm + 1304);
+	}
+	double & default_value() {
+		return *(double *)(pointerInWasm + 1312);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_param_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_param_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_param_info_t>();
+	cNative = native;
+	native->id = wasm.id();
+	native->flags = wasm.flags();
+	wasmToNative(arenas, wasm.cookie(), native->cookie);
+	for (size_t i = 0; i < 256; ++i) {
+		native->name[i] = wasm.name(i);
+	}
+	for (size_t i = 0; i < 1024; ++i) {
+		native->module[i] = wasm.module(i);
+	}
+	native->min_value = wasm.min_value();
+	native->max_value = wasm.max_value();
+	native->default_value = wasm.default_value();
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_param_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_param_info_t");
+	abort();
+//	arenas.create<wclap_param_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_params {
+	wclap_plugin_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get_info() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & get_value() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+	WasmP & value_to_text() {
+		return *(WasmP *)(pointerInWasm + 12);
+	}
+	WasmP & text_to_value() {
+		return *(WasmP *)(pointerInWasm + 16);
+	}
+	WasmP & flush() {
+		return *(WasmP *)(pointerInWasm + 20);
+	}
+
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static bool nativeProxy_get_info(const clap_plugin_t *plugin, uint32_t             param_index, clap_param_info_t   *param_info) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).get_info();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_param_info;
+		nativeToWasm(arenas, param_info, wasm_param_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_index, wasm_param_info);
+		return wasmResult;
+	} 
+	static bool nativeProxy_get_value(const clap_plugin_t *plugin, clap_id param_id, double *out_value) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).get_value();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_out_value;
+		nativeToWasm(arenas, out_value, wasm_out_value);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, wasm_out_value);
+		return wasmResult;
+	}   
+	static bool nativeProxy_value_to_text(const clap_plugin_t *plugin, clap_id              param_id, double               value, char                *out_buffer, uint32_t             out_buffer_capacity) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).value_to_text();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_out_buffer;
+		nativeToWasm(arenas, out_buffer, wasm_out_buffer);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, value, wasm_out_buffer, out_buffer_capacity);
+		return wasmResult;
+	} 
+	static bool nativeProxy_text_to_value(const clap_plugin_t *plugin, clap_id              param_id, const char          *param_value_text, double              *out_value) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).text_to_value();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_param_value_text;
+		nativeToWasm(arenas, param_value_text, wasm_param_value_text);
+		WasmP wasm_out_value;
+		nativeToWasm(arenas, out_value, wasm_out_value);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, wasm_param_value_text, wasm_out_value);
+		return wasmResult;
+	}
+	static void nativeProxy_flush(const clap_plugin_t        *plugin, const clap_input_events_t  *in, const clap_output_events_t *out) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_params>(context.wasmObjP).flush();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_in;
+		nativeToWasm(arenas, in, wasm_in);
+		WasmP wasm_out;
+		nativeToWasm(arenas, out, wasm_out);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_in, wasm_out);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_params_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_params>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_params_t>();
+	cNative = native;
+	native->count = wclap_plugin_params::nativeProxy_count;
+	native->get_info = wclap_plugin_params::nativeProxy_get_info;
+	native->get_value = wclap_plugin_params::nativeProxy_get_value;
+	native->value_to_text = wclap_plugin_params::nativeProxy_value_to_text;
+	native->text_to_value = wclap_plugin_params::nativeProxy_text_to_value;
+	native->flush = wclap_plugin_params::nativeProxy_flush;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_params_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_params_t");
+	abort();
+//	arenas.create<wclap_plugin_params>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_params {
+	wclap_host_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & rescan() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & clear() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+	WasmP & request_flush() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+ 
+	static void nativeProxy_rescan(const clap_host_t *host, clap_param_rescan_flags flags) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_params>(context.wasmObjP).rescan();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
+	}  
+	static void nativeProxy_clear(const clap_host_t *host, clap_id param_id, clap_param_clear_flags flags) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_params>(context.wasmObjP).clear();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, flags);
+	}
+	static void nativeProxy_request_flush(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_params>(context.wasmObjP).request_flush();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_params_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_params>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_params_t>();
+	cNative = native;
+	native->rescan = wclap_host_params::nativeProxy_rescan;
+	native->clear = wclap_host_params::nativeProxy_clear;
+	native->request_flush = wclap_host_params::nativeProxy_request_flush;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_params_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_params_t");
+	abort();
+//	arenas.create<wclap_host_params>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_preset_load {
+	wclap_plugin_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & from_location() {
+		return *(WasmP *)pointerInWasm;
+	}
+ 
+	static bool nativeProxy_from_location(const clap_plugin_t *plugin, uint32_t             location_kind, const char          *location, const char          *load_key) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_preset_load>(context.wasmObjP).from_location();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_location;
+		nativeToWasm(arenas, location, wasm_location);
+		WasmP wasm_load_key;
+		nativeToWasm(arenas, load_key, wasm_load_key);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_preset_load_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_preset_load>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_preset_load_t>();
+	cNative = native;
+	native->from_location = wclap_plugin_preset_load::nativeProxy_from_location;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_preset_load_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_preset_load_t");
+	abort();
+//	arenas.create<wclap_plugin_preset_load>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_preset_load {
+	wclap_host_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & on_error() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & loaded() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+  
+	static void nativeProxy_on_error(const clap_host_t *host, uint32_t           location_kind, const char        *location, const char        *load_key, int32_t            os_error, const char        *msg) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_preset_load>(context.wasmObjP).on_error();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_location;
+		nativeToWasm(arenas, location, wasm_location);
+		WasmP wasm_load_key;
+		nativeToWasm(arenas, load_key, wasm_load_key);
+		WasmP wasm_msg;
+		nativeToWasm(arenas, msg, wasm_msg);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key, os_error, wasm_msg);
+	} 
+	static void nativeProxy_loaded(const clap_host_t *host, uint32_t           location_kind, const char        *location, const char        *load_key) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_preset_load>(context.wasmObjP).loaded();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_location;
+		nativeToWasm(arenas, location, wasm_location);
+		WasmP wasm_load_key;
+		nativeToWasm(arenas, load_key, wasm_load_key);
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_preset_load_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_preset_load>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_preset_load_t>();
+	cNative = native;
+	native->on_error = wclap_host_preset_load::nativeProxy_on_error;
+	native->loaded = wclap_host_preset_load::nativeProxy_loaded;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_preset_load_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_preset_load_t");
+	abort();
+//	arenas.create<wclap_host_preset_load>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_remote_controls_page = clap_remote_controls_page_t;
+
+struct wclap_plugin_remote_controls {
+	wclap_plugin_remote_controls(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & count() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_remote_controls>(context.wasmObjP).count();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static bool nativeProxy_get(const clap_plugin_t         *plugin, uint32_t                     page_index, clap_remote_controls_page_t *page) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_remote_controls>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_page;
+		nativeToWasm(arenas, page, wasm_page);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, page_index, wasm_page);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_remote_controls_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_remote_controls>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_remote_controls_t>();
+	cNative = native;
+	native->count = wclap_plugin_remote_controls::nativeProxy_count;
+	native->get = wclap_plugin_remote_controls::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_remote_controls_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_remote_controls_t");
+	abort();
+//	arenas.create<wclap_plugin_remote_controls>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_remote_controls {
+	wclap_host_remote_controls(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & suggest_page() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_remote_controls>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	} 
+	static void nativeProxy_suggest_page(const clap_host_t *host, clap_id page_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_remote_controls>(context.wasmObjP).suggest_page();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, page_id);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_remote_controls_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_remote_controls>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_remote_controls_t>();
+	cNative = native;
+	native->changed = wclap_host_remote_controls::nativeProxy_changed;
+	native->suggest_page = wclap_host_remote_controls::nativeProxy_suggest_page;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_remote_controls_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_remote_controls_t");
+	abort();
+//	arenas.create<wclap_host_remote_controls>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_render {
+	wclap_plugin_render(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & has_hard_realtime_requirement() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & set() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_has_hard_realtime_requirement(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_render>(context.wasmObjP).has_hard_realtime_requirement();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	} 
+	static bool nativeProxy_set(const clap_plugin_t *plugin, clap_plugin_render_mode mode) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_render>(context.wasmObjP).set();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, mode);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_render_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_render>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_render_t>();
+	cNative = native;
+	native->has_hard_realtime_requirement = wclap_plugin_render::nativeProxy_has_hard_realtime_requirement;
+	native->set = wclap_plugin_render::nativeProxy_set;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_render_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_render_t");
+	abort();
+//	arenas.create<wclap_plugin_render>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_state_context {
+	wclap_plugin_state_context(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & save() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & load() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static bool nativeProxy_save(const clap_plugin_t  *plugin, const clap_ostream_t *stream, uint32_t              context_type) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_state_context>(context.wasmObjP).save();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_stream;
+		nativeToWasm(arenas, stream, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream, context_type);
+		return wasmResult;
+	} 
+	static bool nativeProxy_load(const clap_plugin_t  *plugin, const clap_istream_t *stream, uint32_t              context_type) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_state_context>(context.wasmObjP).load();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_stream;
+		nativeToWasm(arenas, stream, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream, context_type);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_state_context_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_state_context>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_state_context_t>();
+	cNative = native;
+	native->save = wclap_plugin_state_context::nativeProxy_save;
+	native->load = wclap_plugin_state_context::nativeProxy_load;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_state_context_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_state_context_t");
+	abort();
+//	arenas.create<wclap_plugin_state_context>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_state {
+	wclap_plugin_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & save() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & load() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_save(const clap_plugin_t *plugin, const clap_ostream_t *stream) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_state>(context.wasmObjP).save();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_stream;
+		nativeToWasm(arenas, stream, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream);
+		return wasmResult;
+	}
+	static bool nativeProxy_load(const clap_plugin_t *plugin, const clap_istream_t *stream) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_state>(context.wasmObjP).load();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_stream;
+		nativeToWasm(arenas, stream, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_state_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_state>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_state_t>();
+	cNative = native;
+	native->save = wclap_plugin_state::nativeProxy_save;
+	native->load = wclap_plugin_state::nativeProxy_load;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_state_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_state_t");
+	abort();
+//	arenas.create<wclap_plugin_state>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_state {
+	wclap_host_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & mark_dirty() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_mark_dirty(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_state>(context.wasmObjP).mark_dirty();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_state_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_state>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_state_t>();
+	cNative = native;
+	native->mark_dirty = wclap_host_state::nativeProxy_mark_dirty;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_state_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_state_t");
+	abort();
+//	arenas.create<wclap_host_state>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_surround {
+	wclap_plugin_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & is_channel_mask_supported() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & get_channel_map() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static bool nativeProxy_is_channel_mask_supported(const clap_plugin_t *plugin, uint64_t channel_mask) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_surround>(context.wasmObjP).is_channel_mask_supported();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, channel_mask);
+		return wasmResult;
+	}   
+	static uint32_t nativeProxy_get_channel_map(const clap_plugin_t *plugin, bool                 is_input, uint32_t             port_index, uint8_t             *channel_map, uint32_t             channel_map_capacity) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_surround>(context.wasmObjP).get_channel_map();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_channel_map;
+		nativeToWasm(arenas, channel_map, wasm_channel_map);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, wasm_channel_map, channel_map_capacity);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_surround_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_surround>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_surround_t>();
+	cNative = native;
+	native->is_channel_mask_supported = wclap_plugin_surround::nativeProxy_is_channel_mask_supported;
+	native->get_channel_map = wclap_plugin_surround::nativeProxy_get_channel_map;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_surround_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_surround_t");
+	abort();
+//	arenas.create<wclap_plugin_surround>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_surround {
+	wclap_host_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_surround>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_surround_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_surround>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_surround_t>();
+	cNative = native;
+	native->changed = wclap_host_surround::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_surround_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_surround_t");
+	abort();
+//	arenas.create<wclap_host_surround>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_tail {
+	wclap_plugin_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & get() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static uint32_t nativeProxy_get(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_tail>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_tail_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_tail>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_tail_t>();
+	cNative = native;
+	native->get = wclap_plugin_tail::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_tail_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_tail_t");
+	abort();
+//	arenas.create<wclap_plugin_tail>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_tail {
+	wclap_host_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_tail>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_tail_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_tail>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_tail_t>();
+	cNative = native;
+	native->changed = wclap_host_tail::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_tail_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_tail_t");
+	abort();
+//	arenas.create<wclap_host_tail>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_thread_check {
+	wclap_host_thread_check(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & is_main_thread() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & is_audio_thread() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+
+	static bool nativeProxy_is_main_thread(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_thread_check>(context.wasmObjP).is_main_thread();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+	static bool nativeProxy_is_audio_thread(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_thread_check>(context.wasmObjP).is_audio_thread();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_thread_check_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_thread_check>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_thread_check_t>();
+	cNative = native;
+	native->is_main_thread = wclap_host_thread_check::nativeProxy_is_main_thread;
+	native->is_audio_thread = wclap_host_thread_check::nativeProxy_is_audio_thread;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_thread_check_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_thread_check_t");
+	abort();
+//	arenas.create<wclap_host_thread_check>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_thread_pool {
+	wclap_plugin_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & exec() {
+		return *(WasmP *)pointerInWasm;
+	}
+ 
+	static void nativeProxy_exec(const clap_plugin_t *plugin, uint32_t task_index) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_thread_pool>(context.wasmObjP).exec();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, task_index);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_thread_pool_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_thread_pool>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_thread_pool_t>();
+	cNative = native;
+	native->exec = wclap_plugin_thread_pool::nativeProxy_exec;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_thread_pool_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_thread_pool_t");
+	abort();
+//	arenas.create<wclap_plugin_thread_pool>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_thread_pool {
+	wclap_host_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & request_exec() {
+		return *(WasmP *)pointerInWasm;
+	}
+ 
+	static bool nativeProxy_request_exec(const clap_host_t *host, uint32_t num_tasks) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_thread_pool>(context.wasmObjP).request_exec();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, num_tasks);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_thread_pool_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_thread_pool>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_thread_pool_t>();
+	cNative = native;
+	native->request_exec = wclap_host_thread_pool::nativeProxy_request_exec;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_thread_pool_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_thread_pool_t");
+	abort();
+//	arenas.create<wclap_host_thread_pool>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_timer_support {
+	wclap_plugin_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & on_timer() {
+		return *(WasmP *)pointerInWasm;
+	}
+ 
+	static void nativeProxy_on_timer(const clap_plugin_t *plugin, clap_id timer_id) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_timer_support>(context.wasmObjP).on_timer();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, timer_id);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_timer_support_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_timer_support>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_timer_support_t>();
+	cNative = native;
+	native->on_timer = wclap_plugin_timer_support::nativeProxy_on_timer;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_timer_support_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_timer_support_t");
+	abort();
+//	arenas.create<wclap_plugin_timer_support>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_timer_support {
+	wclap_host_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & register_timer() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & unregister_timer() {
+		return *(WasmP *)(pointerInWasm + 4);
+	}
+ 
+	static bool nativeProxy_register_timer(const clap_host_t *host, uint32_t period_ms, clap_id *timer_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_timer_support>(context.wasmObjP).register_timer();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_timer_id;
+		nativeToWasm(arenas, timer_id, wasm_timer_id);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, period_ms, wasm_timer_id);
+		return wasmResult;
+	} 
+	static bool nativeProxy_unregister_timer(const clap_host_t *host, clap_id timer_id) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_timer_support>(context.wasmObjP).unregister_timer();
+		auto scoped = context.wclap.lockRelaxedThread();
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, timer_id);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_timer_support_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_timer_support>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_timer_support_t>();
+	cNative = native;
+	native->register_timer = wclap_host_timer_support::nativeProxy_register_timer;
+	native->unregister_timer = wclap_host_timer_support::nativeProxy_unregister_timer;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_timer_support_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_timer_support_t");
+	abort();
+//	arenas.create<wclap_host_timer_support>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_track_info {
+	wclap_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	uint64_t & flags() {
+		return *(uint64_t *)pointerInWasm;
+	}
+	char & name(size_t index) {
+		return *(char *)(pointerInWasm + 8 + index);
+	}
+	clap_color_t & color() {
+		return *(clap_color_t *)(pointerInWasm + 264);
+	}
+	int32_t & audio_channel_count() {
+		return *(int32_t *)(pointerInWasm + 268);
+	}
+	WasmP & audio_port_type() {
+		return *(WasmP *)(pointerInWasm + 272);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_track_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_track_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_track_info_t>();
+	cNative = native;
+	native->flags = wasm.flags();
+	for (size_t i = 0; i < 256; ++i) {
+		native->name[i] = wasm.name(i);
+	}
+	native->color = wasm.color();
+	native->audio_channel_count = wasm.audio_channel_count();
+	wasmToNative(arenas, wasm.audio_port_type(), native->audio_port_type);
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_track_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_track_info_t");
+	abort();
+//	arenas.create<wclap_track_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_plugin_track_info {
+	wclap_plugin_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_plugin_t *plugin) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_track_info>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_track_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_track_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_track_info_t>();
+	cNative = native;
+	native->changed = wclap_plugin_track_info::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_track_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_track_info_t");
+	abort();
+//	arenas.create<wclap_plugin_track_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_track_info {
+	wclap_host_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & get() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static bool nativeProxy_get(const clap_host_t *host, clap_track_info_t *info) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_track_info>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_info;
+		nativeToWasm(arenas, info, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_info);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_track_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_track_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_track_info_t>();
+	cNative = native;
+	native->get = wclap_host_track_info::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_track_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_track_info_t");
+	abort();
+//	arenas.create<wclap_host_track_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+using wclap_voice_info = clap_voice_info_t;
+
+struct wclap_plugin_voice_info {
+	wclap_plugin_voice_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & get() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static bool nativeProxy_get(const clap_plugin_t *plugin, clap_voice_info_t *info) {
+		auto context = getNativeProxyContext(plugin);
+		WasmP wasmFn = context.wclap.view<wclap_plugin_voice_info>(context.wasmObjP).get();
+		auto scoped = context.wclap.lockRelaxedThread();
+		auto &arenas = *scoped.thread.arenas;
+		auto reset = arenas.scopedWasmReset();
+		
+		WasmP wasm_info;
+		nativeToWasm(arenas, info, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_info);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_plugin_voice_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_plugin_voice_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_plugin_voice_info_t>();
+	cNative = native;
+	native->get = wclap_plugin_voice_info::nativeProxy_get;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_voice_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_plugin_voice_info_t");
+	abort();
+//	arenas.create<wclap_plugin_voice_info>(wasmP).fromNative(arenas, native);
+}
+*/
+
+struct wclap_host_voice_info {
+	wclap_host_voice_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & changed() {
+		return *(WasmP *)pointerInWasm;
+	}
+
+	static void nativeProxy_changed(const clap_host_t *host) {
+		auto context = getNativeProxyContext(host);
+		WasmP wasmFn = context.wclap.view<wclap_host_voice_info>(context.wasmObjP).changed();
+		auto scoped = context.wclap.lockRelaxedThread();
+		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const clap_host_voice_info_t *&cNative) {
+	auto wasm = arenas.view<wclap_host_voice_info>(wasmP);
+	auto *native = arenas.nativeTyped<clap_host_voice_info_t>();
+	cNative = native;
+	native->changed = wclap_host_voice_info::nativeProxy_changed;
+}
+/*
+template<bool=true> // can be overridden
+inline void nativeToWasm(WclapArenas &arenas, const clap_host_voice_info_t *native, WasmP &wasmP) {
+	LOG_EXPR("nativeToWasm: clap_host_voice_info_t");
+	abort();
+//	arenas.create<wclap_host_voice_info>(wasmP).fromNative(arenas, native);
+}
+*/
 }} // namespace

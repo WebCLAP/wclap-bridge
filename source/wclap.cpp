@@ -46,8 +46,8 @@ Wclap::~Wclap() {
 		relaxedThreadPool.clear();
 	}
 	
-	if (methods32) delete methods32;
-	if (methods64) delete methods64;
+	if (methods32) wclap::wclap32::methodsDelete(methods32);
+	if (methods64) wclap::wclap64::methodsDelete(methods64);
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -145,16 +145,16 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	WclapThread *rawPtr;
 
 	if (wasm64) {
-		methods64 = new wclap::wclap64::WclapMethods(*this);
+		methods64 = wclap::wclap64::methodsCreate(*this);
 		rawPtr = new WclapThread(*this, true);
 		if (!errorMessage) {
-			methods64->registerHostMethods(*rawPtr);
+			wclap::wclap64::methodsRegister(methods64, *rawPtr);
 		}
 	} else {
-		methods32 = new wclap::wclap32::WclapMethods(*this);
+		methods32 = wclap::wclap32::methodsCreate(*this);
 		rawPtr = new WclapThread(*this, true);
 		if (!errorMessage) {
-			methods32->registerHostMethods(*rawPtr);
+			wclap::wclap32::methodsRegister(methods32, *rawPtr);
 		}
 	}
 
@@ -220,9 +220,9 @@ Wclap::ScopedThread Wclap::lockThread(WclapThread *ptr) {
 
 const void * Wclap::getFactory(const char *factory_id) {
 	if (wasm64) {
-		return methods64->getFactory(factory_id);
+		return wclap::wclap64::methodsGetFactory(methods64, factory_id);
 	} else {
-		return methods32->getFactory(factory_id);
+		return wclap::wclap32::methodsGetFactory(methods32, factory_id);
 	}
 }
 

@@ -131,8 +131,14 @@ struct WclapThread {
 	}
 
 private:
+	wasmtime_val_raw argToWasmVal(int32_t v) {
+		return {.i32=v};
+	}
 	wasmtime_val_raw argToWasmVal(uint32_t v) {
 		return {.i32=int32_t(v)};
+	}
+	wasmtime_val_raw argToWasmVal(int64_t v) {
+		return {.i64=v};
 	}
 	wasmtime_val_raw argToWasmVal(uint64_t v) {
 		return {.i64=int64_t(v)};

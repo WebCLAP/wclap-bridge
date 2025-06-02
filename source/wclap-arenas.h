@@ -82,16 +82,16 @@ struct WclapArenas {
 		return {*this, wasmArenaPos};
 	}
 
-	// Like a pointer into the WASM object
 	template<class AutoTranslatedStruct>
 	AutoTranslatedStruct view(uint64_t wasmP) {
-		return wclap.view<AutoTranslatedStruct>(wasmP);
+		// TODO: bounds check
+		return AutoTranslatedStruct{wasmP ? wasmMemory(wasmP) : nullptr};
 	}
 	
 	template<class AutoTranslatedStruct, typename WasmP>
 	AutoTranslatedStruct create(WasmP &wasmP) {
 		wasmP = (WasmP)wasmBytes(sizeof(AutoTranslatedStruct), alignof(AutoTranslatedStruct));
-		return wclap.view<AutoTranslatedStruct>(wasmP);
+		return view<AutoTranslatedStruct>(wasmP);
 	}
 	
 private:

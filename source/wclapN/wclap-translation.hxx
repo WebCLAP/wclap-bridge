@@ -19,11 +19,12 @@ struct WclapMethods {
 
 	struct plugin_factory : public clap_plugin_factory {
 		NativeProxyContext context;
-		std::unique_ptr<WclapArenas> arenas;
+		std::unique_ptr<WclapArenas> arenas; // TODO: have a WCLAP global arena, shared between all factories?
+		std::mutex mutex;
 		
 		std::vector<const clap_plugin_descriptor *> descriptorPointers;
 		
-		void assign(NativeProxyContext &&c, WclapThread &thread, wclap_plugin_factory wasmFactory) {
+		void assign(NativeProxyContext &&c, WclapThread &thread, WasmP factoryP) {
 			this->get_plugin_count = native_get_plugin_count;
 			this->get_plugin_descriptor = native_get_plugin_descriptor;
 			this->create_plugin = native_create_plugin;
@@ -32,8 +33,12 @@ struct WclapMethods {
 			arenas = std::unique_ptr<WclapArenas>{
 				new WclapArenas(*c.wclap, thread)
 			};
+			
+			auto wasmFactory = arenas.view<wclap_plugin_factory>(factoryP);
+			auto getPluginCountFn = wasmFactory.get_plugin_count();
+			auto getPluginDescFn = wasmFactory.get_plugin_descriptor();
 
-			auto count = thread.callWasm_I(wasmFactory.get_plugin_count(), context.wasmObjP);
+			auto count = thread.callWasm_I(getPluginCountFn, context.wasmObjP);
 			if (validity.lengths && count > validity.maxPlugins) {
 				context.wclap->errorMessage = "plugin factory advertised too many plugins";
 				descriptorPointers.clear();
@@ -42,7 +47,7 @@ struct WclapMethods {
 			
 			descriptorPointers.clear();
 			for (uint32_t i = 0; i < count; ++i) {
-				auto wasmP = thread.callWasm_P(wasmFactory.get_plugin_descriptor(), context.wasmObjP, i);
+				auto wasmP = thread.callWasm_P(getPluginDescFn, context.wasmObjP, i);
 				if (wasmP) {
 					const clap_plugin_descriptor *desc;
 					wasmToNative(*arenas, wasmP, desc);
@@ -54,18 +59,33 @@ struct WclapMethods {
 		}
 	
 		static uint32_t native_get_plugin_count(const struct clap_plugin_factory *obj) {
-			auto &factory = *(plugin_factory *)obj;
+			auto &factory = *(const plugin_factory *)obj;
 			return uint32_t(factory.descriptorPointers.size());
 		}
 		static const clap_plugin_descriptor_t * native_get_plugin_descriptor(const struct clap_plugin_factory *obj, uint32_t index) {
-			auto &factory = *(plugin_factory *)obj;
+			auto &factory = *(const plugin_factory *)obj;
 			if (index < factory.descriptorPointers.size()) {
 				return factory.descriptorPointers[index];
 			}
 			return nullptr;
 		}
-		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *factory, const clap_host *host, const char *plugin_id) {
-			return nullptr;
+		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *obj, const clap_host *host, const char *plugin_id) {
+			auto &factory = *(const plugin_factory *)obj;
+			// Claim a thread exclusively for this plugin
+			auto ownedThread = factory.context.wclap->claimRealtimeThread();
+			auto &ownedArenas = ownedThread->arenas;
+
+			WasmP wasmHostP, wasmPluginId, wasmPluginP;
+			nativeToWasm(ownedArenas, host, wasmHostP); // persistent, tied to plugin lifetime
+			{
+				auto wasmReset = ownedArenas.scopedWasmReset();
+				nativeToWasm(ownedArenas, plugin_id, wasmPluginId); // temporary
+				auto createPluginFn = ownedArenas.view<wclap_plugin_factory>.create_plugin();
+				wasmPluginP = ownedThread->callWasm_P(createPluginFn, wasmHostP, wasmPluginId);
+			}
+			clap_plugin_t *nativePluginP;
+			wasnToNative(ownedArenas, wasmPluginP, nativePluginP);
+			return nativePluginP;
 		}
 	};
 	
@@ -91,7 +111,7 @@ struct WclapMethods {
 			if (!triedPluginFactory) {
 				triedPluginFactory = true;
 				pluginFactory = std::unique_ptr<plugin_factory>(new plugin_factory());
-				pluginFactory->assign({&wclap, factoryP}, scoped.thread, wclap.view<wclap_plugin_factory>(factoryP));
+				pluginFactory->assign({&wclap, factoryP}, scoped.thread, factoryP);
 			}
 			return pluginFactory.get();
 		}

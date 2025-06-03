@@ -187,6 +187,7 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 
 void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
 	auto lock = writeLock();
+	ptr->arenas.resetIncludingPersistent();
 	realtimeThreadPool.emplace_back(std::move(ptr));
 }
 

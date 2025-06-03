@@ -46,9 +46,10 @@ struct WclapArenas {
 	T * nativeTyped() {
 		return (T *)nativeBytes(sizeof(T), alignof(T));
 	}
-	void nativeReset() {
-		nativeArenaPos = nativeArena;
-	}
+	// This should be scoped, so we can use the arena for persistent storage when it's owned
+//	void nativeReset() {
+//		nativeArenaPos = nativeArena;
+//	}
 
 	size_t wasmArena, wasmArenaEnd, wasmArenaPos;
 	size_t wasmBytes(size_t size, size_t align=1) {

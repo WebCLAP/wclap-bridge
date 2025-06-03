@@ -45,7 +45,8 @@ struct Wclap {
 	template<class AutoTranslatedStruct>
 	AutoTranslatedStruct view(uint64_t wasmP) {
 		// TODO: bounds check
-		return AutoTranslatedStruct{wasmP ? wasmMemory(wasmP) : nullptr};
+		bool valid = wasmP && !(wasmP%AutoTranslatedStruct::wasmAlign);
+		return AutoTranslatedStruct{valid ? wasmMemory(wasmP) : nullptr};
 	}
 
 	std::string wclapDir, presetDir, cacheDir, varDir;

@@ -194,6 +194,8 @@ using ${wclapClass} = ${name};`;
 struct ${wclapClass} {
 	${wclapClass}(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = ${structType.wasmAlign};
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -253,7 +255,7 @@ struct ${wclapClass} {
 						if (needsWasmArena || needsNativeArena) {
 							code += `
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		`;
 						}
 						for (let i = 1; i < field.argTypes.length; ++i) {
@@ -287,7 +289,7 @@ struct ${wclapClass} {
 							} else {
 								code += `
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		${field.returnType + (/\*$/.test(field.returnType) ? '' : ' ')}nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;`;

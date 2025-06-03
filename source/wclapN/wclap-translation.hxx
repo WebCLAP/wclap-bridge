@@ -34,7 +34,7 @@ struct WclapMethods {
 				new WclapArenas(*c.wclap, thread)
 			};
 			
-			auto wasmFactory = arenas.view<wclap_plugin_factory>(factoryP);
+			auto wasmFactory = context.wclap->view<wclap_plugin_factory>(factoryP);
 			auto getPluginCountFn = wasmFactory.get_plugin_count();
 			auto getPluginDescFn = wasmFactory.get_plugin_descriptor();
 
@@ -71,20 +71,22 @@ struct WclapMethods {
 		}
 		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *obj, const clap_host *host, const char *plugin_id) {
 			auto &factory = *(const plugin_factory *)obj;
+			auto &context = factory.context;
 			// Claim a thread exclusively for this plugin
-			auto ownedThread = factory.context.wclap->claimRealtimeThread();
-			auto &ownedArenas = ownedThread->arenas;
+			auto ownedThread = context.wclap->claimRealtimeThread();
+			auto &ownedArenas = *ownedThread->arenas;
 
 			WasmP wasmHostP, wasmPluginId, wasmPluginP;
 			nativeToWasm(ownedArenas, host, wasmHostP); // persistent, tied to plugin lifetime
 			{
 				auto wasmReset = ownedArenas.scopedWasmReset();
 				nativeToWasm(ownedArenas, plugin_id, wasmPluginId); // temporary
-				auto createPluginFn = ownedArenas.view<wclap_plugin_factory>.create_plugin();
+				auto createPluginFn = ownedArenas.view<wclap_plugin_factory>(context.wasmObjP).create_plugin();
 				wasmPluginP = ownedThread->callWasm_P(createPluginFn, wasmHostP, wasmPluginId);
 			}
 			clap_plugin_t *nativePluginP;
-			wasnToNative(ownedArenas, wasmPluginP, nativePluginP);
+			wasmToNative(ownedArenas, wasmPluginP, nativePluginP);
+			getNativeProxyContext(nativePluginP).realtimeThread = std::move(ownedThread);
 			return nativePluginP;
 		}
 	};

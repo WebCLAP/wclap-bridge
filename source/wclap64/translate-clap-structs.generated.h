@@ -7,6 +7,8 @@ using wclap_version = clap_version_t;
 struct wclap_host {
 	wclap_host(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -47,13 +49,13 @@ struct wclap_host {
 		WasmP wasmFn = context.wclap->view<wclap_host>(context.wasmObjP).get_extension();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_extension_id;
 		nativeToWasm(arenas, extension_id, wasm_extension_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const void *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -116,6 +118,8 @@ using wclap_event_note_expression = clap_event_note_expression_t;
 struct wclap_event_param_value {
 	wclap_event_param_value(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -175,6 +179,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_event_param_value_t *na
 
 struct wclap_event_param_mod {
 	wclap_event_param_mod(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -242,6 +248,8 @@ using wclap_event_midi = clap_event_midi_t;
 struct wclap_event_midi_sysex {
 	wclap_event_midi_sysex(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -288,6 +296,8 @@ using wclap_event_midi2 = clap_event_midi2_t;
 struct wclap_input_events {
 	wclap_input_events(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -314,11 +324,11 @@ struct wclap_input_events {
 		WasmP wasmFn = context.wclap->view<wclap_input_events>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const clap_event_header_t *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -350,6 +360,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_input_events_t *native,
 struct wclap_output_events {
 	wclap_output_events(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -366,7 +378,7 @@ struct wclap_output_events {
 		WasmP wasmFn = context.wclap->view<wclap_output_events>(context.wasmObjP).try_push();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_event;
 		nativeToWasm(arenas, event, wasm_event);
@@ -398,6 +410,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_output_events_t *native
 
 struct wclap_audio_buffer {
 	wclap_audio_buffer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -446,6 +460,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_audio_buffer_t *native,
 
 struct wclap_process {
 	wclap_process(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -510,6 +526,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_process_t *native, Wasm
 
 struct wclap_plugin_descriptor {
 	wclap_plugin_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -578,6 +596,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_descriptor_t *na
 
 struct wclap_plugin {
 	wclap_plugin(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -670,7 +690,7 @@ struct wclap_plugin {
 		WasmP wasmFn = context.wclap->view<wclap_plugin>(context.wasmObjP).process();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_process;
 		nativeToWasm(arenas, process, wasm_process);
@@ -682,13 +702,13 @@ struct wclap_plugin {
 		WasmP wasmFn = context.wclap->view<wclap_plugin>(context.wasmObjP).get_extension();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_id;
 		nativeToWasm(arenas, id, wasm_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const void *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -735,6 +755,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_t *native, WasmP
 struct wclap_plugin_factory {
 	wclap_plugin_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -761,11 +783,11 @@ struct wclap_plugin_factory {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_factory>(context.wasmObjP).get_plugin_descriptor();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const clap_plugin_descriptor_t *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -775,7 +797,7 @@ struct wclap_plugin_factory {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_factory>(context.wasmObjP).create_plugin();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_host;
 		nativeToWasm(arenas, host, wasm_host);
@@ -783,7 +805,7 @@ struct wclap_plugin_factory {
 		nativeToWasm(arenas, plugin_id, wasm_plugin_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_host, wasm_plugin_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const clap_plugin_t *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -814,6 +836,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_factory_t *nativ
 
 struct wclap_universal_plugin_id {
 	wclap_universal_plugin_id(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -850,6 +874,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_universal_plugin_id_t *
 
 struct wclap_preset_discovery_metadata_receiver {
 	wclap_preset_discovery_metadata_receiver(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -894,7 +920,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).on_error();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_error_message;
 		nativeToWasm(arenas, error_message, wasm_error_message);
@@ -905,7 +931,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).begin_preset();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_name;
 		nativeToWasm(arenas, name, wasm_name);
@@ -919,7 +945,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_plugin_id();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_plugin_id;
 		nativeToWasm(arenas, plugin_id, wasm_plugin_id);
@@ -930,7 +956,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_soundpack_id();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_soundpack_id;
 		nativeToWasm(arenas, soundpack_id, wasm_soundpack_id);
@@ -947,7 +973,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_creator();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_creator;
 		nativeToWasm(arenas, creator, wasm_creator);
@@ -958,7 +984,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_description();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_description;
 		nativeToWasm(arenas, description, wasm_description);
@@ -975,7 +1001,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_feature();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_feature;
 		nativeToWasm(arenas, feature, wasm_feature);
@@ -986,7 +1012,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_extra_info();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_key;
 		nativeToWasm(arenas, key, wasm_key);
@@ -1029,6 +1055,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_metada
 struct wclap_preset_discovery_filetype {
 	wclap_preset_discovery_filetype(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1068,6 +1096,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_filety
 
 struct wclap_preset_discovery_location {
 	wclap_preset_discovery_location(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1112,6 +1142,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_locati
 
 struct wclap_preset_discovery_soundpack {
 	wclap_preset_discovery_soundpack(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1173,6 +1205,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_soundp
 struct wclap_preset_discovery_provider_descriptor {
 	wclap_preset_discovery_provider_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1217,6 +1251,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_provid
 struct wclap_preset_discovery_provider {
 	wclap_preset_discovery_provider(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1258,7 +1294,7 @@ struct wclap_preset_discovery_provider {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_provider>(context.wasmObjP).get_metadata();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(arenas, location, wasm_location);
@@ -1272,13 +1308,13 @@ struct wclap_preset_discovery_provider {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_provider>(context.wasmObjP).get_extension();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_extension_id;
 		nativeToWasm(arenas, extension_id, wasm_extension_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const void *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -1312,6 +1348,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_provid
 
 struct wclap_preset_discovery_indexer {
 	wclap_preset_discovery_indexer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1353,7 +1391,7 @@ struct wclap_preset_discovery_indexer {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_filetype();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_filetype;
 		nativeToWasm(arenas, filetype, wasm_filetype);
@@ -1365,7 +1403,7 @@ struct wclap_preset_discovery_indexer {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_location();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(arenas, location, wasm_location);
@@ -1377,7 +1415,7 @@ struct wclap_preset_discovery_indexer {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_soundpack();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_soundpack;
 		nativeToWasm(arenas, soundpack, wasm_soundpack);
@@ -1389,13 +1427,13 @@ struct wclap_preset_discovery_indexer {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_indexer>(context.wasmObjP).get_extension();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_extension_id;
 		nativeToWasm(arenas, extension_id, wasm_extension_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const void *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -1434,6 +1472,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_indexe
 struct wclap_preset_discovery_factory {
 	wclap_preset_discovery_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1460,11 +1500,11 @@ struct wclap_preset_discovery_factory {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_factory>(context.wasmObjP).get_descriptor();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const clap_preset_discovery_provider_descriptor_t *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -1474,7 +1514,7 @@ struct wclap_preset_discovery_factory {
 		WasmP wasmFn = context.wclap->view<wclap_preset_discovery_factory>(context.wasmObjP).create();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_indexer;
 		nativeToWasm(arenas, indexer, wasm_indexer);
@@ -1482,7 +1522,7 @@ struct wclap_preset_discovery_factory {
 		nativeToWasm(arenas, provider_id, wasm_provider_id);
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_indexer, wasm_provider_id);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const clap_preset_discovery_provider_t *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -1513,6 +1553,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_preset_discovery_factor
 
 struct wclap_plugin_entry {
 	wclap_plugin_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1549,11 +1591,11 @@ struct wclap_plugin_entry {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_entry>(context.wasmObjP).get_factory();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP);
 
-		arenas.nativeReset();
+		auto resetN = arenas.scopedNativeReset();
 		const void *nativeResult;
 		wasmToNative(arenas, wasmResult, nativeResult);
 		return nativeResult;
@@ -1588,6 +1630,8 @@ using wclap_color = clap_color_t;
 struct wclap_istream {
 	wclap_istream(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1604,7 +1648,7 @@ struct wclap_istream {
 		WasmP wasmFn = context.wclap->view<wclap_istream>(context.wasmObjP).read();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_buffer;
 		nativeToWasm(arenas, buffer, wasm_buffer);
@@ -1637,6 +1681,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_istream_t *native, Wasm
 struct wclap_ostream {
 	wclap_ostream(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1653,7 +1699,7 @@ struct wclap_ostream {
 		WasmP wasmFn = context.wclap->view<wclap_ostream>(context.wasmObjP).write();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_buffer;
 		nativeToWasm(arenas, buffer, wasm_buffer);
@@ -1688,6 +1734,8 @@ using wclap_ambisonic_config = clap_ambisonic_config_t;
 struct wclap_plugin_ambisonic {
 	wclap_plugin_ambisonic(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1704,7 +1752,7 @@ struct wclap_plugin_ambisonic {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_ambisonic>(context.wasmObjP).is_config_supported();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(arenas, config, wasm_config);
@@ -1716,7 +1764,7 @@ struct wclap_plugin_ambisonic {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_ambisonic>(context.wasmObjP).get_config();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(arenas, config, wasm_config);
@@ -1748,6 +1796,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_ambisonic_t *nat
 
 struct wclap_host_ambisonic {
 	wclap_host_ambisonic(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1787,6 +1837,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_ambisonic_t *nativ
 
 struct wclap_audio_port_info {
 	wclap_audio_port_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1842,6 +1894,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_audio_port_info_t *nati
 struct wclap_plugin_audio_ports {
 	wclap_plugin_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1865,7 +1919,7 @@ struct wclap_plugin_audio_ports {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_audio_ports>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(arenas, info, wasm_info);
@@ -1897,6 +1951,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_t *n
 
 struct wclap_host_audio_ports {
 	wclap_host_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1948,6 +2004,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_audio_ports_t *nat
 struct wclap_plugin_audio_ports_activation {
 	wclap_plugin_audio_ports_activation(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -1998,6 +2056,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_acti
 
 struct wclap_audio_ports_config {
 	wclap_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2069,6 +2129,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_audio_ports_config_t *n
 struct wclap_plugin_audio_ports_config {
 	wclap_plugin_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2095,7 +2157,7 @@ struct wclap_plugin_audio_ports_config {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_audio_ports_config>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(arenas, config, wasm_config);
@@ -2136,6 +2198,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_conf
 struct wclap_plugin_audio_ports_config_info {
 	wclap_plugin_audio_ports_config_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2159,7 +2223,7 @@ struct wclap_plugin_audio_ports_config_info {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_audio_ports_config_info>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(arenas, info, wasm_info);
@@ -2191,6 +2255,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_audio_ports_conf
 
 struct wclap_host_audio_ports_config {
 	wclap_host_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2230,6 +2296,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_audio_ports_config
 
 struct wclap_audio_port_configuration_request {
 	wclap_audio_port_configuration_request(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2279,6 +2347,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_audio_port_configuratio
 struct wclap_plugin_configurable_audio_ports {
 	wclap_plugin_configurable_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2295,7 +2365,7 @@ struct wclap_plugin_configurable_audio_ports {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).can_apply_configuration();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_requests;
 		nativeToWasm(arenas, requests, wasm_requests);
@@ -2307,7 +2377,7 @@ struct wclap_plugin_configurable_audio_ports {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).apply_configuration();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_requests;
 		nativeToWasm(arenas, requests, wasm_requests);
@@ -2341,6 +2411,8 @@ using wclap_context_menu_target = clap_context_menu_target_t;
 
 struct wclap_context_menu_entry {
 	wclap_context_menu_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2381,6 +2453,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_entry_t *n
 
 struct wclap_context_menu_check_entry {
 	wclap_context_menu_check_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2426,6 +2500,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_check_entr
 struct wclap_context_menu_item_title {
 	wclap_context_menu_item_title(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2461,6 +2537,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_item_title
 
 struct wclap_context_menu_submenu {
 	wclap_context_menu_submenu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2498,6 +2576,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_submenu_t 
 struct wclap_context_menu_builder {
 	wclap_context_menu_builder(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2517,7 +2597,7 @@ struct wclap_context_menu_builder {
 		WasmP wasmFn = context.wclap->view<wclap_context_menu_builder>(context.wasmObjP).add_item();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_item_data;
 		nativeToWasm(arenas, item_data, wasm_item_data);
@@ -2558,6 +2638,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_context_menu_builder_t 
 struct wclap_plugin_context_menu {
 	wclap_plugin_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2574,7 +2656,7 @@ struct wclap_plugin_context_menu {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_context_menu>(context.wasmObjP).populate();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(arenas, target, wasm_target);
@@ -2588,7 +2670,7 @@ struct wclap_plugin_context_menu {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_context_menu>(context.wasmObjP).perform();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(arenas, target, wasm_target);
@@ -2621,6 +2703,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_context_menu_t *
 struct wclap_host_context_menu {
 	wclap_host_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2643,7 +2727,7 @@ struct wclap_host_context_menu {
 		WasmP wasmFn = context.wclap->view<wclap_host_context_menu>(context.wasmObjP).populate();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(arenas, target, wasm_target);
@@ -2657,7 +2741,7 @@ struct wclap_host_context_menu {
 		WasmP wasmFn = context.wclap->view<wclap_host_context_menu>(context.wasmObjP).perform();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(arenas, target, wasm_target);
@@ -2676,7 +2760,7 @@ struct wclap_host_context_menu {
 		WasmP wasmFn = context.wclap->view<wclap_host_context_menu>(context.wasmObjP).popup();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(arenas, target, wasm_target);
@@ -2711,6 +2795,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_context_menu_t *na
 struct wclap_host_event_registry {
 	wclap_host_event_registry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -2724,7 +2810,7 @@ struct wclap_host_event_registry {
 		WasmP wasmFn = context.wclap->view<wclap_host_event_registry>(context.wasmObjP).query();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_space_name;
 		nativeToWasm(arenas, space_name, wasm_space_name);
@@ -2759,6 +2845,8 @@ using wclap_gui_resize_hints = clap_gui_resize_hints_t;
 
 struct wclap_plugin_gui {
 	wclap_plugin_gui(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2815,7 +2903,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).is_api_supported();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_api;
 		nativeToWasm(arenas, api, wasm_api);
@@ -2827,7 +2915,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).get_preferred_api();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_api;
 		nativeToWasm(arenas, api, wasm_api);
@@ -2841,7 +2929,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).create();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_api;
 		nativeToWasm(arenas, api, wasm_api);
@@ -2866,7 +2954,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).get_size();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_width;
 		nativeToWasm(arenas, width, wasm_width);
@@ -2887,7 +2975,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).get_resize_hints();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_hints;
 		nativeToWasm(arenas, hints, wasm_hints);
@@ -2899,7 +2987,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).adjust_size();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_width;
 		nativeToWasm(arenas, width, wasm_width);
@@ -2920,7 +3008,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).set_parent();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_window;
 		nativeToWasm(arenas, window, wasm_window);
@@ -2932,7 +3020,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).set_transient();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_window;
 		nativeToWasm(arenas, window, wasm_window);
@@ -2944,7 +3032,7 @@ struct wclap_plugin_gui {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_gui>(context.wasmObjP).suggest_title();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_title;
 		nativeToWasm(arenas, title, wasm_title);
@@ -3002,6 +3090,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_gui_t *native, W
 
 struct wclap_host_gui {
 	wclap_host_gui(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3085,6 +3175,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_gui_t *native, Was
 struct wclap_plugin_latency {
 	wclap_plugin_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3125,6 +3217,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_latency_t *nativ
 struct wclap_host_latency {
 	wclap_host_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3164,6 +3258,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_latency_t *native,
 struct wclap_host_log {
 	wclap_host_log(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3177,7 +3273,7 @@ struct wclap_host_log {
 		WasmP wasmFn = context.wclap->view<wclap_host_log>(context.wasmObjP).log();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_msg;
 		nativeToWasm(arenas, msg, wasm_msg);
@@ -3210,6 +3306,8 @@ using wclap_note_name = clap_note_name_t;
 struct wclap_plugin_note_name {
 	wclap_plugin_note_name(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3233,7 +3331,7 @@ struct wclap_plugin_note_name {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_note_name>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_note_name;
 		nativeToWasm(arenas, note_name, wasm_note_name);
@@ -3265,6 +3363,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_note_name_t *nat
 
 struct wclap_host_note_name {
 	wclap_host_note_name(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3307,6 +3407,8 @@ using wclap_note_port_info = clap_note_port_info_t;
 struct wclap_plugin_note_ports {
 	wclap_plugin_note_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3330,7 +3432,7 @@ struct wclap_plugin_note_ports {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_note_ports>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(arenas, info, wasm_info);
@@ -3362,6 +3464,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_note_ports_t *na
 
 struct wclap_host_note_ports {
 	wclap_host_note_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3413,6 +3517,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_note_ports_t *nati
 struct wclap_plugin_param_indication {
 	wclap_plugin_param_indication(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3429,7 +3535,7 @@ struct wclap_plugin_param_indication {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_param_indication>(context.wasmObjP).set_mapping();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_color;
 		nativeToWasm(arenas, color, wasm_color);
@@ -3444,7 +3550,7 @@ struct wclap_plugin_param_indication {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_param_indication>(context.wasmObjP).set_automation();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_color;
 		nativeToWasm(arenas, color, wasm_color);
@@ -3475,6 +3581,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_param_indication
 
 struct wclap_param_info {
 	wclap_param_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3540,6 +3648,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_param_info_t *native, W
 struct wclap_plugin_params {
 	wclap_plugin_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3575,7 +3685,7 @@ struct wclap_plugin_params {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_params>(context.wasmObjP).get_info();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_param_info;
 		nativeToWasm(arenas, param_info, wasm_param_info);
@@ -3587,7 +3697,7 @@ struct wclap_plugin_params {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_params>(context.wasmObjP).get_value();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_out_value;
 		nativeToWasm(arenas, out_value, wasm_out_value);
@@ -3599,7 +3709,7 @@ struct wclap_plugin_params {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_params>(context.wasmObjP).value_to_text();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_out_buffer;
 		nativeToWasm(arenas, out_buffer, wasm_out_buffer);
@@ -3611,7 +3721,7 @@ struct wclap_plugin_params {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_params>(context.wasmObjP).text_to_value();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_param_value_text;
 		nativeToWasm(arenas, param_value_text, wasm_param_value_text);
@@ -3625,7 +3735,7 @@ struct wclap_plugin_params {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_params>(context.wasmObjP).flush();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_in;
 		nativeToWasm(arenas, in, wasm_in);
@@ -3662,6 +3772,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_params_t *native
 
 struct wclap_host_params {
 	wclap_host_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3722,6 +3834,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_params_t *native, 
 struct wclap_plugin_preset_load {
 	wclap_plugin_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3735,7 +3849,7 @@ struct wclap_plugin_preset_load {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_preset_load>(context.wasmObjP).from_location();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(arenas, location, wasm_location);
@@ -3769,6 +3883,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_preset_load_t *n
 struct wclap_host_preset_load {
 	wclap_host_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3785,7 +3901,7 @@ struct wclap_host_preset_load {
 		WasmP wasmFn = context.wclap->view<wclap_host_preset_load>(context.wasmObjP).on_error();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(arenas, location, wasm_location);
@@ -3800,7 +3916,7 @@ struct wclap_host_preset_load {
 		WasmP wasmFn = context.wclap->view<wclap_host_preset_load>(context.wasmObjP).loaded();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(arenas, location, wasm_location);
@@ -3836,6 +3952,8 @@ using wclap_remote_controls_page = clap_remote_controls_page_t;
 struct wclap_plugin_remote_controls {
 	wclap_plugin_remote_controls(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -3859,7 +3977,7 @@ struct wclap_plugin_remote_controls {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_remote_controls>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_page;
 		nativeToWasm(arenas, page, wasm_page);
@@ -3891,6 +4009,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_remote_controls_
 
 struct wclap_host_remote_controls {
 	wclap_host_remote_controls(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3940,6 +4060,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_remote_controls_t 
 
 struct wclap_plugin_render {
 	wclap_plugin_render(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3992,6 +4114,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_render_t *native
 struct wclap_plugin_state_context {
 	wclap_plugin_state_context(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4008,7 +4132,7 @@ struct wclap_plugin_state_context {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_state_context>(context.wasmObjP).save();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(arenas, stream, wasm_stream);
@@ -4020,7 +4144,7 @@ struct wclap_plugin_state_context {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_state_context>(context.wasmObjP).load();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(arenas, stream, wasm_stream);
@@ -4053,6 +4177,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_state_context_t 
 struct wclap_plugin_state {
 	wclap_plugin_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4069,7 +4195,7 @@ struct wclap_plugin_state {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_state>(context.wasmObjP).save();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(arenas, stream, wasm_stream);
@@ -4081,7 +4207,7 @@ struct wclap_plugin_state {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_state>(context.wasmObjP).load();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(arenas, stream, wasm_stream);
@@ -4113,6 +4239,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_state_t *native,
 
 struct wclap_host_state {
 	wclap_host_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4153,6 +4281,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_state_t *native, W
 struct wclap_plugin_surround {
 	wclap_plugin_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4176,7 +4306,7 @@ struct wclap_plugin_surround {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_surround>(context.wasmObjP).get_channel_map();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_channel_map;
 		nativeToWasm(arenas, channel_map, wasm_channel_map);
@@ -4208,6 +4338,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_surround_t *nati
 
 struct wclap_host_surround {
 	wclap_host_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4247,6 +4379,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_surround_t *native
 
 struct wclap_plugin_tail {
 	wclap_plugin_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4288,6 +4422,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_tail_t *native, 
 struct wclap_host_tail {
 	wclap_host_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4326,6 +4462,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_tail_t *native, Wa
 
 struct wclap_host_thread_check {
 	wclap_host_thread_check(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4378,6 +4516,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_thread_check_t *na
 struct wclap_plugin_thread_pool {
 	wclap_plugin_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4416,6 +4556,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_thread_pool_t *n
 
 struct wclap_host_thread_pool {
 	wclap_host_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4457,6 +4599,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_thread_pool_t *nat
 struct wclap_plugin_timer_support {
 	wclap_plugin_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4496,6 +4640,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_timer_support_t 
 struct wclap_host_timer_support {
 	wclap_host_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4512,7 +4658,7 @@ struct wclap_host_timer_support {
 		WasmP wasmFn = context.wclap->view<wclap_host_timer_support>(context.wasmObjP).register_timer();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_timer_id;
 		nativeToWasm(arenas, timer_id, wasm_timer_id);
@@ -4551,6 +4697,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_host_timer_support_t *n
 
 struct wclap_track_info {
 	wclap_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4602,6 +4750,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_track_info_t *native, W
 struct wclap_plugin_track_info {
 	wclap_plugin_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4641,6 +4791,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_track_info_t *na
 struct wclap_host_track_info {
 	wclap_host_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4654,7 +4806,7 @@ struct wclap_host_track_info {
 		WasmP wasmFn = context.wclap->view<wclap_host_track_info>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(arenas, info, wasm_info);
@@ -4688,6 +4840,8 @@ using wclap_voice_info = clap_voice_info_t;
 struct wclap_plugin_voice_info {
 	wclap_plugin_voice_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
+	static constexpr size_t wasmAlign = 8;
+	
 	operator bool() const {
 		return pointerInWasm;
 	}
@@ -4701,7 +4855,7 @@ struct wclap_plugin_voice_info {
 		WasmP wasmFn = context.wclap->view<wclap_plugin_voice_info>(context.wasmObjP).get();
 		auto scoped = context.wclap->lockRelaxedThread();
 		auto &arenas = *scoped.thread.arenas;
-		auto reset = arenas.scopedWasmReset();
+		auto resetW = arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(arenas, info, wasm_info);
@@ -4732,6 +4886,8 @@ inline void nativeToWasm(WclapArenas &arenas, const clap_plugin_voice_info_t *na
 
 struct wclap_host_voice_info {
 	wclap_host_voice_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
 	
 	operator bool() const {
 		return pointerInWasm;

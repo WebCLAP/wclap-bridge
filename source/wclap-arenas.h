@@ -16,9 +16,6 @@ namespace wclap {
 struct Wclap;
 struct WclapThread;
 
-template<class AutoTranslatedStruct>
-AutoTranslatedStruct wclapWasmView(Wclap &wclap, uint64_t wasmP);
-
 /* Manages two arena allocators, used for (temporary) translation of function arguments.
 
 	Since free() isn't exposed from the WCLAP, this object should be active until the WASM memory is destroyed.  If a thread is destroyed (does this ever happen?) this object should be returned to the Wclap's pool.
@@ -28,27 +25,12 @@ struct WclapArenas {
 
 	Wclap &wclap;
 	
-	uint64_t wasmContextP;
-	struct {
-		ProxiedClapStruct<clap_host> host;
-	} proxies;
+	uint64_t wasmContextP; // store this in the `void *` context field of WASM proxies
+	ProxiedClapStruct<clap_host> proxied_clap_host;
 	
 	WclapArenas(Wclap &wclap, WclapThread &currentThread, size_t arenaIndex);
 	~WclapArenas();
 
-	void mallocIfNeeded();
-	
-	template<class AutoTranslatedStruct>
-	AutoTranslatedStruct view(uint64_t wasmP) {
-		return wclapWasmView<AutoTranslatedStruct>(wclap, wasmP);
-	}
-	
-	template<class AutoTranslatedStruct, typename WasmP>
-	AutoTranslatedStruct create(WasmP &wasmP) {
-		wasmP = (WasmP)wasmBytes(sizeof(AutoTranslatedStruct), AutoTranslatedStruct::wasmAlign);
-		return view<AutoTranslatedStruct>(wasmP);
-	}
-	
 	// Object that resets the arena position when it goes out of scope
 	template<bool forWasm>
 	struct ScopedReset {
@@ -59,7 +41,13 @@ struct WclapArenas {
 		}
 		~ScopedReset() {
 			if (forWasm) {
-				if (active) arena.wasmArenaPos = pos;
+				if (active) {
+					if (pos < arena.wasmArenaPos) {
+						arena.wasmArenaPos = pos;
+					} else {
+						
+					}
+				}
 			} else {
 				if (active) arena.nativeArenaPos = (unsigned char *)pos;
 			}
@@ -95,7 +83,7 @@ struct WclapArenas {
 	}
 	
 	size_t wasmArena = 0, wasmArenaEnd = 0, wasmArenaPos = 0, wasmArenaReset = 0;
-	size_t wasmBytes(size_t size, size_t align=1) {
+	size_t wasmBytes(size_t size, size_t align) {
 		while (wasmArenaPos%align) ++wasmArenaPos;
 		size_t result = wasmArenaPos;
 		wasmArenaPos += size;
@@ -106,8 +94,6 @@ struct WclapArenas {
 		return result;
 	}
 	
-	uint8_t * wasmMemory(uint64_t wasmP);
-
 	ScopedReset<true> scopedWasmReset() {
 		return {*this, wasmArenaPos};
 	}
@@ -115,10 +101,25 @@ struct WclapArenas {
 		wasmArena = wasmArenaPos;
 	}
 
+	void resetTemporary() {
+		if (nativeArenaPos != nativeArena) {
+			LOG_EXPR(nativeArenaPos);
+			LOG_EXPR(nativeArena);
+		}
+		if (wasmArenaPos != wasmArena) {
+			LOG_EXPR(wasmArenaPos);
+			LOG_EXPR(wasmArena);
+		}
+		nativeArenaPos = nativeArena;
+		wasmArenaPos = wasmArena;
+	}
+
 	// Called when returning to a pool
 	void resetIncludingPersistent() {
 		nativeArenaPos = nativeArena = nativeArenaReset;
 		wasmArenaPos = wasmArena = wasmArenaReset;
+		
+		proxied_clap_host.clear();
 	}
 
 private:

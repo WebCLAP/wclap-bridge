@@ -12,97 +12,80 @@
 namespace wclap {
 
 WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
+	startInstance();
+}
+
+void WclapThread::startInstance() {
 	if (wclap.errorMessage) return;
 
-	if (wasiConfig) {
-		wclap.errorMessage = "instantiate() called twice";
-		return;
-	}
-	
-	wasiConfig = wasi_config_new();
-	if (!wasiConfig) {
-		wclap.errorMessage = "Failed to create WASI config";
-		return;
-	}
+	store = wasmtime_store_new(global_wasm_engine, nullptr, nullptr);
+	if (!store) return wclap.setError("Failed to create store");
 
+	context = wasmtime_store_context(store);
+	if (!context) return wclap.setError("Failed to create context");
+	
+	// Create a linker with WASI functions defined
+	linker = wasmtime_linker_new(global_wasm_engine);
+	if (!linker) return wclap.setError("error creating linker");
+
+	error = wasmtime_linker_define_wasi(linker);
+	if (error) return wclap.setError("error linking WASI");
+
+	//---------- WASI config ----------//
+
+	wasi_config_t *wasiConfig = wasi_config_new();
+	if (!wasiConfig) return wclap.setError("Failed to create WASI config");
+	// Everything after this point needs to delete `wasiConfig` if it fails
+	
 	wasi_config_inherit_stdout(wasiConfig);
 	wasi_config_inherit_stderr(wasiConfig);
 	// Link various directories - failure is allowed if `mustLinkDirs` is false
 	if (wclap.wclapDir.size()) {
 		if (!wasi_config_preopen_dir(wasiConfig, wclap.wclapDir.c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
 			if (wclap.mustLinkDirs) {
-				wclap.errorMessage = "Failed to open /plugin/ in WASI config";
-				return;
+				wasi_config_delete(wasiConfig);
+				return wclap.setError("Failed to open /plugin/ in WASI config");
 			}
 		}
 	}
 	if (wclap.presetDir.size()) {
 		if (!wasi_config_preopen_dir(wasiConfig, wclap.presetDir.c_str(), "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
 			if (wclap.mustLinkDirs) {
-				wclap.errorMessage = "Failed to open /presets/ in WASI config";
-				return;
+				wasi_config_delete(wasiConfig);
+				return wclap.setError("Failed to open /presets/ in WASI config");
 			}
 		}
 	}
 	if (wclap.cacheDir.size()) {
 		if (!wasi_config_preopen_dir(wasiConfig, wclap.cacheDir.c_str(), "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
 			if (wclap.mustLinkDirs) {
-				wclap.errorMessage = "Failed to open /cache/ in WASI config";
-				return;
+				wasi_config_delete(wasiConfig);
+				return wclap.setError("Failed to open /cache/ in WASI config");
 			}
 		}
 	}
 	if (wclap.varDir.size()) {
 		if (!wasi_config_preopen_dir(wasiConfig, wclap.varDir.c_str(), "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
 			if (wclap.mustLinkDirs) {
-				wclap.errorMessage = "Failed to open /var/ in WASI config";
-				return;
+				wasi_config_delete(wasiConfig);
+				return wclap.setError("Failed to open /var/ in WASI config");
 			}
 		}
-	}
-	
-	//---------- Start the instance ----------//
-
-	store = wasmtime_store_new(global_wasm_engine, nullptr, nullptr);
-	if (!store) {
-		wclap.errorMessage = "Failed to create store";
-		return;
-	}
-	context = wasmtime_store_context(store);
-	if (!context) {
-		wclap.errorMessage = "Failed to create context";
-		return;
-	}
-	
-	// Create a linker with WASI functions defined
-	linker = wasmtime_linker_new(global_wasm_engine);
-	if (!linker) {
-		wclap.errorMessage = "error creating linker";
-		return;
-	}
-	error = wasmtime_linker_define_wasi(linker);
-	if (error) {
-		wclap.errorMessage = "error linking WASI";
-		return;
 	}
 
 	error = wasmtime_context_set_wasi(context, wasiConfig);
 	if (error) {
-		wclap.errorMessage = "Failed to configure WASI";
-		return;
+		wasi_config_delete(wasiConfig);
+		return wclap.setError("Failed to configure WASI");
 	}
 	wasiConfig = nullptr;
 
+	//---------- Start the instance ----------//
+
 	// This doesn't call the WASI _start() or _initialize() methods
 	error = wasmtime_linker_instantiate(linker, context, wclap.module, &instance, &trap);
-	if (error) {
-		wclap.errorMessage = "failed to create instance";
-		return;
-	}
-	if (trap) {
-		wclap.errorMessage = "failed to start instance";
-		return;
-	}
+	if (error) return wclap.setError("failed to create instance");
+	if (trap) return wclap.setError("failed to start instance");
 
 	//---------- Find exports ----------//
 
@@ -116,23 +99,19 @@ WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
 		} else if (item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
 			// TODO: it should be the same as the import - not sure how to check this
 			if (!wclap.sharedMemory) {
-				wclap.errorMessage = "exported shared memory, but didn't import it";
-				return;
+				return wclap.setError("exported shared memory, but didn't import it");
 			}
 		} else {
 			wasmtime_extern_delete(&item);
-			wclap.errorMessage = "exported memory isn't a (Shared)Memory";
-			return;
+			return wclap.setError("exported memory isn't a (Shared)Memory");
 		}
 		wasmtime_extern_delete(&item);
 	} else if (!wclap.sharedMemory) {
-		wclap.errorMessage = "must either export memory or import shared memory";
-		return;
+		return wclap.setError("must either export memory or import shared memory");
 	}
 
 	if (!wasmtime_instance_export_get(context, &instance, "clap_entry", 10, &item)) {
-		wclap.errorMessage = "clap_entry not exported";
-		return;
+		return wclap.setError("clap_entry not exported");
 	}
 	if (item.kind == WASMTIME_EXTERN_GLOBAL) {
 		wasmtime_val_t v;
@@ -142,47 +121,45 @@ WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
 		} else if (v.kind == WASM_I64 && wclap.wasm64) {
 			clapEntryP64 = v.of.i64;
 		} else {
-			wclap.errorMessage = "clap_entry is not a (correctly-sized) pointer";
-			return;
+			return wclap.setError("clap_entry is not a (correctly-sized) pointer");
 		}
 	} else {
 		wasmtime_extern_delete(&item);
-		wclap.errorMessage = "clap_entry isn't a Global";
-		return;
+		return wclap.setError("clap_entry isn't a Global");
 	}
 	wasmtime_extern_delete(&item);
 
 	if (!wasmtime_instance_export_get(context, &instance, "malloc", 6, &item)) {
-		wclap.errorMessage = "malloc not exported";
-		return;
+		return wclap.setError("malloc not exported");
 	}
 	if (item.kind == WASMTIME_EXTERN_FUNC) {
 		wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
 		const wasm_valtype_vec_t *params = wasm_functype_params(type);
 		const wasm_valtype_vec_t *results = wasm_functype_results(type);
 		if (params->size != 1 || results->size != 1) {
-			wclap.errorMessage = "malloc() function signature mismatch";
+			wasmtime_extern_delete(&item);
+			return wclap.setError("malloc() function signature mismatch");
 		}
 		if (wasm_valtype_kind(params->data[0]) != wasm_valtype_kind(results->data[0])) {
-			wclap.errorMessage = "malloc() function signature mismatch";
-			return;
+			wasmtime_extern_delete(&item);
+			return wclap.setError("malloc() function signature mismatch");
 		}
 		if (wclap.wasm64) {
 			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I64) {
-				wclap.errorMessage = "malloc() function signature mismatch";
-				return;
+				wasmtime_extern_delete(&item);
+				return wclap.setError("malloc() function signature mismatch");
 			}
 		} else {
 			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I32) {
-				wclap.errorMessage = "malloc() function signature mismatch";
+				wasmtime_extern_delete(&item);
+				return wclap.setError("malloc() function signature mismatch");
 			}
 		}
 		mallocFunc = item.of.func;
 		wasm_functype_delete(type);
 	} else {
 		wasmtime_extern_delete(&item);
-		wclap.errorMessage = "malloc isn't a Function";
-		return;
+		return wclap.setError("malloc isn't a Function");
 	}
 	wasmtime_extern_delete(&item);
 
@@ -197,8 +174,7 @@ WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
 
 			if (elementKind == WASM_FUNCREF) {
 				if (limits.max < 65536 || limits.max - 65536 < limits.min) {
-					wclap.errorMessage = "exported function table can't grow enough for CLAP host functions";
-					return;
+					return wclap.setError("exported function table can't grow enough for CLAP host functions");
 				}
 				functionTable = item.of.table;
 				break;
@@ -233,38 +209,6 @@ WclapThread::~WclapThread() {
 	if (store) wasmtime_store_delete(store);
 }
 
-void WclapThreadWithArenas::initModule() {
-	setWasmDeadline(validity.deadlines.initModule);
-
-	wasmtime_extern_t item;
-
-	// Call the WASI entry-point `_initialize()` if it exists - WCLAPs don't *have* to use WASI, so it's fine not to
-	if (wasmtime_instance_export_get(context, &instance, "_initialize", 11, &item)) {
-		if (item.kind == WASMTIME_EXTERN_FUNC) {
-			wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
-			const wasm_valtype_vec_t *params = wasm_functype_params(type);
-			const wasm_valtype_vec_t *results = wasm_functype_results(type);
-			if (params->size != 0 || results->size != 0) {
-				wclap.errorMessage = "_initialize() function signature mismatch";
-				return;
-			}
-			wasm_functype_delete(type);
-
-			wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
-			if (trap) {
-				wasmtime_extern_delete(&item);
-				wclap.errorMessage = (trapIsTimeout(trap) ? "_initialize() timeout" : "_initialize() threw (trapped)");
-				return;
-			}
-		} else {
-			wasmtime_extern_delete(&item);
-			wclap.errorMessage = "_initialize isn't a function";
-			return;
-		}
-		wasmtime_extern_delete(&item);
-	}
-}
-
 uint64_t WclapThread::wasmMalloc(size_t bytes) {
 	uint64_t wasmP;
 	
@@ -281,11 +225,11 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 	setWasmDeadline(validity.deadlines.malloc);
 	error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
 	if (error) {
-		wclap.errorMessage = "calling malloc() failed";
+		wclap.setError("calling malloc() failed");
 		return 0;
 	}
 	if (trap) {
-		wclap.errorMessage = (trapIsTimeout(trap) ? "malloc() timeout" : "malloc() threw (trapped)");
+		wclap.setError(trapIsTimeout(trap) ? "malloc() timeout" : "malloc() threw (trapped)");
 		return 0;
 	}
 	if (wclap.wasm64) {
@@ -297,25 +241,54 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 	}
 }
 
+void WclapThread::wasmInit() {
+	wasmtime_extern_t item;
+
+	// Call the WASI entry-point `_initialize()` if it exists - WCLAPs don't *have* to use WASI, so it's fine not to
+	if (wasmtime_instance_export_get(context, &instance, "_initialize", 11, &item)) {
+		if (item.kind != WASMTIME_EXTERN_FUNC) {
+			wasmtime_extern_delete(&item);
+			return wclap.setError("_initialize isn't a function");
+		}
+		wasm_functype_t *type = wasmtime_func_type(context, &item.of.func);
+		const wasm_valtype_vec_t *params = wasm_functype_params(type);
+		const wasm_valtype_vec_t *results = wasm_functype_results(type);
+		if (params->size != 0 || results->size != 0) {
+			wasmtime_extern_delete(&item);
+			return wclap.setError("_initialize() function signature mismatch");
+		}
+		wasm_functype_delete(type);
+
+		setWasmDeadline(validity.deadlines.initModule);
+		error = wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
+		if (error) {
+			wasmtime_extern_delete(&item);
+			return wclap.setError("error calling _initialize()");
+		} else if (trap) {
+			wasmtime_extern_delete(&item);
+			return wclap.setError(trapIsTimeout(trap) ? "_initialize() timeout" : "_initialize() threw (trapped)");
+		}
+		wasmtime_extern_delete(&item);
+	}
+}
+
 void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
 	wasmtime_val_t funcVal;
 	if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
-		wclap.errorMessage = "function pointer doesn't resolve";
-		return;
+		return wclap.setError("function pointer doesn't resolve");
 	}
 	if (funcVal.kind != WASMTIME_FUNCREF) {
-		wclap.errorMessage = "function pointer didn't resolve to a function";
-		return;
+		// Shouldn't ever happen, but who knows
+		return wclap.setError("function pointer doesn't resolve to a function");
 	}
 
 	setWasmDeadline(validity.deadlines.other);
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
-	if (trap) wclap.errorMessage = (trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
-	if (error) wclap.errorMessage = "calling function failed";
+	if (error) return wclap.setError("calling function failed");
+	if (trap) return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
 }
 
-WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap, bool isGlobalThread) : WclapThread(wclap) {
-	if (isGlobalThread) initModule(); // needs to happen once before anything `malloc()`s
+WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap) : WclapThread(wclap) {
 	arenas = wclap.claimArenas(this);
 }
 

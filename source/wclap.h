@@ -11,6 +11,7 @@
 #include <shared_mutex>
 #include <string>
 #include <atomic>
+#include <iostream>
 
 namespace wclap {
 
@@ -28,6 +29,7 @@ static bool nameEquals(const wasm_name_t *name, const char *cName) {
 
 struct WclapThread;
 struct WclapThreadWithArenas;
+struct ScopedThread;
 
 namespace wclap32 {
 	struct WclapMethods;
@@ -40,14 +42,15 @@ struct Wclap {
 	clap_version clapVersion;
 	const char *errorMessage = nullptr; // something that happened while executing the WCLAP - it still exists (and requires cleanup), but isn't reliable
 
-	uint8_t * wasmMemory(uint64_t wasmP);
-
-	template<class AutoTranslatedStruct>
-	AutoTranslatedStruct view(uint64_t wasmP) {
-		// TODO: bounds check
-		bool valid = wasmP && !(wasmP%AutoTranslatedStruct::wasmAlign);
-		return AutoTranslatedStruct{valid ? wasmMemory(wasmP) : nullptr};
+	// Call this and it'll get logged as well
+	void setError(const char *message) {
+		// Only keep the first error, that's probably the root of any problems
+		if (!errorMessage) errorMessage = message;
+		std::cerr << message << std::endl;
 	}
+
+	uint8_t * wasmMemory(WclapThread &lockedThread, uint64_t wasmP, uint64_t size);
+	uint64_t wasmMemorySize(WclapThread &lockedThread);
 
 	const std::string wclapDir, presetDir, cacheDir, varDir;
 	const bool mustLinkDirs;
@@ -60,37 +63,23 @@ struct Wclap {
 
 	// obtains a thread for realtime calls by removing from the pool, or creating if needed
 	std::unique_ptr<WclapThread> claimRealtimeThread();
+	// hands it back
 	void returnRealtimeThread(std::unique_ptr<WclapThread> &ptr);
 
-	std::unique_ptr<WclapArenas> claimArenas(WclapThread *lockedThread);
 	std::unique_ptr<WclapArenas> claimArenas();
+	// if we have a thread already, we'll use that if we need to malloc() anything
+	std::unique_ptr<WclapArenas> claimArenas(WclapThread *lockedThread);
 	void returnArenas(std::unique_ptr<WclapArenas> &arenas);
 
-	WclapArenas * arenasForWasmContext(uint64_t wasmContextP) {
-		size_t index = *(size_t *)wasmMemory(wasmContextP);
-		auto lock = readLock();
-		if (index < arenaList.size()) return arenaList[index];
-		return nullptr;
-	}
+	WclapArenas * arenasForWasmContext(uint64_t wasmContextP);
 
-	// borrows a locked non-realtime thread, adding to the pool if necessary
-	struct ScopedThread {
-		WclapThread &thread;
-		WclapArenas &arenas;
-
-		ScopedThread(WclapThread &alreadyLocked, WclapArenas &arenas) : thread(alreadyLocked), arenas(arenas) {}
-
-		ScopedThread(ScopedThread &&other) : thread(other.thread), arenas(other.arenas) {
-			other.locked = false;
-		}
-		~ScopedThread(); // unlocks the mutex (if `locked`)
-	private:
-		bool locked = true;
-	};
+	// Used to lock a specific thread (e.g. a realtime one owned by a plugin/whatever)
 	ScopedThread lockThread(WclapThread *ptr, WclapArenas &arenas);
-	//ScopedThread lockThread(WclapThreadWithArenas *ptr);
-	ScopedThread lockRelaxedThread();
+	// Either locks a relaxed thread from the pool, or continues the current locked thread if there's already one further up the OS thread's stack
+	ScopedThread lockThread();
+	// Can be locked multiple times on the same OS thread
 	ScopedThread lockGlobalThread();
+	ScopedThread lockGlobalThread(WclapArenas &arenas);
 
 	const void * getFactory(const char *factory_id);
 	
@@ -123,15 +112,10 @@ private:
 	std::vector<WclapArenas *> arenaList;
 	std::vector<std::unique_ptr<WclapArenas>> arenaPool; // removed from pool
 
-	std::unique_ptr<WclapThreadWithArenas> globalThread; // used for creating contexts, or for everything in single-threaded mode
-	std::vector<std::unique_ptr<WclapThread>> realtimeThreadPool; // removed from the pool, locked later
-	std::vector<std::unique_ptr<WclapThreadWithArenas>> relaxedThreadPool; // never leaves the pool
+	std::unique_ptr<WclapThread> globalThread;
+	std::unique_ptr<WclapArenas> globalArenas;
+	std::vector<std::unique_ptr<WclapThread>> realtimeThreadPool; // removed from the pool, to be locked later
+	std::vector<std::unique_ptr<WclapThreadWithArenas>> relaxedThreadPool; // never leaves the pool, arenas are always temporary.  Called "relaxed" because (unlike realtime threads which are known to already exist) this might need to call Wclap::writeLock() for an exclusive lock while it allocates a new one
 };
-
-// We need this to resolve a circular dependency in the WclapArenas.view() template
-template<class AutoTranslatedStruct>
-AutoTranslatedStruct wclapWasmView(Wclap &wclap, uint64_t wasmP) {
-	return wclap.view<AutoTranslatedStruct>(wasmP);
-}
 
 } // namespace

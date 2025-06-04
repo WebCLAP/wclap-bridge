@@ -6,28 +6,44 @@
 
 #include "../validity.h"
 #include "../wclap-thread.h"
+#include "../wclap.h"
 
 #include "clap/all.h"
 #include <vector>
 
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
+ScopedThread NativeProxyContext::lock(bool realtime) {
+	if (realtime) {
+		return wclap->lockThread(realtimeThread.get(), *arenas);
+	} else {
+		return wclap->lockThread();
+	}
+}
+
 struct WclapMethods {
 	Wclap &wclap;
+	bool initSuccess = false;
 	
-	WclapMethods(Wclap &wclap) : wclap(wclap) {
-		uint64_t funcIndex;
-		int32_t success;
+	WclapMethods(Wclap &wclap) : wclap(wclap) {}
+	
+	bool initClapEntry() {
 		auto global = wclap.lockGlobalThread();
-		auto wasmEntry = wclap.view<wclap_plugin_entry>(global.thread.clapEntryP64);
+		auto wasmEntry = global.view<wclap_plugin_entry>(global.thread.clapEntryP64);
 		auto initFn = wasmEntry.init();
+
 		auto reset = global.arenas.scopedWasmReset();
-		WasmP wasmStr = nativeToWasm(global.arenas, "/plugin/");
-		success = global.thread.callWasm_I(initFn, wasmStr);
-		if (!success) {
-			wclap.errorMessage = "clap_entry.init() returned false";
-			return;
-		}
+		WasmP wasmStr = nativeToWasm(global, "/plugin/");
+		initSuccess = global.thread.callWasm_I(initFn, wasmStr);
+		return initSuccess;
+	}
+	
+	void deinitClapEntry() {
+		if (!initSuccess) return;
+		auto global = wclap.lockGlobalThread();
+		auto wasmEntry = global.view<wclap_plugin_entry>(global.thread.clapEntryP64);
+		auto deinitFn = wasmEntry.deinit();
+		global.thread.callWasm_V(deinitFn);
 	}
 
 	struct plugin_factory : public clap_plugin_factory {
@@ -43,7 +59,7 @@ struct WclapMethods {
 
 			auto global = wclap.lockGlobalThread();
 			
-			auto wasmFactory = wclap.view<wclap_plugin_factory>(factoryObjP);
+			auto wasmFactory = global.view<wclap_plugin_factory>(factoryObjP);
 			auto getPluginCountFn = wasmFactory.get_plugin_count();
 			auto getPluginDescFn = wasmFactory.get_plugin_descriptor();
 
@@ -58,8 +74,7 @@ struct WclapMethods {
 			for (uint32_t i = 0; i < count; ++i) {
 				auto wasmP = global.thread.callWasm_P(getPluginDescFn, factoryObjP, i);
 				if (wasmP) {
-					const clap_plugin_descriptor *desc;
-					wasmToNative(global.arenas, wasmP, desc);
+					auto *desc = wasmToNative<const clap_plugin_descriptor>(global, wasmP);
 					descriptorPointers.push_back(desc);
 				} else if (!validity.filterOnlyWorking) {
 					descriptorPointers.push_back(nullptr);
@@ -81,33 +96,32 @@ struct WclapMethods {
 		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *obj, const clap_host *host, const char *plugin_id) {
 			auto &factory = *(const plugin_factory *)obj;
 			auto &wclap = factory.wclap;
-			auto createPluginFn = factory.wclap.view<wclap_plugin_factory>(factory.factoryObjP).create_plugin();
-
-			// Claim thread/arenas to be owned by this plugin, and released (returned to the pool) when it's destroyed
-			auto rtThread = wclap.claimRealtimeThread();
-			auto arenas = wclap.claimArenas(rtThread.get());
+			
+			auto context = NativeProxyContext::claimRealtime(wclap);
+			auto scoped = context.lock(true);
+			auto &arenas = *context.arenas;
+			auto createPluginFn = scoped.view<wclap_plugin_factory>(factory.factoryObjP).create_plugin();
 
 			// Proxy the host, and make it persistent
-			WasmP wasmHostP = nativeToWasm(*arenas, host);
-			setWasmProxyContext<wclap_host>(*arenas, wasmHostP);
-			arenas->persistWasm();
+			WasmP wasmHostP = nativeToWasm(scoped, host);
+			arenas.proxied_clap_host.assign(host);
+			arenas.persistWasm();
 			
 			// Attempt to create the plugin;
-			WasmP wasmPluginP;
+			WasmP &wasmPluginP = context.wasmObjP;
 			{
-				auto wasmReset = arenas->scopedWasmReset();
-				auto wasmPluginId = nativeToWasm(*arenas, plugin_id);
-				wasmPluginP = rtThread->callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
+				auto wasmReset = arenas.scopedWasmReset();
+				auto wasmPluginId = nativeToWasm(scoped, plugin_id);
+				wasmPluginP = scoped.thread.callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
 			}
 			if (!wasmPluginP) {
-				wclap.returnRealtimeThread(rtThread);
-				wclap.returnArenas(arenas);
+				context.reset();
 				return nullptr;
 			}
-			auto *nativePlugin = wasmToNative<const clap_plugin>(*arenas, wasmPluginP);
-			arenas->persistNative();
+			auto *nativePlugin = wasmToNative<const clap_plugin>(scoped, wasmPluginP);
+			arenas.persistNative();
 			
-			nativeProxyContextFor(nativePlugin) = {&wclap, wasmPluginP, std::move(arenas), std::move(rtThread)};
+			nativeProxyContextFor(nativePlugin) = std::move(context);
 			return nativePlugin;
 		}
 	};
@@ -118,13 +132,13 @@ struct WclapMethods {
 	void * getFactory(const char *factory_id) {
 		WasmP factoryP;
 		{
-			auto scoped = wclap.lockRelaxedThread();
+			auto scoped = wclap.lockThread();
 			auto entryP = WasmP(scoped.thread.clapEntryP64);
-			auto wasmEntry = wclap.view<wclap_plugin_entry>(entryP);
+			auto wasmEntry = scoped.view<wclap_plugin_entry>(entryP);
 			auto getFactoryFn = wasmEntry.get_factory();
 
 			auto reset = scoped.arenas.scopedWasmReset();
-			WasmP wasmStr = nativeToWasm(scoped.arenas, factory_id);
+			WasmP wasmStr = nativeToWasm(scoped, factory_id);
 			factoryP = scoped.thread.callWasm_P(getFactoryFn, wasmStr);
 		}
 		if (!factoryP) return nullptr;
@@ -156,10 +170,15 @@ struct WclapMethods {
 	}
 };
 
-WclapMethods * methodsCreate(Wclap &wclap) {
-	return new WclapMethods(wclap);
+WclapMethods * methodsCreateAndInit(Wclap &wclap) {
+	auto *methods = new WclapMethods(wclap);
+	if (!methods->initClapEntry()) {
+		wclap.setError("clap_entry.init() returned false");
+	}
+	return methods;
 }
-void methodsDelete(WclapMethods *methods) {
+void methodsDeinitAndDelete(WclapMethods *methods) {
+	methods->deinitClapEntry();
 	delete methods;
 }
 void methodsRegister(WclapMethods *methods, WclapThread &thread) {
@@ -169,38 +188,32 @@ void * methodsGetFactory(WclapMethods *methods, const char *factoryId) {
 	return methods->getFactory(factoryId);
 }
 
-//--------------
+//-------------- Translating some basic types
 
 template<>
-void nativeToWasm<const char>(WclapArenas &arenas, const char *str, WasmP &wasmP) {
+void nativeToWasm<const char>(ScopedThread &scoped, const char *str, WasmP &wasmP) {
 	if (!str) {
 		wasmP = 0;
 		return;
 	}
-	size_t length = std::strlen(str);
-	if (validity.lengths && length > validity.maxStringLength) {
-		length = validity.maxStringLength;
-	}
-	wasmP = arenas.wasmBytes(length + 1);
-	auto *nativeTmp = (char *)arenas.wasmMemory(wasmP);
+	size_t length = validity.strlen(str);
+	auto *strInWasm = scoped.createDirectArray<char>(length + 1, wasmP);
 	for (size_t i = 0; i < length; ++i) {
-		nativeTmp[i] = str[i];
+		strInWasm[i] = str[i];
 	}
-	nativeTmp[length] = 0;
+	strInWasm[length] = 0;
 }
 
 template<>
-void wasmToNative<const char>(WclapArenas &arenas, WasmP wasmStr, const char *&str) {
+void wasmToNative<const char>(ScopedThread &scoped, WasmP wasmStr, const char *&str) {
 	if (!wasmStr) {
 		str = nullptr;
 		return;
 	}
-	auto *nativeInWasm = (char *)arenas.wasmMemory(wasmStr);
-	size_t length = std::strlen(nativeInWasm);
-	if (validity.lengths && length > validity.maxStringLength) {
-		length = validity.maxStringLength;
-	}
-	auto *nativeTmp = (char *)arenas.nativeBytes(length + 1);
+	auto maxLength = scoped.wclap.wasmMemorySize(scoped.thread) - wasmStr;
+	auto *nativeInWasm = (char *)scoped.wasmMemory(wasmStr, maxLength);
+	size_t length = validity.strlen(nativeInWasm, maxLength);
+	auto *nativeTmp = (char *)scoped.arenas.nativeBytes(length + 1);
 	for (size_t i = 0; i < length; ++i) {
 		nativeTmp[i] = nativeInWasm[i];
 	}
@@ -209,31 +222,258 @@ void wasmToNative<const char>(WclapArenas &arenas, WasmP wasmStr, const char *&s
 }
 
 template<>
-void wasmToNative<const char * const>(WclapArenas &arenas, WasmP stringList, const char * const * &features) {
+void wasmToNative<const char * const>(ScopedThread &scoped, WasmP stringList, const char * const * &features) {
 	if (!stringList) {
 		features = nullptr;
 		return;
 	}
 	// Null-terminated array of strings
 	size_t count = 0;
-	WasmP *wasmStrArray = (WasmP *)arenas.wasmMemory(stringList);
+	auto *wasmStrArray = scoped.viewDirectPointer<WasmP>(stringList);
 	while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
 		++count;
 	}
-	auto *nativeStrArray = (const char **)arenas.nativeBytes(sizeof(char *)*(count + 1));
+	auto *nativeStrArray = (const char **)scoped.arenas.nativeBytes(sizeof(char *)*(count + 1));
 	for (size_t i = 0; i < count; ++i) {
-		wasmToNative(arenas, wasmStrArray[count], nativeStrArray[i]);
+		wasmToNative(scoped, wasmStrArray[count], nativeStrArray[i]);
 	}
 	nativeStrArray[count] = nullptr;
 	features = nativeStrArray;
 }
 
-//--------------
+//-------------- Translating CLAP structs: WASM -> Native
 
 template<>
-void wasmToNative<const clap_plugin_descriptor>(WclapArenas &arenas, WasmP wasmP, const clap_plugin_descriptor *&nativeP) {
-	generated_wasmToNative(arenas, wasmP, nativeP);
-	// TODO: validity checks for the mandatory fields, maybe replace optional ones with ""
+void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasmP, const clap_plugin_descriptor *&nativeP) {
+	generated_wasmToNative(scoped, wasmP, nativeP);
+	if (!nativeP) return;
+
+	auto *desc = (clap_plugin_descriptor *)nativeP; // Yes, un-const it.  It's ours anyway.
+	if (validity.correctInvalid) {
+		if (!validity.strlen(desc->id)) desc->id = "no-clap-id-supplied";
+		if (!validity.strlen(desc->name)) desc->name = "(no name supplied)";
+	}
+	if (validity.avoidNull) {
+		if (!desc->vendor) desc->vendor = "";
+		if (!desc->url) desc->url = "";
+		if (!desc->manual_url) desc->manual_url = "";
+		if (!desc->support_url) desc->support_url = "";
+		if (!desc->version) desc->version = "";
+		if (!desc->description) desc->description = "";
+		if (!desc->features) desc->features = validity.nullPointer<const char * const *>();
+	}
+}
+
+static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct clap_plugin *plugin, const clap_process_t *process) {
+	auto &context = nativeProxyContextFor(plugin);
+	if (context.wclap->errorMessage) return CLAP_PROCESS_ERROR; // Don't even attempt if there have been any errors
+
+	auto scoped = context.lock(true); // realtime if we have one
+	auto resetW = scoped.arenas.scopedWasmReset();
+	WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).process();
+
+	WasmP wasmProcessP = nativeToWasm(scoped, process);
+	int32_t status = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasmProcessP);
+	if ((status < 0 || status > 4) && validity.correctInvalid) {
+		status = CLAP_PROCESS_ERROR;
+	}
+	if (status == CLAP_PROCESS_ERROR) return status; // Spec says to discard output, no point copying
+
+	const uint32_t frames = process->frames_count;
+
+	// Copy sample data back to native
+	auto processView = scoped.view<wclap_process>(wasmProcessP);
+	auto outputBufferList = scoped.arrayView<wclap_audio_buffer>(processView.audio_outputs());
+	if (!outputBufferList) return status;
+	for (uint32_t o = 0; o < process->audio_outputs_count; ++o) {
+		auto *buffer = process->audio_outputs + o;
+		
+		auto wasmBufferView = outputBufferList[o];
+		buffer->latency = wasmBufferView.latency();
+		buffer->constant_mask = wasmBufferView.constant_mask();
+		
+		auto *wasmData32 = scoped.viewDirectPointer<WasmP>(wasmBufferView.data32());
+		if (buffer->data32 && wasmData32) {
+			for (uint32_t c = 0; c < buffer->channel_count; ++c) {
+				auto *channel = buffer->data32[c];
+				auto *wasmChannel = scoped.viewDirectPointer<float>(wasmData32[c]);
+				if (wasmChannel) {
+					for (uint32_t i = 0; i < frames; ++i) {
+						channel[i] = wasmChannel[i];
+					}
+				}
+			}
+			validity.audioSafety(buffer->data32, buffer->channel_count, frames);
+		}
+		auto *wasmData64 = scoped.viewDirectPointer<WasmP>(wasmBufferView.data64());
+		if (buffer->data64 && wasmData64) {
+			for (uint32_t c = 0; c < buffer->channel_count; ++c) {
+				auto *channel = buffer->data64[c];
+				auto *wasmChannel = scoped.viewDirectPointer<double>(wasmData64[c]);
+				if (wasmChannel) {
+					for (uint32_t i = 0; i < frames; ++i) {
+						channel[i] = wasmChannel[i];
+					}
+				}
+			}
+			validity.audioSafety(buffer->data64, buffer->channel_count, frames);
+		}
+	}
+	
+	return status;
+}
+
+static const void * nativeProxy_plugin_get_extension_fromWclap(const struct clap_plugin *plugin, const char *extId) {
+	auto &context = nativeProxyContextFor(plugin);
+	auto &wclap = *context.wclap;
+	// TODO: The central Wclap should have spaces to proxy all the WASM extensions (since they're just bundles of functions)
+	return nullptr;
+}
+
+static void nativeProxy_plugin_destroy_andResetContext(const struct clap_plugin *plugin) {
+	wclap_plugin::nativeProxy_destroy(plugin);
+
+	auto &context = nativeProxyContextFor(plugin);
+	context.reset();
+}
+
+template<>
+void wasmToNative<const clap_plugin>(ScopedThread &scoped, WasmP wasmP, const clap_plugin *&constNativeP) {
+	LOG_EXPR("wasmToNative<clap_plugin>");
+
+	// based on generated_wasmToNative()
+	auto wasm = scoped.view<wclap_plugin>(wasmP);
+	auto *native = scoped.arenas.nativeTyped<clap_plugin_t>();
+	constNativeP = native;
+	wasmToNative(scoped, wasm.desc(), native->desc);
+	//wasmToNative(scoped, wasm.plugin_data(), native->plugin_data);
+	native->init = wclap_plugin::nativeProxy_init;
+	//native->destroy = wclap_plugin::nativeProxy_destroy;
+	native->activate = wclap_plugin::nativeProxy_activate;
+	native->deactivate = wclap_plugin::nativeProxy_deactivate;
+	native->start_processing = wclap_plugin::nativeProxy_start_processing<true>; // audio thread
+	native->stop_processing = wclap_plugin::nativeProxy_stop_processing<true>; // audio thread
+	native->reset = wclap_plugin::nativeProxy_reset<true>; // audio thread
+	//native->process = wclap_plugin::nativeProxy_process;
+	//native->get_extension = wclap_plugin::nativeProxy_get_extension;
+	native->on_main_thread = wclap_plugin::nativeProxy_on_main_thread;
+
+	// Replacements
+	native->plugin_data = scoped.arenas.nativeTyped<NativeProxyContext>(); // blank - it should get filled in by `create_plugin()`
+	native->destroy = nativeProxy_plugin_destroy_andResetContext;
+	native->process = nativeProxy_plugin_process_andCopyOutput;
+	native->get_extension = nativeProxy_plugin_get_extension_fromWclap;
+}
+
+template<>
+NativeProxyContext & nativeProxyContextFor<clap_plugin>(const clap_plugin *plugin) {
+	return *(NativeProxyContext *)plugin->plugin_data;
+}
+
+//-------------- Translating CLAP structs: WASM -> Native
+
+template<>
+void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native, WasmP &wasmP) {
+	if (!native) return void(wasmP = 0);
+
+	LOG_EXPR("nativeToWasm<clap_host>");
+
+	auto view = scoped.create<wclap_host>(wasmP); // claim the appropriate number of bytes
+	view.clap_version() = native->clap_version;
+	view.host_data() = scoped.arenas.wasmContextP;
+	view.name() = nativeToWasm(scoped, validity.mandatoryString(native->name, "(no name provided)"));
+	view.vendor() = nativeToWasm(scoped, validity.optionalString(native->vendor));
+	view.url() = nativeToWasm(scoped, validity.optionalString(native->url));
+	view.version() = nativeToWasm(scoped, validity.mandatoryString(native->version, "0.0.0"));
+
+	// Methods don't exist yet - this will probably crash
+	view.get_extension() = 0;
+	view.request_restart() = 0;
+	view.request_process() = 0;
+	view.request_callback() = 0;
+}
+
+template<>
+void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *native, WasmP &wasmP) {
+	auto view = scoped.create<wclap_process>(wasmP);
+
+	LOG_EXPR("nativeToWasm<clap_process>");
+
+	view.steady_time() = native->steady_time;
+	uint32_t frames = view.frames_count() = native->frames_count;
+	nativeToWasmDirectArray(scoped, native->transport, view.transport(), 1); // sets the output to 0 if native->transport is NULL
+
+	view.audio_inputs_count() = native->audio_inputs_count;
+	auto inputBufferList = scoped.createArray<wclap_audio_buffer>(native->audio_inputs_count, view.audio_inputs());
+	for (uint32_t i = 0; i < native->audio_inputs_count; ++i) {
+		auto *buffer = native->audio_inputs + i;
+		auto wasmBuffer = inputBufferList[i];
+		uint32_t channels = wasmBuffer.channel_count() = buffer->channel_count;
+		wasmBuffer.latency() = buffer->latency;
+		wasmBuffer.constant_mask() = buffer->constant_mask;
+		
+		if (buffer->data32) {
+			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data32());
+			for (uint32_t c = 0; c < channels; ++c) {
+				nativeToWasmDirectArray(scoped, buffer->data32[c], bufferP[c], frames);
+			}
+		} else {
+			wasmBuffer.data32() = 0;
+		}
+		if (buffer->data64) {
+			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data64());
+			for (uint32_t c = 0; c < channels; ++c) {
+				nativeToWasmDirectArray(scoped, buffer->data64[c], bufferP[c], frames);
+			}
+		} else {
+			wasmBuffer.data64() = 0;
+		}
+	}
+	view.audio_outputs_count() = native->audio_outputs_count;
+	auto outputBufferList = scoped.createArray<wclap_audio_buffer>(native->audio_outputs_count, view.audio_outputs());
+	for (uint32_t o = 0; o < native->audio_outputs_count; ++o) {
+		auto *buffer = native->audio_outputs + o;
+		auto wasmBuffer = outputBufferList[o];
+		uint32_t channels = wasmBuffer.channel_count() = buffer->channel_count;
+		wasmBuffer.latency() = 0;
+		wasmBuffer.constant_mask() = 0;
+		
+		if (buffer->data32) {
+			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data32());
+			for (uint32_t c = 0; c < channels; ++c) {
+				if (validity.correctInvalid) {
+					auto *wasmChannel = scoped.createDirectArray<float>(frames, bufferP[c]);
+					for (uint32_t i = 0; i < frames; ++i) {
+						wasmChannel[i] = 0;
+					}
+				} else {
+					// Deliberately allow the WCLAP to fail validation by not preserving the output buffer contents
+					nativeToWasmDirectArray(scoped, buffer->data32[c], bufferP[c], frames);
+				}
+			}
+		} else {
+			wasmBuffer.data32() = 0;
+		}
+		if (buffer->data64) {
+			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data64());
+			for (uint32_t c = 0; c < channels; ++c) {
+				if (validity.correctInvalid) {
+					auto *wasmChannel = scoped.createDirectArray<double>(frames, bufferP[c]);
+					for (uint32_t i = 0; i < frames; ++i) {
+						wasmChannel[i] = 0;
+					}
+				} else {
+					nativeToWasmDirectArray(scoped, buffer->data64[c], bufferP[c], frames);
+				}
+			}
+		} else {
+			wasmBuffer.data64() = 0;
+		}
+	}
+//	nativeToWasm(scoped, native->in_events, view.in_events());
+//	nativeToWasm(scoped, native->out_events, view.out_events());
+	view.in_events() = 0;
+	view.out_events() = 0;
 }
 
 }} // namespace

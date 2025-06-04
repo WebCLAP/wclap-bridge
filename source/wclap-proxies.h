@@ -15,15 +15,17 @@ struct ProxiedClapStruct {
 	
 	std::atomic<const ClapStruct *> native;
 	
-	void assignNative(const ClapStruct *n) {
+	void assign(const ClapStruct *n) {
 		mutex.lock(); // so temporary use doesn't cross over
 		native.store(n);
 		assigned.test_and_set();
 	}
-	void clear() {
-		assigned.clear();
-		native.store({nullptr, 0});
-		mutex.unlock();
+	void clear() { // safe to call even if nothing's stored
+		if (assigned.test()) {
+			assigned.clear();
+			native.store(nullptr);
+			mutex.unlock();
+		}
 	}
 	
 	operator const ClapStruct *() const {

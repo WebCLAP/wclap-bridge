@@ -6,24 +6,24 @@
 
 namespace wclap {
 
-WclapArenas::WclapArenas(Wclap &wclap, WclapThread &currentThread, size_t arenaIndex) : wclap(wclap) {
+WclapArenas::WclapArenas(Wclap &wclap, WclapThread &threadToUse, size_t arenaIndex) : wclap(wclap) {
 	nativeArena = nativeArenaPos = nativeArenaReset = (unsigned char *)malloc(arenaBytes);
 	nativeArenaEnd = nativeArena + arenaBytes;
 
-	wasmArena = wasmArenaPos = wasmArenaReset = currentThread.wasmMalloc(arenaBytes);
-	wasmArenaEnd = wasmArena + arenaBytes;
+	auto wasmBytes = threadToUse.wasmMalloc(arenaBytes);
+	
+	// Take the first few bytes as a context pointer
+	wasmContextP = wasmBytes;
+	auto *wasmContextV = (size_t *)wclap.wasmMemory(threadToUse, wasmContextP, sizeof(size_t));
+	*wasmContextV = arenaIndex;
 
-	wasmContextP = wasmBytes(sizeof(size_t), alignof(size_t));
-	wasmArenaReset = wasmArena = wasmArenaPos; // never erase
-	*(size_t *)wclap.wasmMemory(wasmContextP) = arenaIndex;
+	// The rest is our arena
+	wasmArena = wasmArenaPos = wasmArenaReset = wasmBytes + sizeof(size_t);
+	wasmArenaEnd = wasmArena + arenaBytes;
 }
 
 WclapArenas::~WclapArenas() {
 	if (nativeArena) free(nativeArena);
-}
-
-uint8_t * WclapArenas::wasmMemory(uint64_t wasmP) {
-	return wclap.wasmMemory(wasmP);
 }
 
 } // namespace

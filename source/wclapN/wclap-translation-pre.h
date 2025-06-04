@@ -4,7 +4,9 @@
 #endif
 // `WasmP` is defined in the namespace, but nothing else
 
+#include "../scoped-thread.h"
 #include "../wclap-thread.h"
+#include "../wclap-arenas.h"
 
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
@@ -14,7 +16,7 @@ struct NativeProxyContext {
 	WasmP wasmObjP = 0;
 	std::unique_ptr<WclapArenas> arenas = nullptr;
 	std::unique_ptr<WclapThread> realtimeThread = nullptr;
-
+	
 	NativeProxyContext() {}
 	NativeProxyContext(Wclap *wclap, WasmP wasmObjP) : wclap(wclap), wasmObjP(wasmObjP) {}
 	NativeProxyContext(Wclap *wclap, WasmP wasmObjP, std::unique_ptr<WclapArenas> &&arenas) : wclap(wclap), wasmObjP(wasmObjP), arenas(std::move(arenas)) {}
@@ -31,7 +33,15 @@ struct NativeProxyContext {
 		realtimeThread = std::move(other.realtimeThread);
 		return *this;
 	}
+
+	static NativeProxyContext claimRealtime(Wclap &wclap, WasmP wasmObjP=0) {
+		auto rtThread = wclap.claimRealtimeThread();
+		auto arenas = wclap.claimArenas(rtThread.get());
+		return {&wclap, wasmObjP, std::move(arenas), std::move(rtThread)};
+	}
 	
+	ScopedThread lock(bool realtime=false);
+
 	// Call when the native proxy is destroyed
 	void reset() {
 		if (!wclap) {
@@ -45,34 +55,44 @@ struct NativeProxyContext {
 };
 
 template<class NativeT>
-void wasmToNative(WclapArenas &arenas, WasmP wasmP, NativeT *&native);
+void wasmToNative(ScopedThread &scoped, WasmP wasmP, NativeT *&native);
 template<class NativeT>
-NativeT * wasmToNative(WclapArenas &arenas, WasmP wasmP) {
+NativeT * wasmToNative(ScopedThread &scoped, WasmP wasmP) {
 	NativeT *native;
-	wasmToNative(arenas, wasmP, native);
+	wasmToNative(scoped, wasmP, native);
 	return native;
 }
 template<class NativeT>
-void nativeToWasm(WclapArenas &arenas, NativeT *native, WasmP &wasmP);
+void nativeToWasm(ScopedThread &scoped, NativeT *native, WasmP &wasmP);
 template<class NativeT>
-WasmP nativeToWasm(WclapArenas &arenas, NativeT *native) {
+WasmP nativeToWasm(ScopedThread &scoped, NativeT *native) {
 	WasmP wasmP;
-	nativeToWasm(arenas, native, wasmP);
+	nativeToWasm(scoped, native, wasmP);
 	return wasmP;
+}
+template<class DirectT>
+void nativeToWasmDirectArray(ScopedThread &scoped, const DirectT *native, WasmP &wasmP, size_t length) {
+	if (!native) {
+		wasmP = 0;
+		return;
+	}
+	auto *inWasm = scoped.createDirectArray<DirectT>(length, wasmP);
+	for (size_t i = 0; i < length; ++i) {
+		inWasm[i] = native[i];
+	}
 }
 
 template<class NativeT>
 NativeProxyContext & nativeProxyContextFor(const NativeT *native);
-template<class WclapStruct>
-void setWasmProxyContext(WclapArenas &arenas, WasmP wasmP);
+// WASM equivalent is wclap.arenasForWasmContext(wasmContextP), which is much more consistent
 
 // non-struct specialisations
 
 template<>
-void nativeToWasm<const char>(WclapArenas &arenas, const char *str, WasmP &wasmP);
+void nativeToWasm<const char>(ScopedThread &scoped, const char *str, WasmP &wasmP);
 template<>
-void wasmToNative<const char>(WclapArenas &arenas, WasmP wasmStr, const char *&str);
+void wasmToNative<const char>(ScopedThread &scoped, WasmP wasmStr, const char *&str);
 template<>
-void wasmToNative<const char * const>(WclapArenas &arenas, WasmP stringList, const char * const * &features);
+void wasmToNative<const char * const>(ScopedThread &scoped, WasmP stringList, const char * const * &features);
 
 }} // namespace

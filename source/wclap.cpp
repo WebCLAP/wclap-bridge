@@ -26,18 +26,8 @@ std::string wclap_error_message_string;
 Wclap::Wclap(const std::string &wclapDir, const std::string &presetDir, const std::string &cacheDir, const std::string &varDir, bool mustLinkDirs) : wclapDir(wclapDir), presetDir(presetDir), cacheDir(cacheDir), varDir(varDir), mustLinkDirs(mustLinkDirs) {}
 
 Wclap::~Wclap() {
-	if (initSuccess) {
-		auto scoped = lockRelaxedThread();
-		if (wasm64) {
-			auto wasmEntry = view<wclap64::wclap_plugin_entry>(scoped.thread.clapEntryP64);
-			auto deinitFn = wasmEntry.deinit();
-			scoped.thread.callWasm_V(deinitFn);
-		} else {
-			auto wasmEntry = view<wclap32::wclap_plugin_entry>(uint32_t(scoped.thread.clapEntryP64));
-			auto deinitFn = wasmEntry.deinit();
-			scoped.thread.callWasm_V(deinitFn);
-		}
-	}
+	if (methods32) wclap::wclap32::methodsDeinitAndDelete(methods32);
+	if (methods64) wclap::wclap64::methodsDeinitAndDelete(methods64);
 
 	{ // Clear all threads/scopes
 		auto lock = writeLock();
@@ -45,9 +35,6 @@ Wclap::~Wclap() {
 		realtimeThreadPool.clear();
 		relaxedThreadPool.clear();
 	}
-	
-	if (methods32) wclap::wclap32::methodsDelete(methods32);
-	if (methods64) wclap::wclap64::methodsDelete(methods64);
 
 	if (sharedMemory) {
 		wasmtime_sharedmemory_delete(sharedMemory);
@@ -57,22 +44,29 @@ Wclap::~Wclap() {
 	if (module) wasmtime_module_delete(module);
 }
 
-uint8_t * Wclap::wasmMemory(uint64_t wasmP) {
+uint8_t * Wclap::wasmMemory(WclapThread &lockedThread, uint64_t wasmP, uint64_t size) {
 	if (sharedMemory) {
-		wasmP = std::min<uint64_t>(wasmP, wasmtime_sharedmemory_data_size(sharedMemory));
+		auto memorySize = wasmtime_sharedmemory_data_size(sharedMemory);
+		wasmP = std::min<uint64_t>(wasmP, memorySize - size);
 		return wasmtime_sharedmemory_data(sharedMemory) + wasmP;
 	} else {
-		wasmP = std::min<uint64_t>(wasmP, wasmtime_memory_data_size(globalThread->context, &globalThread->memory));
-		return wasmtime_memory_data(globalThread->context, &globalThread->memory) + wasmP;
+		auto memorySize = wasmtime_memory_data_size(lockedThread.context, &lockedThread.memory);
+		wasmP = std::min<uint64_t>(wasmP, memorySize - size);
+		return wasmtime_memory_data(lockedThread.context, &lockedThread.memory) + wasmP;
 	}
 }
-	
+
+uint64_t Wclap::wasmMemorySize(WclapThread &lockedThread) {
+	if (sharedMemory) {
+		return wasmtime_sharedmemory_data_size(sharedMemory);
+	} else {
+		return wasmtime_memory_data_size(lockedThread.context, &lockedThread.memory);
+	}
+}
+
 void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	error = wasmtime_module_new(global_wasm_engine, bytes, size, &module);
-	if (error) {
-		errorMessage = "Failed to compile module";
-		return;
-	}
+	if (error) return setError("Failed to compile module");
 	
 	bool foundClapEntry = false;
 	{ // Find `clap_entry`, which is a memory-address pointer, so the type of it tells us if it's 64-bit
@@ -87,8 +81,7 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 			auto *externType = wasm_exporttype_type(exportType);
 			auto *globalType = wasm_externtype_as_globaltype_const(externType);
 			if (!globalType) {
-				errorMessage = "clap_entry is not a global (value) export";
-				return;
+				return setError("clap_entry is not a global (value) export");
 			}
 			auto *valType = wasm_globaltype_content(globalType);
 			auto kind = wasm_valtype_kind(valType);
@@ -97,16 +90,12 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 				wasm64 = true;
 				break;
 			} else if (kind != WASMTIME_I32) {
-				errorMessage = "clap_entry must be 32-bit or 64-bit memory address";
-				return;
+				return setError("clap_entry must be 32-bit or 64-bit memory address");
 			}
 		}
 		wasm_exporttype_vec_delete(&exportTypes);
 	}
-	if (!foundClapEntry) {
-		errorMessage = "clap_entry not found";
-		return;
-	}
+	if (!foundClapEntry) return setError("clap_entry not found");
 
 	{ // Check for a shared-memory import - otherwise it's single-threaded
 		wasm_importtype_vec_t importTypes;
@@ -121,38 +110,46 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 			if (!asMemory) continue;
 
 			if (!wasmtime_memorytype_isshared(asMemory)) {
-				errorMessage = "imports non-shared memory";
-				return;
+				setError("imports non-shared memory");
+				break;
 			}
 			bool mem64 = wasmtime_memorytype_is64(asMemory);
 			if (mem64 != wasm64) {
-				errorMessage = mem64 ? "64-bit memory but 32-bit clap_entry" : "32-bit memory but 64-bit clap_entry";
-				return;
+				setError(mem64 ? "64-bit memory but 32-bit clap_entry" : "32-bit memory but 64-bit clap_entry");
+				break;
 			}
 			if (sharedMemory) {
-				errorMessage = "multiple memory imports";
-				return;
+				setError("multiple memory imports");
+				break;
 			}
 
 			error = wasmtime_sharedmemory_new(global_wasm_engine, asMemory, &sharedMemory);
 			if (error || !sharedMemory) {
-				errorMessage = "failed to create shared memory";
+				setError("failed to create shared memory");
+				break;
 			}
 		}
 		wasm_importtype_vec_delete(&importTypes);
 	}
-
-	globalThread = std::unique_ptr<WclapThreadWithArenas>{
-		new WclapThreadWithArenas(*this, true)
-	};
 	if (errorMessage) return;
 
+	globalThread = std::unique_ptr<WclapThread>{
+		new WclapThread(*this)
+	};
+	if (errorMessage) return;
+	
+	globalThread->wasmInit();
+	if (errorMessage) return;
+	
+	globalArenas = claimArenas(globalThread.get());
+	if (errorMessage) return;
+
+	// These also call clap_entry.init();
 	if (wasm64) {
-		methods64 = wclap::wclap64::methodsCreate(*this);
+		methods64 = wclap::wclap64::methodsCreateAndInit(*this);
 	} else {
-		methods32 = wclap::wclap32::methodsCreate(*this);
+		methods32 = wclap::wclap32::methodsCreateAndInit(*this);
 	}
-	initSuccess = !errorMessage;
 }
 
 std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
@@ -168,20 +165,27 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 	return std::unique_ptr<WclapThread>(new WclapThread(*this));
 }
 
+const void * Wclap::getFactory(const char *factory_id) {
+	if (wasm64) {
+		return wclap::wclap64::methodsGetFactory(methods64, factory_id);
+	} else {
+		return wclap::wclap32::methodsGetFactory(methods32, factory_id);
+	}
+}
+
 void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
 	auto lock = writeLock();
 	realtimeThreadPool.emplace_back(std::move(ptr));
 }
 
 std::unique_ptr<WclapArenas> Wclap::claimArenas() {
-	globalThread->mutex.lock();
-	auto result = claimArenas(globalThread.get());
-	globalThread->mutex.unlock();
-	return result;
+	auto scoped = lockThread(); // Shouldn't get stuck in a cycle even if no relaxed threads are available, because the `WclapThread` constructor always passes itself to `.claimArenas()`
+	scoped.arenas.resetTemporary();
+	return claimArenas(&scoped.thread);
 }
 
 std::unique_ptr<WclapArenas> Wclap::claimArenas(WclapThread *lockedThread) {
-	if (!lockedThread) return claimArenas(); // use global if it's null
+	if (!lockedThread) return claimArenas();
 	auto lock = writeLock();
 	if (arenaPool.size()) {
 		std::unique_ptr<WclapArenas> result = std::move(arenaPool.back());
@@ -200,11 +204,18 @@ void Wclap::returnArenas(std::unique_ptr<WclapArenas> &arenas) {
 	arenaPool.emplace_back(std::move(arenas));
 }
 
-Wclap::ScopedThread::~ScopedThread() {
-	if (locked) thread.mutex.unlock();
+WclapArenas * Wclap::arenasForWasmContext(uint64_t wasmContextP) {
+	size_t index = *lockThread().viewDirectPointer<size_t>(wasmContextP);
+	auto lock = readLock();
+	if (index < arenaList.size()) return arenaList[index];
+	return nullptr;
 }
 
-Wclap::ScopedThread Wclap::lockRelaxedThread() {
+ScopedThread Wclap::lockThread() {
+	if (currentScopedThread) {
+		// already a scoped thread somewhere up the stack for this thread, re-use that
+		return ScopedThread::weakCopy(*currentScopedThread);
+	}
 	if (!sharedMemory) return lockGlobalThread();
 
 	{
@@ -215,26 +226,36 @@ Wclap::ScopedThread Wclap::lockRelaxedThread() {
 	}
 
 	auto lock = writeLock();
-	auto *rawPtr = new WclapThreadWithArenas(*this, false);
+	auto *rawPtr = new WclapThreadWithArenas(*this);
 	rawPtr->mutex.lock();
 	relaxedThreadPool.emplace_back(rawPtr);
 	return {*rawPtr, *rawPtr->arenas};
 }
-Wclap::ScopedThread Wclap::lockThread(WclapThread *ptr, WclapArenas &arenas) {
-	if (!ptr) ptr = globalThread.get();
+ScopedThread Wclap::lockThread(WclapThread *ptr, WclapArenas &arenas) {
+	arenas.resetTemporary();
+	if (!ptr) {
+		// We're expecting an exclusive lock (e.g. on a realtime thread).  If it's null, it's almost certainly because the WCLAP is single-threaded.
+		// But either way, we need something consistent so that the arena doesn't get used simultaneously
+		return lockGlobalThread(arenas);
+	}
 	ptr->mutex.lock();
 	return {*ptr, arenas};
 }
-Wclap::ScopedThread Wclap::lockGlobalThread() {
-	return lockThread(globalThread.get(), *globalThread->arenas);
-}
-
-const void * Wclap::getFactory(const char *factory_id) {
-	if (wasm64) {
-		return wclap::wclap64::methodsGetFactory(methods64, factory_id);
-	} else {
-		return wclap::wclap32::methodsGetFactory(methods32, factory_id);
+ScopedThread Wclap::lockGlobalThread() {
+	if (currentScopedThread && currentScopedThreadIsGlobal) {
+		// Global thread is already locked somewhere up the stack
+		return ScopedThread::weakCopy(*currentScopedThread);
 	}
+	currentScopedThreadIsGlobal = true;
+	return lockThread(globalThread.get(), *globalArenas);
+}
+ScopedThread Wclap::lockGlobalThread(WclapArenas &arenas) {
+	if (currentScopedThread && currentScopedThreadIsGlobal) {
+		// Global thread is already locked somewhere up the stack
+		return ScopedThread::weakCopy(*globalThread, arenas);
+	}
+	currentScopedThreadIsGlobal = true;
+	return lockThread(globalThread.get(), arenas);
 }
 
 } // namespace

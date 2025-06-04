@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdlib> // size_t
+#include <cstdint>
+
 namespace wclap {
 
 struct ValidityChecks {
@@ -20,6 +23,9 @@ struct ValidityChecks {
 		unsigned int other = 500;
 	} deadlines;
 	
+	bool correctInvalid = false;
+	bool avoidNull = false; // some values (like strings or empty lists) _could_ be NULL, but it's weird.
+	
 	ValidityChecks(unsigned int level) {
 		if (level > 0) {
 			executionDeadlines = true;
@@ -32,6 +38,7 @@ struct ValidityChecks {
 		
 		if (level >= 100) {
 			filterOnlyWorking = true;
+			correctInvalid = true;
 		}
 		
 		// opinionated checks
@@ -39,7 +46,43 @@ struct ValidityChecks {
 			deadlines.initModule = 150;
 			deadlines.other = 50;
 			lengths = true;
+
+			avoidNull = true;
 		}
+	}
+	
+	size_t strlen(const char *str, size_t max=SIZE_MAX) {
+		if (!str) return 0;
+		if (lengths && maxStringLength < max) max = maxStringLength;
+		size_t length = 0;
+		while (str[length] && length < max) ++length;
+		return length;
+	}
+
+	const char * mandatoryString(const char *maybeStr, const char *fallback) {
+		if (correctInvalid) {
+			if (!maybeStr || !maybeStr[0] /*empty string*/) {
+				return fallback;
+			}
+		}
+		return maybeStr;
+	}
+	const char * optionalString(const char *maybeStr) {
+		if (!maybeStr && avoidNull) return "";
+		return maybeStr;
+	}
+
+	template<typename PointerT>
+	static PointerT nullPointer() {
+		static PointerT ptr = nullptr;
+		return ptr;
+	}
+	
+	void audioSafety(float **buffers, size_t channels, size_t frames) {
+		// TODO: check for NaNs or extremely large output
+	}
+	void audioSafety(double **buffers, size_t channels, size_t frames) {
+		// TODO
 	}
 };
 

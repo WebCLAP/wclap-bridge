@@ -76,6 +76,10 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 		wclap::wclap_error_message = "No WASM engine - did you call wclap_global_init()?";
 		return nullptr;
 	}
+	if (!wclapDir) {
+		wclap::wclap_error_message = "WCLAP path was null";
+		return nullptr;
+	}
 
 	std::ifstream wasmFile{ensureTrailingSlash(wclapDir) + "module.wasm", std::ios::binary};
 	if (!wasmFile) {

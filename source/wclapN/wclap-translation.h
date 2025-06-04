@@ -8,8 +8,8 @@ namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
 struct WclapMethods;
 
-WclapMethods * methodsCreate(Wclap &);
-void methodsDelete(WclapMethods *);
+WclapMethods * methodsCreateAndInit(Wclap &);
+void methodsDeinitAndDelete(WclapMethods *);
 void methodsRegister(WclapMethods *, WclapThread &);
 void * methodsGetFactory(WclapMethods *, const char *);
 

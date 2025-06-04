@@ -24,7 +24,6 @@ struct WclapThread {
 	std::mutex mutex;
 
 	// We should delete these (in reverse order) if they're defined
-	wasi_config_t *wasiConfig = nullptr;
 	wasmtime_store_t *store = nullptr;
 	wasmtime_linker_t *linker = nullptr;
 	wasmtime_error_t *error = nullptr;
@@ -125,8 +124,12 @@ struct WclapThread {
 	uint64_t callWasm_P(uint64_t fnP, Args ...args) {
 		return callWasm_L(fnP, std::forward<Args>(args)...);
 	}
+	
+	void wasmInit();
 
 private:
+	void startInstance();
+
 	wasmtime_val_raw argToWasmVal(int32_t v) {
 		return {.i32=v};
 	}
@@ -150,10 +153,7 @@ private:
 struct WclapThreadWithArenas : public WclapThread {
 	std::unique_ptr<WclapArenas> arenas;
 
-	WclapThreadWithArenas(Wclap &wclap, bool isGlobalThread=false);
-
-	void initModule(); // called only once, on the global thread
-	void initEntry(); // also called only once, but after the thread/translation-scope is set up
+	WclapThreadWithArenas(Wclap &wclap);
 };
 
 } // namespace

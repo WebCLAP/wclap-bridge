@@ -143,7 +143,7 @@ namespace wclap { namespace wclap${bits} {`;
 						//arg = normaliseTypeName(arg);
 
 						getType(arg); // check it exists
-						return arg;
+						return arg.replace(/\s+/g, ' ');
 					});
 
 					if (fReturn == "void") {
@@ -186,9 +186,8 @@ using ${wclapClass} = ${name};`;
 
 			} else {
 				let nativeType = `${name}`;
-				if (structType.calledAsObject && !structType.object) {
-					nativeType = `WclapLifetimeStruct<${name}>`;
-				}
+				let arraySize = structType.wasmSize; // size, padded to alignment
+				while (arraySize%structType.wasmAlign) ++arraySize;
 				code += `
 
 struct ${wclapClass} {
@@ -196,6 +195,7 @@ struct ${wclapClass} {
 	
 	static constexpr size_t wasmAlign = ${structType.wasmAlign};
 	static constexpr size_t wasmSize = ${structType.wasmSize};
+	static constexpr size_t wasmArraySize = ${arraySize};
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -249,10 +249,12 @@ struct ${wclapClass} {
 							}
 						}
 						code += `
+	template<bool realtime=false>
 	static ${field.returnType || 'void'} nativeProxy_${field.name}(${argsCode}) {
 		auto &context = nativeProxyContextFor(${field.argNames[0] || ('(' + name + ' *)nullptr')});
-		WasmP wasmFn = context.wclap->view<${wclapClass}>(context.wasmObjP).${field.name}();
-		auto scoped = context.wclap->lockRelaxedThread();`;
+		auto scoped = context.lock(realtime);
+		WasmP wasmFn = scoped.view<${wclapClass}>(context.wasmObjP).${field.name}();
+		`;
 						if (needsWasmArena || needsNativeArena) {
 							code += `
 		auto resetW = scoped.arenas.scopedWasmReset();
@@ -263,7 +265,7 @@ struct ${wclapClass} {
 							if (!argType.compatible) {
 								code += `
 		${getWasmType(field.argTypes[i])} wasm_${field.argNames[i]};
-		nativeToWasm(scoped.arenas, ${field.argNames[i]}, wasm_${field.argNames[i]});`;
+		nativeToWasm(scoped, ${field.argNames[i]}, wasm_${field.argNames[i]});`;
 							}
 						}
 						if (field.returnType) {
@@ -291,7 +293,7 @@ struct ${wclapClass} {
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		${field.returnType + (/\*$/.test(field.returnType) ? '' : ' ')}nativeResult;
-		wasmToNative(scoped.arenas, wasmResult, nativeResult);
+		wasmToNative(scoped, wasmResult, nativeResult);
 		return nativeResult;`;
 							}
 						}
@@ -307,11 +309,11 @@ private:
 };
 
 template<>
-void wasmToNative<const ${name}>(WclapArenas &arenas, WasmP wasmP, const ${name} *&nativeP);
+void wasmToNative<const ${name}>(ScopedThread &scoped, WasmP wasmP, const ${name} *&nativeP);
 
-inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const ${name} *&constNativeP) {
-	auto wasm = arenas.view<${wclapClass}>(wasmP);
-	auto *native = arenas.nativeTyped<${name}>();
+inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const ${name} *&constNativeP) {
+	auto wasm = scoped.view<${wclapClass}>(wasmP);
+	auto *native = scoped.arenas.nativeTyped<${name}>();
 	constNativeP = native;`;
 				structFields.forEach(field => {
 					let fieldType = getType(field.type);
@@ -327,29 +329,29 @@ inline void generated_wasmToNative(WclapArenas &arenas, WasmP wasmP, const ${nam
 						}
 					} else if (field.argTypes) {
 						code += `
-	native->${field.name} = ${wclapClass}::nativeProxy_${field.name};`;
+	native->${field.name} = ${wclapClass}::nativeProxy_${field.name}<false>;`;
 					} else {
 						if (field.arrayCount) {
 							code += `
 	for (size_t i = 0; i < ${field.arrayCount}; ++i) {
-		wasmToNative(arenas, wasm.${field.name}(i), native->${field.name}[i]);
+		wasmToNative(scoped, wasm.${field.name}(i), native->${field.name}[i]);
 	}`;
 						} else {
 							code += `
-	wasmToNative(arenas, wasm.${field.name}(), native->${field.name});`;
+	wasmToNative(scoped, wasm.${field.name}(), native->${field.name});`;
 						}
 					}
 				});
 				code += `
 }
-/*
-template<bool=true> // can be overridden
-inline void nativeToWasm(WclapArenas &arenas, const ${name} *native, WasmP &wasmP) {
-	LOG_EXPR("nativeToWasm: ${name}");
-	abort();
-//	arenas.create<${wclapClass}>(wasmP).fromNative(arenas, native);
-}
-*/`;
+
+template<>
+void nativeToWasm<const ${name}>(ScopedThread &scoped, const ${name} *native, WasmP &wasmP);
+
+template<>
+NativeProxyContext & nativeProxyContextFor<${name}>(const ${name} *native);
+
+`;
 			}
 		});
 	}

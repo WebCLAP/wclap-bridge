@@ -195,6 +195,7 @@ struct ${wclapClass} {
 	${wclapClass}(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = ${structType.wasmAlign};
+	static constexpr size_t wasmSize = ${structType.wasmSize};
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -249,13 +250,12 @@ struct ${wclapClass} {
 						}
 						code += `
 	static ${field.returnType || 'void'} nativeProxy_${field.name}(${argsCode}) {
-		auto &context = getNativeProxyContext(${field.argNames[0] || ('(' + name + ' *)nullptr')});
+		auto &context = nativeProxyContextFor(${field.argNames[0] || ('(' + name + ' *)nullptr')});
 		WasmP wasmFn = context.wclap->view<${wclapClass}>(context.wasmObjP).${field.name}();
 		auto scoped = context.wclap->lockRelaxedThread();`;
 						if (needsWasmArena || needsNativeArena) {
 							code += `
-		auto &arenas = *scoped.thread.arenas;
-		auto resetW = arenas.scopedWasmReset();
+		auto resetW = scoped.arenas.scopedWasmReset();
 		`;
 						}
 						for (let i = 1; i < field.argTypes.length; ++i) {
@@ -263,7 +263,7 @@ struct ${wclapClass} {
 							if (!argType.compatible) {
 								code += `
 		${getWasmType(field.argTypes[i])} wasm_${field.argNames[i]};
-		nativeToWasm(arenas, ${field.argNames[i]}, wasm_${field.argNames[i]});`;
+		nativeToWasm(scoped.arenas, ${field.argNames[i]}, wasm_${field.argNames[i]});`;
 							}
 						}
 						if (field.returnType) {
@@ -289,9 +289,9 @@ struct ${wclapClass} {
 							} else {
 								code += `
 
-		auto resetN = arenas.scopedNativeReset();
+		auto resetN = scoped.arenas.scopedNativeReset();
 		${field.returnType + (/\*$/.test(field.returnType) ? '' : ' ')}nativeResult;
-		wasmToNative(arenas, wasmResult, nativeResult);
+		wasmToNative(scoped.arenas, wasmResult, nativeResult);
 		return nativeResult;`;
 							}
 						}

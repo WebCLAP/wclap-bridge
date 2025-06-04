@@ -5,12 +5,13 @@
 
 #include "./wclap-thread.h"
 #include "./wclap.h"
+#include "./wclap-arenas.h"
 #include "./wclap32/wclap-translation.h"
 #include "./wclap64/wclap-translation.h"
 
 namespace wclap {
 
-WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
+WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
 	if (wclap.errorMessage) return;
 
 	if (wasiConfig) {
@@ -206,14 +207,6 @@ WclapThread::WclapThread(Wclap &wclap, bool andInitModule) : wclap(wclap) {
 		wasmtime_extern_delete(&item);
 		++exportIndex;
 	}
-	
-	if (andInitModule) initModule();
-	
-	if (!wclap.errorMessage) {
-		arenas = std::unique_ptr<WclapArenas>{
-			new WclapArenas(wclap, *this)
-		};
-	}
 }
 
 WclapThread::~WclapThread() {
@@ -240,7 +233,7 @@ WclapThread::~WclapThread() {
 	if (store) wasmtime_store_delete(store);
 }
 
-void WclapThread::initModule() {
+void WclapThreadWithArenas::initModule() {
 	setWasmDeadline(validity.deadlines.initModule);
 
 	wasmtime_extern_t item;
@@ -260,7 +253,7 @@ void WclapThread::initModule() {
 			wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
 			if (trap) {
 				wasmtime_extern_delete(&item);
-				wclap.errorMessage = "_initialize() threw an error";
+				wclap.errorMessage = (trapIsTimeout(trap) ? "_initialize() timeout" : "_initialize() threw (trapped)");
 				return;
 			}
 		} else {
@@ -269,34 +262,6 @@ void WclapThread::initModule() {
 			return;
 		}
 		wasmtime_extern_delete(&item);
-	}
-}
-
-void WclapThread::initEntry() {
-	uint64_t funcIndex;
-	int32_t success;
-	if (wclap.wasm64) {
-		auto wasmEntry = wclap.view<wclap64::wclap_plugin_entry>(clapEntryP64);
-		auto initFn = wasmEntry.init();
-		auto reset = arenas->scopedWasmReset();
-		wclap64::WasmP wasmStr;
-		wclap64::nativeToWasm(*arenas, "/plugin/", wasmStr);
-		success = callWasm_I(initFn, wasmStr);
-	} else {
-		auto wasmEntry = wclap.view<wclap32::wclap_plugin_entry>(uint32_t(clapEntryP64));
-		auto initFn = wasmEntry.init();
-		auto reset = arenas->scopedWasmReset();
-		wclap32::WasmP wasmStr;
-		wclap32::nativeToWasm(*arenas, "/plugin/", wasmStr);
-		success = callWasm_I(initFn, wasmStr);
-	}
-	if (trap) {
-		wclap.errorMessage = (trapIsTimeout(trap) ? "clap_entry.init() timeout" : "clap_entry.init() threw (trapped)");
-		return;
-	}
-	if (!success) {
-		wclap.errorMessage = "clap_entry.init() returned false";
-		return;
 	}
 }
 
@@ -347,6 +312,11 @@ void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, si
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
 	if (trap) wclap.errorMessage = (trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
 	if (error) wclap.errorMessage = "calling function failed";
+}
+
+WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap, bool isGlobalThread) : WclapThread(wclap) {
+	if (isGlobalThread) initModule(); // needs to happen once before anything `malloc()`s
+	arenas = wclap.claimArenas(this);
 }
 
 } // namespace

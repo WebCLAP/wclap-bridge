@@ -12,28 +12,59 @@ namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 struct NativeProxyContext {
 	Wclap *wclap = nullptr;
 	WasmP wasmObjP = 0;
+	std::unique_ptr<WclapArenas> arenas = nullptr;
 	std::unique_ptr<WclapThread> realtimeThread = nullptr;
 
 	NativeProxyContext() {}
 	NativeProxyContext(Wclap *wclap, WasmP wasmObjP) : wclap(wclap), wasmObjP(wasmObjP) {}
+	NativeProxyContext(Wclap *wclap, WasmP wasmObjP, std::unique_ptr<WclapArenas> &&arenas) : wclap(wclap), wasmObjP(wasmObjP), arenas(std::move(arenas)) {}
+	NativeProxyContext(Wclap *wclap, WasmP wasmObjP, std::unique_ptr<WclapArenas> &&arenas, std::unique_ptr<WclapThread> &&rtThread) : wclap(wclap), wasmObjP(wasmObjP), arenas(std::move(arenas)), realtimeThread(std::move(rtThread)) {}
+
+	// Move only, no copy
 	NativeProxyContext(NativeProxyContext &&other) {
 		*this = std::move(other);
 	}
-	
 	NativeProxyContext & operator=(NativeProxyContext &&other) {
 		wclap = other.wclap;
 		wasmObjP = other.wasmObjP;
+		arenas = std::move(other.arenas);
 		realtimeThread = std::move(other.realtimeThread);
 		return *this;
+	}
+	
+	// Call when the native proxy is destroyed
+	void reset() {
+		if (!wclap) {
+			LOG_EXPR("NativeProxyContext::reset()");
+			LOG_EXPR(wclap);
+			abort();
+		}
+		if (arenas) wclap->returnArenas(arenas);
+		if (realtimeThread) wclap->returnRealtimeThread(realtimeThread);
 	}
 };
 
 template<class NativeT>
 void wasmToNative(WclapArenas &arenas, WasmP wasmP, NativeT *&native);
 template<class NativeT>
+NativeT * wasmToNative(WclapArenas &arenas, WasmP wasmP) {
+	NativeT *native;
+	wasmToNative(arenas, wasmP, native);
+	return native;
+}
+template<class NativeT>
 void nativeToWasm(WclapArenas &arenas, NativeT *native, WasmP &wasmP);
 template<class NativeT>
-const NativeProxyContext & getNativeProxyContext(const NativeT *native);
+WasmP nativeToWasm(WclapArenas &arenas, NativeT *native) {
+	WasmP wasmP;
+	nativeToWasm(arenas, native, wasmP);
+	return wasmP;
+}
+
+template<class NativeT>
+NativeProxyContext & nativeProxyContextFor(const NativeT *native);
+template<class WclapStruct>
+void setWasmProxyContext(WclapArenas &arenas, WasmP wasmP);
 
 // non-struct specialisations
 

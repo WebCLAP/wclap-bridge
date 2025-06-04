@@ -6,6 +6,7 @@
 #endif
 
 #include "clap/all.h"
+#include "./wclap-proxies.h"
 
 #include <type_traits>
 #include <unordered_map>
@@ -14,6 +15,9 @@ namespace wclap {
 
 struct Wclap;
 struct WclapThread;
+
+template<class AutoTranslatedStruct>
+AutoTranslatedStruct wclapWasmView(Wclap &wclap, uint64_t wasmP);
 
 /* Manages two arena allocators, used for (temporary) translation of function arguments.
 
@@ -24,22 +28,20 @@ struct WclapArenas {
 
 	Wclap &wclap;
 	
-	struct WasmContext {
-	};
 	uint64_t wasmContextP;
+	struct {
+		ProxiedClapStruct<clap_host> host;
+	} proxies;
 	
-	WclapArenas(Wclap &wclap, WclapThread &currentThread);
+	WclapArenas(Wclap &wclap, WclapThread &currentThread, size_t arenaIndex);
 	~WclapArenas();
 
 	void mallocIfNeeded();
-	// Called when returning to a pool
-	void resetIncludingPersistent() {
-		nativeArenaPos = nativeArenaEnd;
-		wasmArenaPos = wasmArena;
-	}
 	
 	template<class AutoTranslatedStruct>
-	AutoTranslatedStruct view(uint64_t wasmP);
+	AutoTranslatedStruct view(uint64_t wasmP) {
+		return wclapWasmView<AutoTranslatedStruct>(wclap, wasmP);
+	}
 	
 	template<class AutoTranslatedStruct, typename WasmP>
 	AutoTranslatedStruct create(WasmP &wasmP) {
@@ -68,7 +70,7 @@ struct WclapArenas {
 		bool active = true;
 	};
 	
-	unsigned char *nativeArena = nullptr, *nativeArenaEnd = nullptr, *nativeArenaPos = nullptr;
+	unsigned char *nativeArena = nullptr, *nativeArenaReset = nullptr, *nativeArenaEnd = nullptr, *nativeArenaPos = nullptr;
 	unsigned char * nativeBytes(size_t size, size_t align=1) {
 		while (((size_t)nativeArenaPos)%align) ++nativeArenaPos;
 		unsigned char *result = nativeArenaPos;
@@ -88,8 +90,11 @@ struct WclapArenas {
 	ScopedReset<false> scopedNativeReset() {
 		return {*this, nativeArenaPos};
 	}
+	void persistNative() {
+		nativeArena = nativeArenaPos;
+	}
 	
-	size_t wasmArena, wasmArenaEnd, wasmArenaPos;
+	size_t wasmArena = 0, wasmArenaEnd = 0, wasmArenaPos = 0, wasmArenaReset = 0;
 	size_t wasmBytes(size_t size, size_t align=1) {
 		while (wasmArenaPos%align) ++wasmArenaPos;
 		size_t result = wasmArenaPos;
@@ -106,7 +111,16 @@ struct WclapArenas {
 	ScopedReset<true> scopedWasmReset() {
 		return {*this, wasmArenaPos};
 	}
-	
+	void persistWasm() {
+		wasmArena = wasmArenaPos;
+	}
+
+	// Called when returning to a pool
+	void resetIncludingPersistent() {
+		nativeArenaPos = nativeArena = nativeArenaReset;
+		wasmArenaPos = wasmArena = wasmArenaReset;
+	}
+
 private:
 	unsigned char * nativeInWasm(size_t wasmP);
 };

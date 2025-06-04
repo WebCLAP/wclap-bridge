@@ -3,12 +3,12 @@
 #include "wasmtime.h"
 #include "clap/all.h"
 
+#include "./validity.h"
+#include "./wclap-arenas.h"
+
 #include <fstream>
 #include <vector>
 #include <mutex>
-
-#include "./validity.h"
-#include "./wclap-arenas.h"
 
 namespace wclap {
 
@@ -21,7 +21,6 @@ inline bool trapIsTimeout(const wasm_trap_t *trap) {
 
 struct WclapThread {
 	Wclap &wclap;
-	std::unique_ptr<WclapArenas> arenas;
 	std::mutex mutex;
 
 	// We should delete these (in reverse order) if they're defined
@@ -40,11 +39,8 @@ struct WclapThread {
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	wasmtime_instance_t instance;
 	
-	WclapThread(Wclap &wclap, bool andInitModule=false);
+	WclapThread(Wclap &wclap);
 	~WclapThread();
-
-	void initModule(); // called only once, on the first thread
-	void initEntry(); // also called only once, but after the thread/translation-scope is set up
 
 	uint64_t wasmMalloc(size_t bytes);
 	
@@ -149,6 +145,15 @@ private:
 	wasmtime_val_raw argToWasmVal(double v) {
 		return {.f64=v};
 	}
+};
+
+struct WclapThreadWithArenas : public WclapThread {
+	std::unique_ptr<WclapArenas> arenas;
+
+	WclapThreadWithArenas(Wclap &wclap, bool isGlobalThread=false);
+
+	void initModule(); // called only once, on the global thread
+	void initEntry(); // also called only once, but after the thread/translation-scope is set up
 };
 
 } // namespace

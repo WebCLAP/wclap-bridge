@@ -6,17 +6,16 @@
 
 namespace wclap {
 
-WclapArenas::WclapArenas(Wclap &wclap, WclapThread &currentThread) : wclap(wclap) {
-	nativeArena = nativeArenaPos = (unsigned char *)malloc(arenaBytes);
+WclapArenas::WclapArenas(Wclap &wclap, WclapThread &currentThread, size_t arenaIndex) : wclap(wclap) {
+	nativeArena = nativeArenaPos = nativeArenaReset = (unsigned char *)malloc(arenaBytes);
 	nativeArenaEnd = nativeArena + arenaBytes;
 
-	wasmContextP = currentThread.wasmMalloc(sizeof(WasmContext) + alignof(WasmContext));
-	// ensure alignment
-	while (size_t(wclap.wasmMemory(wasmContextP))%alignof(WasmContext)) {
-		++wasmContextP;
-	}
-	wasmArena = wasmArenaPos = currentThread.wasmMalloc(arenaBytes);
+	wasmArena = wasmArenaPos = wasmArenaReset = currentThread.wasmMalloc(arenaBytes);
 	wasmArenaEnd = wasmArena + arenaBytes;
+
+	wasmContextP = wasmBytes(sizeof(size_t), alignof(size_t));
+	wasmArenaReset = wasmArena = wasmArenaPos; // never erase
+	*(size_t *)wclap.wasmMemory(wasmContextP) = arenaIndex;
 }
 
 WclapArenas::~WclapArenas() {
@@ -25,11 +24,6 @@ WclapArenas::~WclapArenas() {
 
 uint8_t * WclapArenas::wasmMemory(uint64_t wasmP) {
 	return wclap.wasmMemory(wasmP);
-}
-
-template<class AutoTranslatedStruct>
-AutoTranslatedStruct WclapArenas::view(uint64_t wasmP) {
-	return wclap.view<AutoTranslatedStruct>(wasmP);
 }
 
 } // namespace

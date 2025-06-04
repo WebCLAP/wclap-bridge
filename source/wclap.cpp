@@ -41,7 +41,7 @@ Wclap::~Wclap() {
 
 	{ // Clear all threads/scopes
 		auto lock = writeLock();
-		singleThread = nullptr;
+		globalThread = nullptr;
 		realtimeThreadPool.clear();
 		relaxedThreadPool.clear();
 	}
@@ -62,8 +62,8 @@ uint8_t * Wclap::wasmMemory(uint64_t wasmP) {
 		wasmP = std::min<uint64_t>(wasmP, wasmtime_sharedmemory_data_size(sharedMemory));
 		return wasmtime_sharedmemory_data(sharedMemory) + wasmP;
 	} else {
-		wasmP = std::min<uint64_t>(wasmP, wasmtime_memory_data_size(singleThread->context, &singleThread->memory));
-		return wasmtime_memory_data(singleThread->context, &singleThread->memory) + wasmP;
+		wasmP = std::min<uint64_t>(wasmP, wasmtime_memory_data_size(globalThread->context, &globalThread->memory));
+		return wasmtime_memory_data(globalThread->context, &globalThread->memory) + wasmP;
 	}
 }
 	
@@ -142,40 +142,23 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 		wasm_importtype_vec_delete(&importTypes);
 	}
 
-	WclapThread *rawPtr;
+	globalThread = std::unique_ptr<WclapThreadWithArenas>{
+		new WclapThreadWithArenas(*this, true)
+	};
+	if (errorMessage) return;
 
 	if (wasm64) {
 		methods64 = wclap::wclap64::methodsCreate(*this);
-		rawPtr = new WclapThread(*this, true);
-		if (!errorMessage) {
-			wclap::wclap64::methodsRegister(methods64, *rawPtr);
-		}
 	} else {
 		methods32 = wclap::wclap32::methodsCreate(*this);
-		rawPtr = new WclapThread(*this, true);
-		if (!errorMessage) {
-			wclap::wclap32::methodsRegister(methods32, *rawPtr);
-		}
 	}
-
-	if (errorMessage) {
-		delete rawPtr;
-		return;
-	}
-	if (!sharedMemory) {
-		// need to do this before .initEntry(), so singleThread exists (if needed) since it owns the memory export
-		singleThread = std::unique_ptr<WclapThread>(rawPtr);
-	} else {
-		realtimeThreadPool.emplace_back(rawPtr);
-	}
-	if (!errorMessage) rawPtr->initEntry();
 	initSuccess = !errorMessage;
 }
 
 std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
-	if (singleThread) return {}; // null pointer
+	if (!sharedMemory) return {}; // single-threaded mode - null pointer
+	auto lock = writeLock();
 	{
-		auto lock = writeLock();
 		if (realtimeThreadPool.size()) {
 			std::unique_ptr<WclapThread> result = std::move(realtimeThreadPool.back());
 			realtimeThreadPool.pop_back();
@@ -187,8 +170,34 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 
 void Wclap::returnRealtimeThread(std::unique_ptr<WclapThread> &ptr) {
 	auto lock = writeLock();
-	ptr->arenas->resetIncludingPersistent();
 	realtimeThreadPool.emplace_back(std::move(ptr));
+}
+
+std::unique_ptr<WclapArenas> Wclap::claimArenas() {
+	globalThread->mutex.lock();
+	auto result = claimArenas(globalThread.get());
+	globalThread->mutex.unlock();
+	return result;
+}
+
+std::unique_ptr<WclapArenas> Wclap::claimArenas(WclapThread *lockedThread) {
+	if (!lockedThread) return claimArenas(); // use global if it's null
+	auto lock = writeLock();
+	if (arenaPool.size()) {
+		std::unique_ptr<WclapArenas> result = std::move(arenaPool.back());
+		arenaPool.pop_back();
+		return result;
+	}
+	std::unique_ptr<WclapArenas> result{
+		new WclapArenas(*this, *lockedThread, arenaList.size())
+	};
+	arenaList.push_back(result.get());
+	return result;
+}
+void Wclap::returnArenas(std::unique_ptr<WclapArenas> &arenas) {
+	arenas->resetIncludingPersistent();
+	auto lock = writeLock();
+	arenaPool.emplace_back(std::move(arenas));
 }
 
 Wclap::ScopedThread::~ScopedThread() {
@@ -196,27 +205,28 @@ Wclap::ScopedThread::~ScopedThread() {
 }
 
 Wclap::ScopedThread Wclap::lockRelaxedThread() {
-	if (singleThread) {
-		singleThread->mutex.lock();
-		return {*singleThread};
-	}
+	if (!sharedMemory) return lockGlobalThread();
+
 	{
 		auto lock = readLock();
 		for (auto &threadPtr : relaxedThreadPool) {
-			if (threadPtr->mutex.try_lock()) return {*threadPtr};
+			if (threadPtr->mutex.try_lock()) return {*threadPtr, *threadPtr->arenas};
 		}
 	}
 
-	auto *rawPtr = new WclapThread(*this);
-	rawPtr->mutex.lock();
-
 	auto lock = writeLock();
+	auto *rawPtr = new WclapThreadWithArenas(*this, false);
+	rawPtr->mutex.lock();
 	relaxedThreadPool.emplace_back(rawPtr);
-	return {*rawPtr};
+	return {*rawPtr, *rawPtr->arenas};
 }
-Wclap::ScopedThread Wclap::lockThread(WclapThread *ptr) {
+Wclap::ScopedThread Wclap::lockThread(WclapThread *ptr, WclapArenas &arenas) {
+	if (!ptr) ptr = globalThread.get();
 	ptr->mutex.lock();
-	return {*ptr};
+	return {*ptr, arenas};
+}
+Wclap::ScopedThread Wclap::lockGlobalThread() {
+	return lockThread(globalThread.get(), *globalThread->arenas);
 }
 
 const void * Wclap::getFactory(const char *factory_id) {

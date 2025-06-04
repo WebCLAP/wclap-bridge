@@ -15,42 +15,51 @@ namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 struct WclapMethods {
 	Wclap &wclap;
 	
-	WclapMethods(Wclap &wclap) : wclap(wclap) {}
+	WclapMethods(Wclap &wclap) : wclap(wclap) {
+		uint64_t funcIndex;
+		int32_t success;
+		auto global = wclap.lockGlobalThread();
+		auto wasmEntry = wclap.view<wclap_plugin_entry>(global.thread.clapEntryP64);
+		auto initFn = wasmEntry.init();
+		auto reset = global.arenas.scopedWasmReset();
+		WasmP wasmStr = nativeToWasm(global.arenas, "/plugin/");
+		success = global.thread.callWasm_I(initFn, wasmStr);
+		if (!success) {
+			wclap.errorMessage = "clap_entry.init() returned false";
+			return;
+		}
+	}
 
 	struct plugin_factory : public clap_plugin_factory {
-		NativeProxyContext context;
-		std::unique_ptr<WclapArenas> arenas; // TODO: have a WCLAP global arena, shared between all factories?
-		std::mutex mutex;
-		
+		Wclap &wclap;
+		WasmP factoryObjP;
+	
 		std::vector<const clap_plugin_descriptor *> descriptorPointers;
 		
-		void assign(NativeProxyContext &&c, WclapThread &thread, WasmP factoryP) {
+		plugin_factory(Wclap &wclap, WasmP factoryObjP) : wclap(wclap), factoryObjP(factoryObjP) {
 			this->get_plugin_count = native_get_plugin_count;
 			this->get_plugin_descriptor = native_get_plugin_descriptor;
 			this->create_plugin = native_create_plugin;
 
-			context = std::move(c);
-			arenas = std::unique_ptr<WclapArenas>{
-				new WclapArenas(*c.wclap, thread)
-			};
+			auto global = wclap.lockGlobalThread();
 			
-			auto wasmFactory = context.wclap->view<wclap_plugin_factory>(factoryP);
+			auto wasmFactory = wclap.view<wclap_plugin_factory>(factoryObjP);
 			auto getPluginCountFn = wasmFactory.get_plugin_count();
 			auto getPluginDescFn = wasmFactory.get_plugin_descriptor();
 
-			auto count = thread.callWasm_I(getPluginCountFn, context.wasmObjP);
+			auto count = global.thread.callWasm_I(getPluginCountFn, factoryObjP);
 			if (validity.lengths && count > validity.maxPlugins) {
-				context.wclap->errorMessage = "plugin factory advertised too many plugins";
+				wclap.errorMessage = "plugin factory advertised too many plugins";
 				descriptorPointers.clear();
 				return;
 			}
 			
 			descriptorPointers.clear();
 			for (uint32_t i = 0; i < count; ++i) {
-				auto wasmP = thread.callWasm_P(getPluginDescFn, context.wasmObjP, i);
+				auto wasmP = global.thread.callWasm_P(getPluginDescFn, factoryObjP, i);
 				if (wasmP) {
 					const clap_plugin_descriptor *desc;
-					wasmToNative(*arenas, wasmP, desc);
+					wasmToNative(global.arenas, wasmP, desc);
 					descriptorPointers.push_back(desc);
 				} else if (!validity.filterOnlyWorking) {
 					descriptorPointers.push_back(nullptr);
@@ -71,23 +80,35 @@ struct WclapMethods {
 		}
 		static const clap_plugin_t * native_create_plugin(const struct clap_plugin_factory *obj, const clap_host *host, const char *plugin_id) {
 			auto &factory = *(const plugin_factory *)obj;
-			auto &context = factory.context;
-			// Claim a thread exclusively for this plugin
-			auto ownedThread = context.wclap->claimRealtimeThread();
-			auto &ownedArenas = *ownedThread->arenas;
+			auto &wclap = factory.wclap;
+			auto createPluginFn = factory.wclap.view<wclap_plugin_factory>(factory.factoryObjP).create_plugin();
 
-			WasmP wasmHostP, wasmPluginId, wasmPluginP;
-			nativeToWasm(ownedArenas, host, wasmHostP); // persistent, tied to plugin lifetime
+			// Claim thread/arenas to be owned by this plugin, and released (returned to the pool) when it's destroyed
+			auto rtThread = wclap.claimRealtimeThread();
+			auto arenas = wclap.claimArenas(rtThread.get());
+
+			// Proxy the host, and make it persistent
+			WasmP wasmHostP = nativeToWasm(*arenas, host);
+			setWasmProxyContext<wclap_host>(*arenas, wasmHostP);
+			arenas->persistWasm();
+			
+			// Attempt to create the plugin;
+			WasmP wasmPluginP;
 			{
-				auto wasmReset = ownedArenas.scopedWasmReset();
-				nativeToWasm(ownedArenas, plugin_id, wasmPluginId); // temporary
-				auto createPluginFn = ownedArenas.view<wclap_plugin_factory>(context.wasmObjP).create_plugin();
-				wasmPluginP = ownedThread->callWasm_P(createPluginFn, wasmHostP, wasmPluginId);
+				auto wasmReset = arenas->scopedWasmReset();
+				auto wasmPluginId = nativeToWasm(*arenas, plugin_id);
+				wasmPluginP = rtThread->callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
 			}
-			clap_plugin_t *nativePluginP;
-			wasmToNative(ownedArenas, wasmPluginP, nativePluginP);
-			getNativeProxyContext(nativePluginP).realtimeThread = std::move(ownedThread);
-			return nativePluginP;
+			if (!wasmPluginP) {
+				wclap.returnRealtimeThread(rtThread);
+				wclap.returnArenas(arenas);
+				return nullptr;
+			}
+			auto *nativePlugin = wasmToNative<const clap_plugin>(*arenas, wasmPluginP);
+			arenas->persistNative();
+			
+			nativeProxyContextFor(nativePlugin) = {&wclap, wasmPluginP, std::move(arenas), std::move(rtThread)};
+			return nativePlugin;
 		}
 	};
 	
@@ -95,16 +116,15 @@ struct WclapMethods {
 	std::unique_ptr<plugin_factory> pluginFactory;
 
 	void * getFactory(const char *factory_id) {
-		auto scoped = wclap.lockRelaxedThread();
-		auto entryP = WasmP(scoped.thread.clapEntryP64);
-		auto wasmEntry = wclap.view<wclap_plugin_entry>(entryP);
-		
-		auto getFactoryFn = wasmEntry.get_factory();
 		WasmP factoryP;
 		{
-			auto reset = scoped.thread.arenas->scopedWasmReset();
-			WasmP wasmStr;
-			nativeToWasm(*scoped.thread.arenas, factory_id, wasmStr);
+			auto scoped = wclap.lockRelaxedThread();
+			auto entryP = WasmP(scoped.thread.clapEntryP64);
+			auto wasmEntry = wclap.view<wclap_plugin_entry>(entryP);
+			auto getFactoryFn = wasmEntry.get_factory();
+
+			auto reset = scoped.arenas.scopedWasmReset();
+			WasmP wasmStr = nativeToWasm(scoped.arenas, factory_id);
 			factoryP = scoped.thread.callWasm_P(getFactoryFn, wasmStr);
 		}
 		if (!factoryP) return nullptr;
@@ -112,8 +132,7 @@ struct WclapMethods {
 		if (!std::strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID)) {
 			if (!triedPluginFactory) {
 				triedPluginFactory = true;
-				pluginFactory = std::unique_ptr<plugin_factory>(new plugin_factory());
-				pluginFactory->assign({&wclap, factoryP}, scoped.thread, factoryP);
+				pluginFactory = std::unique_ptr<plugin_factory>(new plugin_factory(wclap, factoryP));
 			}
 			return pluginFactory.get();
 		}

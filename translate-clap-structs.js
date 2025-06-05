@@ -251,7 +251,7 @@ struct ${wclapClass} {
 						code += `
 	template<bool realtime=false>
 	static ${field.returnType || 'void'} nativeProxy_${field.name}(${argsCode}) {
-		auto &context = nativeProxyContextFor(${field.argNames[0] || ('(' + name + ' *)nullptr')});
+		auto &context = getNativeProxyContext(${field.argNames[0] || ('(' + name + ' *)nullptr')});
 		auto scoped = context.lock(realtime);
 		WasmP wasmFn = scoped.view<${wclapClass}>(context.wasmObjP).${field.name}();
 		`;
@@ -349,7 +349,7 @@ template<>
 void nativeToWasm<const ${name}>(ScopedThread &scoped, const ${name} *native, WasmP &wasmP);
 
 template<>
-NativeProxyContext & nativeProxyContextFor<${name}>(const ${name} *native);
+void * & nativeProxyContextPointer<${name}>(const ${name} *native);
 
 `;
 			}

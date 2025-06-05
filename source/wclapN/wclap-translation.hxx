@@ -13,7 +13,7 @@
 
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
-ScopedThread NativeProxyContext::lock(bool realtime) {
+ScopedThread NativeProxyContext::lock(bool realtime) const {
 	if (realtime) {
 		return wclap->lockThread(realtimeThread.get(), *arenas);
 	} else {
@@ -80,6 +80,8 @@ struct WclapMethods {
 					descriptorPointers.push_back(nullptr);
 				}
 			}
+			// Keep those descriptors for the lifetime of the WCLAP module
+			global.arenas.persistNative();
 		}
 	
 		static uint32_t native_get_plugin_count(const struct clap_plugin_factory *obj) {
@@ -99,29 +101,26 @@ struct WclapMethods {
 			
 			auto context = NativeProxyContext::claimRealtime(wclap);
 			auto scoped = context.lock(true);
-			auto &arenas = *context.arenas;
 			auto createPluginFn = scoped.view<wclap_plugin_factory>(factory.factoryObjP).create_plugin();
 
 			// Proxy the host, and make it persistent
 			WasmP wasmHostP = nativeToWasm(scoped, host);
-			arenas.proxied_clap_host.assign(host);
-			arenas.persistWasm();
-			
+			scoped.arenas.proxied_clap_host.assign(host);
+			scoped.arenas.persistWasm();
+
 			// Attempt to create the plugin;
 			WasmP &wasmPluginP = context.wasmObjP;
 			{
-				auto wasmReset = arenas.scopedWasmReset();
+				auto wasmReset = scoped.arenas.scopedWasmReset();
 				auto wasmPluginId = nativeToWasm(scoped, plugin_id);
 				wasmPluginP = scoped.thread.callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
 			}
-			if (!wasmPluginP) {
-				context.reset();
-				return nullptr;
-			}
-			auto *nativePlugin = wasmToNative<const clap_plugin>(scoped, wasmPluginP);
-			arenas.persistNative();
+			if (!wasmPluginP) return nullptr;
+
+			const clap_plugin_t *nativePlugin = wasmToNative<const clap_plugin>(scoped, wasmPluginP);
+			scoped.arenas.persistNative();
 			
-			nativeProxyContextFor(nativePlugin) = std::move(context);
+			createNativeProxyContext(scoped, nativePlugin, std::move(context));
 			return nativePlugin;
 		}
 	};
@@ -213,7 +212,7 @@ void wasmToNative<const char>(ScopedThread &scoped, WasmP wasmStr, const char *&
 	auto maxLength = scoped.wclap.wasmMemorySize(scoped.thread) - wasmStr;
 	auto *nativeInWasm = (char *)scoped.wasmMemory(wasmStr, maxLength);
 	size_t length = validity.strlen(nativeInWasm, maxLength);
-	auto *nativeTmp = (char *)scoped.arenas.nativeBytes(length + 1);
+	auto *nativeTmp = (char *)scoped.arenas.nativeBytes(length + 1, 1);
 	for (size_t i = 0; i < length; ++i) {
 		nativeTmp[i] = nativeInWasm[i];
 	}
@@ -233,9 +232,9 @@ void wasmToNative<const char * const>(ScopedThread &scoped, WasmP stringList, co
 	while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
 		++count;
 	}
-	auto *nativeStrArray = (const char **)scoped.arenas.nativeBytes(sizeof(char *)*(count + 1));
+	auto *nativeStrArray = (const char **)scoped.arenas.nativeBytes(sizeof(const char *)*(count + 1), alignof(const char *));
 	for (size_t i = 0; i < count; ++i) {
-		wasmToNative(scoped, wasmStrArray[count], nativeStrArray[i]);
+		wasmToNative(scoped, wasmStrArray[i], nativeStrArray[i]);
 	}
 	nativeStrArray[count] = nullptr;
 	features = nativeStrArray;
@@ -250,8 +249,8 @@ void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasm
 
 	auto *desc = (clap_plugin_descriptor *)nativeP; // Yes, un-const it.  It's ours anyway.
 	if (validity.correctInvalid) {
-		if (!validity.strlen(desc->id)) desc->id = "no-clap-id-supplied";
-		if (!validity.strlen(desc->name)) desc->name = "(no name supplied)";
+		if (!validity.strlen(desc->id)) desc->id = "no-wclap-id-supplied";
+		if (!validity.strlen(desc->name)) desc->name = "(unknown WCLAP)";
 	}
 	if (validity.avoidNull) {
 		if (!desc->vendor) desc->vendor = "";
@@ -265,7 +264,7 @@ void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasm
 }
 
 static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct clap_plugin *plugin, const clap_process_t *process) {
-	auto &context = nativeProxyContextFor(plugin);
+	auto &context = getNativeProxyContext(plugin);
 	if (context.wclap->errorMessage) return CLAP_PROCESS_ERROR; // Don't even attempt if there have been any errors
 
 	auto scoped = context.lock(true); // realtime if we have one
@@ -324,23 +323,19 @@ static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct
 }
 
 static const void * nativeProxy_plugin_get_extension_fromWclap(const struct clap_plugin *plugin, const char *extId) {
-	auto &context = nativeProxyContextFor(plugin);
+	auto &context = getNativeProxyContext(plugin);
 	auto &wclap = *context.wclap;
 	// TODO: The central Wclap should have spaces to proxy all the WASM extensions (since they're just bundles of functions)
 	return nullptr;
 }
 
 static void nativeProxy_plugin_destroy_andResetContext(const struct clap_plugin *plugin) {
-	wclap_plugin::nativeProxy_destroy(plugin);
-
-	auto &context = nativeProxyContextFor(plugin);
-	context.reset();
+	wclap_plugin::nativeProxy_destroy(plugin); // uses the context, so this goes first
+	destroyNativeProxyContext(plugin);
 }
 
 template<>
 void wasmToNative<const clap_plugin>(ScopedThread &scoped, WasmP wasmP, const clap_plugin *&constNativeP) {
-	LOG_EXPR("wasmToNative<clap_plugin>");
-
 	// based on generated_wasmToNative()
 	auto wasm = scoped.view<wclap_plugin>(wasmP);
 	auto *native = scoped.arenas.nativeTyped<clap_plugin_t>();
@@ -359,15 +354,15 @@ void wasmToNative<const clap_plugin>(ScopedThread &scoped, WasmP wasmP, const cl
 	native->on_main_thread = wclap_plugin::nativeProxy_on_main_thread;
 
 	// Replacements
-	native->plugin_data = scoped.arenas.nativeTyped<NativeProxyContext>(); // blank - it should get filled in by `create_plugin()`
+	native->plugin_data = nullptr; // filled in by `create_plugin()`
 	native->destroy = nativeProxy_plugin_destroy_andResetContext;
 	native->process = nativeProxy_plugin_process_andCopyOutput;
 	native->get_extension = nativeProxy_plugin_get_extension_fromWclap;
 }
 
 template<>
-NativeProxyContext & nativeProxyContextFor<clap_plugin>(const clap_plugin *plugin) {
-	return *(NativeProxyContext *)plugin->plugin_data;
+void * & nativeProxyContextPointer<clap_plugin>(const clap_plugin *plugin) {
+	return (void * &)plugin->plugin_data;
 }
 
 //-------------- Translating CLAP structs: WASM -> Native
@@ -375,8 +370,6 @@ NativeProxyContext & nativeProxyContextFor<clap_plugin>(const clap_plugin *plugi
 template<>
 void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native, WasmP &wasmP) {
 	if (!native) return void(wasmP = 0);
-
-	LOG_EXPR("nativeToWasm<clap_host>");
 
 	auto view = scoped.create<wclap_host>(wasmP); // claim the appropriate number of bytes
 	view.clap_version() = native->clap_version;
@@ -396,8 +389,6 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 template<>
 void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *native, WasmP &wasmP) {
 	auto view = scoped.create<wclap_process>(wasmP);
-
-	LOG_EXPR("nativeToWasm<clap_process>");
 
 	view.steady_time() = native->steady_time;
 	uint32_t frames = view.frames_count() = native->frames_count;

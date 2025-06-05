@@ -8,6 +8,11 @@
 #include "../wclap-thread.h"
 #include "../wclap-arenas.h"
 
+#ifndef LOG_EXPR
+#	include <iostream>
+#	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
+#endif
+
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
 // This is what we store in the `void *` context fields of native proxies
@@ -33,6 +38,11 @@ struct NativeProxyContext {
 		realtimeThread = std::move(other.realtimeThread);
 		return *this;
 	}
+	
+	// Only gets called when it's a temporary variable on the stack
+	~NativeProxyContext() {
+		reset();
+	}
 
 	static NativeProxyContext claimRealtime(Wclap &wclap, WasmP wasmObjP=0) {
 		auto rtThread = wclap.claimRealtimeThread();
@@ -40,7 +50,7 @@ struct NativeProxyContext {
 		return {&wclap, wasmObjP, std::move(arenas), std::move(rtThread)};
 	}
 	
-	ScopedThread lock(bool realtime=false);
+	ScopedThread lock(bool realtime=false) const;
 
 	// Call when the native proxy is destroyed
 	void reset() {
@@ -58,9 +68,9 @@ template<class NativeT>
 void wasmToNative(ScopedThread &scoped, WasmP wasmP, NativeT *&native);
 template<class NativeT>
 NativeT * wasmToNative(ScopedThread &scoped, WasmP wasmP) {
-	NativeT *native;
+	const NativeT *native;
 	wasmToNative(scoped, wasmP, native);
-	return native;
+	return (NativeT *)native;
 }
 template<class NativeT>
 void nativeToWasm(ScopedThread &scoped, NativeT *native, WasmP &wasmP);
@@ -83,10 +93,35 @@ void nativeToWasmDirectArray(ScopedThread &scoped, const DirectT *native, WasmP 
 }
 
 template<class NativeT>
-NativeProxyContext & nativeProxyContextFor(const NativeT *native);
+void * & nativeProxyContextPointer(const NativeT *native);
 // WASM equivalent is wclap.arenasForWasmContext(wasmContextP), which is much more consistent
 
-// non-struct specialisations
+template<class NativeT, class ...Args>
+NativeProxyContext & createNativeProxyContext(ScopedThread &scoped, NativeT *v, Args &&...args) {
+	void *&ptr = nativeProxyContextPointer(v);
+	if (ptr) {
+		LOG_EXPR("context fields should be NULL before they're created");
+		abort();
+	}
+	ptr = scoped.arenas.nativeTyped<NativeProxyContext>();
+	// Call proper constructor
+	return *(new(ptr) NativeProxyContext(std::forward<Args>(args)...));
+}
+
+template<class NativeT>
+const NativeProxyContext & getNativeProxyContext(const NativeT *native) {
+	return *(const NativeProxyContext *)nativeProxyContextPointer(native);
+}
+
+template<class NativeT>
+void destroyNativeProxyContext(const NativeT *native) {
+	void *&ptr = nativeProxyContextPointer(native);
+	auto *context = (NativeProxyContext *)ptr;
+	ptr = nullptr;
+	context->~NativeProxyContext();
+}
+
+//---------- non-struct specialisations ----------
 
 template<>
 void nativeToWasm<const char>(ScopedThread &scoped, const char *str, WasmP &wasmP);

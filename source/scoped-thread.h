@@ -6,6 +6,7 @@ struct Wclap;
 struct WclapThread;
 struct WclapArenas;
 struct ScopedThread;
+struct NativeProxyContext;
 
 // `Wclap` checks these when it's asked to lock something
 extern thread_local ScopedThread *currentScopedThread;
@@ -87,6 +88,10 @@ struct ScopedThread {
 		wasmP = WasmP(bytes);
 		return viewDirectPointer<T>(bytes);
 	}
+
+	// Just a helper - forwards the arguments to
+	template<class ClapStruct, class ...Args>
+	NativeProxyContext & createNativeProxyContext(ClapStruct *v, Args &&...args);
 
 private:
 	friend class Wclap;

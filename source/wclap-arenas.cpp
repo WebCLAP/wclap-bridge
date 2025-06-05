@@ -23,7 +23,7 @@ WclapArenas::WclapArenas(Wclap &wclap, WclapThread &threadToUse, size_t arenaInd
 }
 
 WclapArenas::~WclapArenas() {
-	if (nativeArena) free(nativeArena);
+	if (nativeArenaReset) free(nativeArenaReset);
 }
 
 } // namespace

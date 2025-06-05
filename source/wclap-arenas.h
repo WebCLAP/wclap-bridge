@@ -10,6 +10,7 @@
 
 #include <type_traits>
 #include <unordered_map>
+#include <new>
 
 namespace wclap {
 
@@ -42,14 +43,24 @@ struct WclapArenas {
 		~ScopedReset() {
 			if (forWasm) {
 				if (active) {
-					if (pos < arena.wasmArenaPos) {
-						arena.wasmArenaPos = pos;
-					} else {
-						
+					if (pos > arena.wasmArenaPos || pos < arena.wasmArena) {
+						// This means we tried to persist the arena *while* holding a scoped reset
+						LOG_EXPR(pos > arena.wasmArenaPos);
+						LOG_EXPR(pos < arena.wasmArena);
+						abort();
 					}
+					arena.wasmArenaPos = pos;
 				}
 			} else {
-				if (active) arena.nativeArenaPos = (unsigned char *)pos;
+				if (active) {
+					if ((unsigned char *)pos > arena.nativeArenaPos || (unsigned char *)pos < arena.nativeArena) {
+						// This means we tried to persist the arena *while* holding a scoped reset
+						LOG_EXPR((unsigned char *)pos > arena.nativeArenaPos);
+						LOG_EXPR((unsigned char *)pos < arena.nativeArena);
+						abort();
+					}
+					arena.nativeArenaPos = (unsigned char *)pos;
+				}
 			}
 		}
 	private:
@@ -59,21 +70,18 @@ struct WclapArenas {
 	};
 	
 	unsigned char *nativeArena = nullptr, *nativeArenaReset = nullptr, *nativeArenaEnd = nullptr, *nativeArenaPos = nullptr;
-	unsigned char * nativeBytes(size_t size, size_t align=1) {
+	unsigned char * nativeBytes(size_t size, size_t align) {
 		while (((size_t)nativeArenaPos)%align) ++nativeArenaPos;
 		unsigned char *result = nativeArenaPos;
 		nativeArenaPos += size;
 		if (nativeArenaPos > nativeArenaEnd) {
-			LOG_EXPR(nativeArena);
-			LOG_EXPR(nativeArenaEnd);
-			LOG_EXPR(nativeArenaPos);
+			LOG_EXPR(nativeArenaPos > nativeArenaEnd);
+			LOG_EXPR((void *)nativeArena);
+			LOG_EXPR((void *)nativeArenaEnd);
+			LOG_EXPR((void *)nativeArenaPos);
 			abort(); // TODO: grow list of arenas
 		}
 		return result;
-	}
-	template<class T>
-	T * nativeTyped() {
-		return (T *)nativeBytes(sizeof(T), alignof(T));
 	}
 	ScopedReset<false> scopedNativeReset() {
 		return {*this, nativeArenaPos};
@@ -89,6 +97,8 @@ struct WclapArenas {
 		wasmArenaPos += size;
 		if (wasmArenaPos > wasmArenaEnd) {
 			LOG_EXPR(wasmArenaPos > wasmArenaEnd);
+			LOG_EXPR(wasmArenaPos)
+			LOG_EXPR(wasmArenaEnd);
 			abort(); // TODO: grow list of arenas
 		}
 		return result;
@@ -103,10 +113,12 @@ struct WclapArenas {
 
 	void resetTemporary() {
 		if (nativeArenaPos != nativeArena) {
-			LOG_EXPR(nativeArenaPos);
-			LOG_EXPR(nativeArena);
+			LOG_EXPR(nativeArenaPos != nativeArena);
+			LOG_EXPR((void *)nativeArenaPos);
+			LOG_EXPR((void *)nativeArena);
 		}
 		if (wasmArenaPos != wasmArena) {
+			LOG_EXPR(wasmArenaPos != wasmArena);
 			LOG_EXPR(wasmArenaPos);
 			LOG_EXPR(wasmArena);
 		}
@@ -122,8 +134,21 @@ struct WclapArenas {
 		proxied_clap_host.clear();
 	}
 
+	template<class T>
+	T * nativeTyped() {
+		return (T *)nativeBytes(sizeof(T), alignof(T));
+	}
+
 private:
 	unsigned char * nativeInWasm(size_t wasmP);
 };
+
+// This doesn't release any memory, but it calls the destructor
+// Appropriate to use on native-arena objects before the arena is reset
+template<class T>
+void arenaNativeDelete(T *&obj) {
+	obj->~T();
+	obj = nullptr;
+}
 
 } // namespace

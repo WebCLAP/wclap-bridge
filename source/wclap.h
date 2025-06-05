@@ -83,10 +83,10 @@ struct Wclap {
 
 	const void * getFactory(const char *factory_id);
 	
-	// All translated host extensions point to the same
+	// All translated plugin extensions point to the same structs
 	struct {
-		//ProxiedClapStruct<clap_ext_host_params> params;
-	} extensionProxies;
+		//ProxiedClapStruct<clap_ext_plugin_params> params;
+	} pluginExtensions;
 private:
 	bool initSuccess = false;
 

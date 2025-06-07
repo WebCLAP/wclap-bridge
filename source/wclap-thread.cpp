@@ -9,6 +9,8 @@
 #include "./wclap32/wclap-translation.h"
 #include "./wclap64/wclap-translation.h"
 
+#include <cstdlib>
+
 namespace wclap {
 
 WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
@@ -39,6 +41,22 @@ void WclapThread::startInstance() {
 	
 	wasi_config_inherit_stdout(wasiConfig);
 	wasi_config_inherit_stderr(wasiConfig);
+	
+	// Set a few specific environment variables
+	std::vector<const char *> envNames, envValues;
+	auto addEnv = [&](const char *name) {
+		auto *value = std::getenv(name);
+		if (value) {
+			envNames.push_back(name);
+			envValues.push_back(value);
+		}
+	};
+	addEnv("TERM");
+	addEnv("LANG");
+	if (envNames.size()) {
+		wasi_config_set_env(wasiConfig, envNames.size(), envNames.data(), envValues.data());
+	}
+	
 	// Link various directories - failure is allowed if `mustLinkDirs` is false
 	if (wclap.wclapDir.size()) {
 		if (!wasi_config_preopen_dir(wasiConfig, wclap.wclapDir.c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {

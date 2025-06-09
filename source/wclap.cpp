@@ -136,6 +136,7 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	globalThread = std::unique_ptr<WclapThread>{
 		new WclapThread(*this)
 	};
+	// Normally directly after creation we'd register the methods, but we can't create those until after `wasmInit()` and `claimArenas()` have made arenas/`malloc()` usable
 	if (errorMessage) return;
 	
 	globalThread->wasmInit();
@@ -147,8 +148,10 @@ void Wclap::initWasmBytes(const uint8_t *bytes, size_t size) {
 	// These also call clap_entry.init();
 	if (wasm64) {
 		methods64 = wclap::wclap64::methodsCreateAndInit(*this);
+		wclap::wclap64::methodsRegister(methods64, *globalThread);
 	} else {
 		methods32 = wclap::wclap32::methodsCreateAndInit(*this);
+		wclap::wclap32::methodsRegister(methods32, *globalThread);
 	}
 }
 
@@ -162,7 +165,13 @@ std::unique_ptr<WclapThread> Wclap::claimRealtimeThread() {
 			return result;
 		}
 	}
-	return std::unique_ptr<WclapThread>(new WclapThread(*this));
+	auto *rawPtr = new WclapThread(*this);
+	if (wasm64) {
+		wclap::wclap64::methodsRegister(methods64, *rawPtr);
+	} else {
+		wclap::wclap32::methodsRegister(methods32, *rawPtr);
+	}
+	return std::unique_ptr<WclapThread>(rawPtr);
 }
 
 const void * Wclap::getFactory(const char *factory_id) {
@@ -227,6 +236,11 @@ ScopedThread Wclap::lockThread() {
 
 	auto lock = writeLock();
 	auto *rawPtr = new WclapThreadWithArenas(*this);
+	if (wasm64) {
+		wclap::wclap64::methodsRegister(methods64, *rawPtr);
+	} else {
+		wclap::wclap32::methodsRegister(methods32, *rawPtr);
+	}
 	rawPtr->mutex.lock();
 	relaxedThreadPool.emplace_back(rawPtr);
 	return {*rawPtr, *rawPtr->arenas};
@@ -256,6 +270,10 @@ ScopedThread Wclap::lockGlobalThread(WclapArenas &arenas) {
 	}
 	currentScopedThreadIsGlobal = true;
 	return lockThread(globalThread.get(), arenas);
+}
+
+void wclapSetError(Wclap &wclap, const char *message) {
+	wclap.setError(message);
 }
 
 } // namespace

@@ -14,6 +14,7 @@ namespace wclap {
 extern unsigned int timeLimitEpochs;
 
 struct Wclap;
+void wclapSetError(Wclap &, const char *message);
 
 inline bool trapIsTimeout(const wasm_trap_t *trap) {
 	wasmtime_trap_code_t code;
@@ -41,6 +42,27 @@ struct WclapThread {
 	
 	WclapThread(Wclap &wclap);
 	~WclapThread();
+	
+	static void logMessage(const wasm_message_t &message) {
+		for (size_t i = 0; i < message.size; ++i) {
+			std::cout << message.data[i];
+		}
+		std::cout << std::endl;
+	}
+	
+	static void logError(const wasmtime_error_t *error) {
+		wasm_message_t message;
+		wasmtime_error_message(error, &message);
+		logMessage(message);
+		wasm_byte_vec_delete(&message);
+	}
+	
+	static void logTrap(const wasm_trap_t *trap) {
+		wasm_message_t message;
+		wasm_trap_message(trap, &message);
+		logMessage(message);
+		wasm_byte_vec_delete(&message);
+	}
 
 	uint64_t wasmMalloc(size_t bytes);
 	
@@ -127,7 +149,107 @@ struct WclapThread {
 	}
 	
 	void wasmInit();
+	
+	template<typename WasmP>
+	void registerFunctionIndex(wasmtime_val_t fnVal, WasmP &fnP) {
+		uint64_t fnIndex = WasmP(-1);
+		error = wasmtime_table_grow(context, &functionTable, 1, &fnVal, &fnIndex);
+		if (error) {
+			fnP = WasmP(-1);
+			return wclapSetError(wclap, "failed to register function");
+		}
+		
+		if (fnP == 0) {
+			fnP = WasmP(fnIndex);
+		} else if (fnP != fnIndex) {
+			fnP = WasmP(-1);
+			return wclapSetError(wclap, "index mismatch when registering function");
+		}
+	}
+	
+	template<void nativeFn(uint32_t), typename WasmP>
+	void registerFunction(WasmP &fnP) {
+		struct S {
+			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
+				nativeFn(argsResults[0].i32);
+				return nullptr;
+			}
+		};
 
+		wasm_valtype_vec_t params, results;
+		wasm_valtype_vec_new_uninitialized(&params, 1);
+		params.data[0] = wasm_valtype_new(WASM_I32);
+		wasm_valtype_vec_new_empty(&results);
+		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
+
+		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
+		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
+		registerFunctionIndex(fnVal, fnP);
+	}
+
+	template<uint32_t nativeFn(uint32_t, uint32_t), typename WasmP>
+	void registerFunction(WasmP &fnP) {
+		struct S {
+			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
+				argsResults[0].i32 = nativeFn(argsResults[0].i32, argsResults[1].i32);
+				return nullptr;
+			}
+		};
+
+		wasm_valtype_vec_t params, results;
+		wasm_valtype_vec_new_uninitialized(&params, 2);
+		params.data[0] = wasm_valtype_new(WASM_I32);
+		params.data[1] = wasm_valtype_new(WASM_I32);
+		wasm_valtype_vec_new_uninitialized(&results, 1);
+		results.data[0] = wasm_valtype_new(WASM_I32);
+		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
+
+		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
+		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
+		registerFunctionIndex(fnVal, fnP);
+	}
+
+	template<void nativeFn(uint64_t), typename WasmP>
+	void registerFunction(WasmP &fnP) {
+		struct S {
+			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
+				nativeFn(argsResults[0].i64);
+				return nullptr;
+			}
+		};
+
+		wasm_valtype_vec_t params, results;
+		wasm_valtype_vec_new_uninitialized(&params, 1);
+		params.data[0] = wasm_valtype_new(WASM_I64);
+		wasm_valtype_vec_new_empty(&results);
+		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
+
+		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
+		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
+		registerFunctionIndex(fnVal, fnP);
+	}
+
+	template<uint64_t nativeFn(uint64_t, uint64_t), typename WasmP>
+	void registerFunction(WasmP &fnP) {
+		struct S {
+			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
+				argsResults[0].i64 = nativeFn(argsResults[0].i64, argsResults[1].i64);
+				return nullptr;
+			}
+		};
+
+		wasm_valtype_vec_t params, results;
+		wasm_valtype_vec_new_uninitialized(&params, 2);
+		params.data[0] = wasm_valtype_new(WASM_I64);
+		params.data[1] = wasm_valtype_new(WASM_I64);
+		wasm_valtype_vec_new_uninitialized(&results, 1);
+		results.data[0] = wasm_valtype_new(WASM_I64);
+		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
+
+		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
+		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
+		registerFunctionIndex(fnVal, fnP);
+	}
 private:
 	void startInstance();
 

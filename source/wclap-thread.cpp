@@ -243,10 +243,12 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 	setWasmDeadline();
 	error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
 	if (error) {
+		logError(error);
 		wclap.setError("calling malloc() failed");
 		return 0;
 	}
 	if (trap) {
+		logTrap(trap);
 		wclap.setError(trapIsTimeout(trap) ? "malloc() timeout" : "malloc() threw (trapped)");
 		return 0;
 	}
@@ -281,9 +283,11 @@ void WclapThread::wasmInit() {
 		error = wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
 		if (error) {
 			wasmtime_extern_delete(&item);
+			logError(error);
 			return wclap.setError("error calling _initialize()");
 		} else if (trap) {
 			wasmtime_extern_delete(&item);
+			logTrap(trap);
 			return wclap.setError(trapIsTimeout(trap) ? "_initialize() timeout" : "_initialize() threw (trapped)");
 		}
 		wasmtime_extern_delete(&item);
@@ -302,8 +306,14 @@ void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, si
 
 	setWasmDeadline();
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
-	if (error) return wclap.setError("calling function failed");
-	if (trap) return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
+	if (error) {
+		logError(error);
+		return wclap.setError("calling function failed");
+	}
+	if (trap) {
+		logTrap(trap);
+		return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
+	}
 }
 
 WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap) : WclapThread(wclap) {

@@ -87,6 +87,13 @@ struct Wclap {
 	struct {
 		//ProxiedClapStruct<clap_ext_plugin_params> params;
 	} pluginExtensions;
+	
+	wclap32::WclapMethods & methods(uint32_t) {
+		return *methods32;
+	}
+	wclap64::WclapMethods & methods(uint64_t) {
+		return *methods64;
+	}
 private:
 	bool initSuccess = false;
 
@@ -117,5 +124,7 @@ private:
 	std::vector<std::unique_ptr<WclapThread>> realtimeThreadPool; // removed from the pool, to be locked later
 	std::vector<std::unique_ptr<WclapThreadWithArenas>> relaxedThreadPool; // never leaves the pool, arenas are always temporary.  Called "relaxed" because (unlike realtime threads which are known to already exist) this might need to call Wclap::writeLock() for an exclusive lock while it allocates a new one
 };
+
+void wclapSetError(Wclap &wclap, const char *message);
 
 } // namespace

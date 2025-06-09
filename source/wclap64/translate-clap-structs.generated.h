@@ -8,7 +8,7 @@ struct wclap_host {
 	wclap_host(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 84;
+	static constexpr size_t wasmSize = 88;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -127,7 +127,7 @@ struct wclap_event_param_value {
 	wclap_event_param_value(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 46;
+	static constexpr size_t wasmSize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -190,7 +190,7 @@ struct wclap_event_param_mod {
 	wclap_event_param_mod(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 46;
+	static constexpr size_t wasmSize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -259,7 +259,7 @@ struct wclap_event_midi_sysex {
 	wclap_event_midi_sysex(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 30;
+	static constexpr size_t wasmSize = 32;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -480,7 +480,7 @@ struct wclap_process {
 	wclap_process(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 60;
+	static constexpr size_t wasmSize = 64;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -547,7 +547,7 @@ struct wclap_plugin_descriptor {
 	wclap_plugin_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 84;
+	static constexpr size_t wasmSize = 88;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1204,7 +1204,7 @@ struct wclap_preset_discovery_soundpack {
 	wclap_preset_discovery_soundpack(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 60;
+	static constexpr size_t wasmSize = 64;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1267,7 +1267,7 @@ struct wclap_preset_discovery_provider_descriptor {
 	wclap_preset_discovery_provider_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 36;
+	static constexpr size_t wasmSize = 40;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1419,7 +1419,7 @@ struct wclap_preset_discovery_indexer {
 	wclap_preset_discovery_indexer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 84;
+	static constexpr size_t wasmSize = 88;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1634,7 +1634,7 @@ struct wclap_plugin_entry {
 	wclap_plugin_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 36;
+	static constexpr size_t wasmSize = 40;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2168,7 +2168,7 @@ struct wclap_audio_ports_config {
 	wclap_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 294;
+	static constexpr size_t wasmSize = 296;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2422,7 +2422,7 @@ struct wclap_audio_port_configuration_request {
 	wclap_audio_port_configuration_request(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 25;
+	static constexpr size_t wasmSize = 32;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2541,7 +2541,7 @@ struct wclap_context_menu_entry {
 	wclap_context_menu_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 13;
+	static constexpr size_t wasmSize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2584,7 +2584,7 @@ struct wclap_context_menu_check_entry {
 	wclap_context_menu_check_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 14;
+	static constexpr size_t wasmSize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2631,7 +2631,7 @@ struct wclap_context_menu_item_title {
 	wclap_context_menu_item_title(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 9;
+	static constexpr size_t wasmSize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2670,7 +2670,7 @@ struct wclap_context_menu_submenu {
 	wclap_context_menu_submenu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
 	static constexpr size_t wasmAlign = 8;
-	static constexpr size_t wasmSize = 9;
+	static constexpr size_t wasmSize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;

@@ -22,7 +22,8 @@ namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 size_t strlen(const char *str, size_t maxLength=WCLAP_MAX_STRING_LENGTH) {
 	if (!str) return 0;
 	size_t length = 0;
-	while (str[0] && length < maxLength) ++length;
+	if (maxLength > WCLAP_MAX_STRING_LENGTH) maxLength = WCLAP_MAX_STRING_LENGTH;
+	while (str[length] && length < maxLength) ++length;
 	return length;
 }
 
@@ -168,7 +169,20 @@ struct WclapMethods {
 		}
 	} host_example_struct_dummy;
 	
+	static void notImplementedFnVP(WasmP) {
+		std::cout << "unimplemented V(P)\n";
+	}
+	static WasmP notImplementedFnPPP(WasmP, WasmP) {
+		std::cout << "unimplemented P(PP)\n";
+		return 0;
+	}
+	WasmP notImplementedVP = 0;
+	WasmP notImplementedPPP = 0;
+	
 	void registerHostMethods(WclapThread &thread) {
+		thread.registerFunction<notImplementedFnVP>(notImplementedVP);
+		thread.registerFunction<notImplementedFnPPP>(notImplementedPPP);
+
 		host_example_struct_dummy.registerMethods(thread);
 	}
 };
@@ -368,10 +382,11 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 	view.version() = nativeToWasm(scoped, native->version);
 
 	// Methods don't exist yet - this will probably crash
-	view.get_extension() = 0;
-	view.request_restart() = 0;
-	view.request_process() = 0;
-	view.request_callback() = 0;
+	auto &methods = scoped.wclap.methods(wasmP);
+	view.get_extension() = methods.notImplementedPPP;
+	view.request_restart() = methods.notImplementedVP;
+	view.request_process() = methods.notImplementedVP;
+	view.request_callback() = methods.notImplementedVP;
 }
 
 template<>

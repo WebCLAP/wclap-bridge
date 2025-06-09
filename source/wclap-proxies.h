@@ -1,5 +1,10 @@
 #pragma once
 
+#ifndef WCLAP_ENGINE_WASMTIME
+// Wasmtime is the only supported one for now
+#	define WCLAP_ENGINE_WASMTIME
+#endif
+
 #include <mutex>
 #include <atomic>
 

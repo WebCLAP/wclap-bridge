@@ -4,8 +4,11 @@
 
 #include "./wclap-arenas.h"
 
-// I haven't figured out how to avoid this, since we can't specialise the _impl templates in a separate compilation unit without knowing which ones are used
-#include "./wasmtime/call-wasm.h"
+#ifdef WCLAP_ENGINE_WASMTIME
+#	include "./wasmtime/call-wasm.h"
+#else
+#	error No WASM engine selected
+#endif
 
 #include <fstream>
 #include <vector>

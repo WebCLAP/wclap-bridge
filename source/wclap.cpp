@@ -158,3 +158,9 @@ void wclapSetError(Wclap &wclap, const char *message) {
 }
 
 } // namespace
+
+#ifdef WCLAP_ENGINE_WASMTIME
+#	include "./wasmtime/wclap-impl.hxx"
+#else
+#	error No WASM engine selected
+#endif

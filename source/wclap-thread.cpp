@@ -18,3 +18,9 @@ WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap) : WclapThread(wclap) 
 }
 
 } // namespace
+
+#ifdef WCLAP_ENGINE_WASMTIME
+#	include "./wasmtime/wclap-thread-impl.hxx"
+#else
+#	error No WASM engine selected
+#endif

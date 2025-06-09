@@ -1,17 +1,4 @@
-#ifndef LOG_EXPR
-#	include <iostream>
-#	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
-#endif
-
-#include "../wclap-thread.h"
-#include "../wclap.h"
-#include "../wclap-arenas.h"
-#include "../wclap32/wclap-translation.h"
-#include "../wclap64/wclap-translation.h"
-
 #include "./wclap-impl-wasmtime.h"
-
-#include <cstdlib>
 
 namespace wclap {
 
@@ -31,6 +18,36 @@ namespace _impl {
 	void registerFunctionIndex(WclapThread &thread, wasmtime_val_t fnVal, uint64_t &fnP) {
 		thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 	}
+}
+
+void WclapThread::implCreate() {
+	impl = new Impl();
+}
+
+void WclapThread::implDestroy() {
+	if (impl->trap) {
+		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown trap]");
+		wclap_error_message_string += ": ";
+		wasm_message_t message;
+		wasm_trap_message(impl->trap, &message);
+		wclap_error_message_string += message.data; // should always be null-terminated C string
+		wclap_error_message = wclap_error_message_string.c_str();
+
+		wasm_trap_delete(impl->trap);
+	}
+
+	if (impl->error) {
+		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown error]");
+		wclap_error_message_string += ": ";
+		wasm_name_t message;
+		wasmtime_error_message(impl->error, &message);
+		wclap_error_message_string.append(message.data, message.size);
+		wclap_error_message = wclap_error_message_string.c_str();
+
+		wasmtime_error_delete(impl->error);
+	}
+	if (impl->linker) wasmtime_linker_delete(impl->linker);
+	if (impl->store) wasmtime_store_delete(impl->store);
 }
 
 void WclapThread::Impl::setWasmDeadline() {
@@ -222,36 +239,6 @@ void WclapThread::startInstance() {
 		wasmtime_extern_delete(&item);
 		++exportIndex;
 	}
-}
-
-void WclapThread::implCreate() {
-	impl = new Impl();
-}
-
-void WclapThread::implDestroy() {
-	if (impl->trap) {
-		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown trap]");
-		wclap_error_message_string += ": ";
-		wasm_message_t message;
-		wasm_trap_message(impl->trap, &message);
-		wclap_error_message_string += message.data; // should always be null-terminated C string
-		wclap_error_message = wclap_error_message_string.c_str();
-
-		wasm_trap_delete(impl->trap);
-	}
-
-	if (impl->error) {
-		wclap_error_message_string = (wclap.errorMessage ? wclap.errorMessage : "[unknown error]");
-		wclap_error_message_string += ": ";
-		wasm_name_t message;
-		wasmtime_error_message(impl->error, &message);
-		wclap_error_message_string.append(message.data, message.size);
-		wclap_error_message = wclap_error_message_string.c_str();
-
-		wasmtime_error_delete(impl->error);
-	}
-	if (impl->linker) wasmtime_linker_delete(impl->linker);
-	if (impl->store) wasmtime_store_delete(impl->store);
 }
 
 void WclapThread::wasmInit() {

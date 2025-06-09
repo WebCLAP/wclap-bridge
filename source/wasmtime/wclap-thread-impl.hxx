@@ -1,27 +1,61 @@
-#include "./wclap-impl-wasmtime.h"
-
 namespace wclap {
 
 extern std::atomic<wasm_engine_t *> global_wasm_engine;
 extern unsigned int timeLimitEpochs;
 
-namespace _impl {
-	void callWithThread(WclapThread &thread, uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-		return thread.impl->callWasmFnP(thread.wclap, fnP, argsAndResults, argN);
+template<typename WasmP>
+void implRegisterFunctionIndex(WclapThreadImpl &impl, Wclap &wclap, wasmtime_val_t fnVal, WasmP &fnP) {
+	uint64_t fnIndex = WasmP(-1);
+	impl.error = wasmtime_table_grow(impl.context, &impl.functionTable, 1, &fnVal, &fnIndex);
+	if (impl.error) {
+		fnP = WasmP(-1);
+		logError(impl.error);
+		return wclapSetError(wclap, "failed to register function");
 	}
-	wasmtime_context_t * contextForThread(WclapThread &thread) {
-		return thread.impl->context;
-	}
-	void registerFunctionIndex(WclapThread &thread, wasmtime_val_t fnVal, uint32_t &fnP) {
-		thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
-	}
-	void registerFunctionIndex(WclapThread &thread, wasmtime_val_t fnVal, uint64_t &fnP) {
-		thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
+	
+	if (fnP == 0) {
+		fnP = WasmP(fnIndex);
+	} else if (fnP != fnIndex) {
+		fnP = WasmP(-1);
+		return wclapSetError(wclap, "index mismatch when registering function");
 	}
 }
 
+void WclapThreadImpl::registerFunctionIndex(Wclap &wclap, wasmtime_val_t fnVal, uint32_t &fnP) {
+	implRegisterFunctionIndex(*this, wclap, fnVal, fnP);
+}
+void WclapThreadImpl::registerFunctionIndex(Wclap &wclap, wasmtime_val_t fnVal, uint64_t &fnP) {
+	implRegisterFunctionIndex(*this, wclap, fnVal, fnP);
+}
+
+void WclapThreadImpl::setWasmDeadline() {
+	if (timeLimitEpochs) wasmtime_context_set_epoch_deadline(context, timeLimitEpochs);
+}
+
+void WclapThreadImpl::callWasmFnP(Wclap &wclap, uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
+	wasmtime_val_t funcVal;
+	if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
+		return wclap.setError("function pointer doesn't resolve");
+	}
+	if (funcVal.kind != WASMTIME_FUNCREF) {
+		// Shouldn't ever happen, but who knows
+		return wclap.setError("function pointer doesn't resolve to a function");
+	}
+
+	setWasmDeadline();
+	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
+	if (error) {
+		logError(error);
+		return wclap.setError("calling function failed");
+	}
+	if (trap) {
+		logTrap(trap);
+		return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
+	}
+}
+	
 void WclapThread::implCreate() {
-	impl = new Impl();
+	impl = new WclapThreadImpl();
 }
 
 void WclapThread::implDestroy() {
@@ -48,10 +82,6 @@ void WclapThread::implDestroy() {
 	}
 	if (impl->linker) wasmtime_linker_delete(impl->linker);
 	if (impl->store) wasmtime_store_delete(impl->store);
-}
-
-void WclapThread::Impl::setWasmDeadline() {
-	if (timeLimitEpochs) wasmtime_context_set_epoch_deadline(context, timeLimitEpochs);
 }
 
 void WclapThread::startInstance() {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "wasmtime.h"
+#include "./common.h"
 
-namespace wclap { namespace _impl {
+namespace wclap {
 
 inline wasmtime_val_raw argToWasmVal(int32_t v) {
 	return {.i32=v};
@@ -23,74 +23,68 @@ inline wasmtime_val_raw argToWasmVal(double v) {
 	return {.f64=v};
 }
 
-void callWithThread(WclapThread &thread, uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);
-
-inline void callWasm_V(WclapThread &thread, uint64_t fnP) {
-	callWithThread(thread, fnP, nullptr, 0);
+inline void WclapThread::callWasm_V(uint64_t fnP) {
+	impl->callWasmFnP(wclap, fnP, nullptr, 0);
 }
 template<typename ...Args>
-void callWasm_V(WclapThread &thread, uint64_t fnP, Args ...args) {
+void WclapThread::callWasm_V(uint64_t fnP, Args ...args) {
 	wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-	callWithThread(thread, fnP, values, sizeof...(args));
+	impl->callWasmFnP(wclap, fnP, values, sizeof...(args));
 }
 
-inline int32_t callWasm_I(WclapThread &thread, uint64_t fnP) {
+inline int32_t WclapThread::callWasm_I(uint64_t fnP) {
 	wasmtime_val_raw values[1];
-	callWithThread(thread, fnP, values, 1);
+	impl->callWasmFnP(wclap, fnP, values, 1);
 	return values[0].i32;
 }
 template<typename ...Args>
-int32_t callWasm_I(WclapThread &thread, uint64_t fnP, Args ...args) {
+int32_t WclapThread::callWasm_I(uint64_t fnP, Args ...args) {
 	wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-	callWithThread(thread, fnP, values, sizeof...(args));
+	impl->callWasmFnP(wclap, fnP, values, sizeof...(args));
 	return values[0].i32;
 }
 
-inline int64_t callWasm_L(WclapThread &thread, uint64_t fnP) {
+inline int64_t WclapThread::callWasm_L(uint64_t fnP) {
 	wasmtime_val_raw values[1];
-	callWithThread(thread, fnP, values, 1);
+	impl->callWasmFnP(wclap, fnP, values, 1);
 	return values[0].i64;
 }
 template<typename ...Args>
-int64_t callWasm_L(WclapThread &thread, uint64_t fnP, Args ...args) {
+int64_t WclapThread::callWasm_L(uint64_t fnP, Args ...args) {
 	wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-	callWithThread(thread, fnP, values, sizeof...(args));
+	impl->callWasmFnP(wclap, fnP, values, sizeof...(args));
 	return values[0].i32;
 }
 
-inline float callWasm_F(WclapThread &thread, uint64_t fnP) {
+inline float WclapThread::callWasm_F(uint64_t fnP) {
 	wasmtime_val_raw values[1];
-	callWithThread(thread, fnP, values, 1);
+	impl->callWasmFnP(wclap, fnP, values, 1);
 	return values[0].f32;
 }
 template<typename ...Args>
-float callWasm_F(WclapThread &thread, uint64_t fnP, Args ...args) {
+float WclapThread::callWasm_F(uint64_t fnP, Args ...args) {
 	wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-	callWithThread(thread, fnP, values, sizeof...(args));
+	impl->callWasmFnP(wclap, fnP, values, sizeof...(args));
 	return values[0].f32;
 }
 
-inline double callWasm_D(WclapThread &thread, uint64_t fnP) {
+inline double WclapThread::callWasm_D(uint64_t fnP) {
 	wasmtime_val_raw values[1];
-	callWithThread(thread, fnP, values, 1);
+	impl->callWasmFnP(wclap, fnP, values, 1);
 	return values[0].f64;
 }
 template<typename ...Args>
-double callWasm_D(WclapThread &thread, uint64_t fnP, Args ...args) {
+double WclapThread::callWasm_D(uint64_t fnP, Args ...args) {
 	wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-	callWithThread(thread, fnP, values, sizeof...(args));
+	impl->callWasmFnP(wclap, fnP, values, sizeof...(args));
 	return values[0].f64;
 }
 
-wasmtime_context_t * contextForThread(WclapThread &thread);
-void registerFunctionIndex(WclapThread &thread, wasmtime_val_t fnVal, uint32_t &fnP);
-void registerFunctionIndex(WclapThread &thread, wasmtime_val_t fnVal, uint64_t &fnP);
-
-template<void nativeFn(uint32_t), typename WasmP>
-void registerFunction(WclapThread &thread, WasmP &fnP) {
+template<void nativeFn(Wclap &, uint32_t), typename WasmP>
+void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {
 		static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-			nativeFn(argsResults[0].i32);
+			nativeFn(*(Wclap *)env, argsResults[0].i32);
 			return nullptr;
 		}
 	};
@@ -102,15 +96,15 @@ void registerFunction(WclapThread &thread, WasmP &fnP) {
 	wasm_functype_t *fnType = wasm_functype_new(&params, &results);
 
 	wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-	wasmtime_func_new_unchecked(contextForThread(thread), fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-	registerFunctionIndex(thread, fnVal, fnP);
+	wasmtime_func_new_unchecked(thread.impl->context, fnType, S::unchecked, &thread.wclap, nullptr, &fnVal.of.funcref);
+	thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 }
 
-template<uint32_t nativeFn(uint32_t, uint32_t), typename WasmP>
-void registerFunction(WclapThread &thread, WasmP &fnP) {
+template<uint32_t nativeFn(Wclap &, uint32_t, uint32_t), typename WasmP>
+void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {
 		static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-			argsResults[0].i32 = nativeFn(argsResults[0].i32, argsResults[1].i32);
+			argsResults[0].i32 = nativeFn(*(Wclap *)env, argsResults[0].i32, argsResults[1].i32);
 			return nullptr;
 		}
 	};
@@ -124,15 +118,15 @@ void registerFunction(WclapThread &thread, WasmP &fnP) {
 	wasm_functype_t *fnType = wasm_functype_new(&params, &results);
 
 	wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-	wasmtime_func_new_unchecked(contextForThread(thread), fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-	registerFunctionIndex(thread, fnVal, fnP);
+	wasmtime_func_new_unchecked(thread.impl->context, fnType, S::unchecked, &thread.wclap, nullptr, &fnVal.of.funcref);
+	thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 }
 
-template<void nativeFn(uint64_t), typename WasmP>
-void registerFunction(WclapThread &thread, WasmP &fnP) {
+template<void nativeFn(Wclap &, uint64_t), typename WasmP>
+void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {
 		static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-			nativeFn(argsResults[0].i64);
+			nativeFn(*(Wclap *)env, argsResults[0].i64);
 			return nullptr;
 		}
 	};
@@ -144,15 +138,15 @@ void registerFunction(WclapThread &thread, WasmP &fnP) {
 	wasm_functype_t *fnType = wasm_functype_new(&params, &results);
 
 	wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-	wasmtime_func_new_unchecked(contextForThread(thread), fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-	registerFunctionIndex(thread, fnVal, fnP);
+	wasmtime_func_new_unchecked(thread.impl->context, fnType, S::unchecked, &thread.wclap, nullptr, &fnVal.of.funcref);
+	thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 }
 
-template<uint64_t nativeFn(uint64_t, uint64_t), typename WasmP>
-void registerFunction(WclapThread &thread, WasmP &fnP) {
+template<uint64_t nativeFn(Wclap &, uint64_t, uint64_t), typename WasmP>
+void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {
 		static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-			argsResults[0].i64 = nativeFn(argsResults[0].i64, argsResults[1].i64);
+			argsResults[0].i64 = nativeFn(*(Wclap *)env, argsResults[0].i64, argsResults[1].i64);
 			return nullptr;
 		}
 	};
@@ -166,8 +160,13 @@ void registerFunction(WclapThread &thread, WasmP &fnP) {
 	wasm_functype_t *fnType = wasm_functype_new(&params, &results);
 
 	wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-	wasmtime_func_new_unchecked(contextForThread(thread), fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-	registerFunctionIndex(thread, fnVal, fnP);
+	wasmtime_func_new_unchecked(thread.impl->context, fnType, S::unchecked, &thread.wclap, nullptr, &fnVal.of.funcref);
+	thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 }
 
-}} // namespace
+template<typename FnStruct>
+void WclapThread::registerFunction(FnStruct &fnStruct) {
+	registerFunctionOnThread<FnStruct::native>(*this, fnStruct.wasmP);
+}
+
+} // namespace

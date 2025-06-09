@@ -158,26 +158,63 @@ struct WclapMethods {
 	}
 	
 	struct {
-		static uint32_t some_dummy_method_fn() {
-			return 5;
-		}
-		WasmP some_dummy_method = 0;
+		struct {
+			WasmP wasmP;
+			static WasmP native(Wclap &wclap, WasmP hostP, WasmP extStr) {
+				auto scoped = wclap.lockThread();
+				auto reset = scoped.arenas.scopedNativeReset();
+				const char *extNativeStr = wasmToNative<const char>(scoped, extStr);
+				if (!extNativeStr) return 0;
+
+				auto view = scoped.view<wclap_host>(hostP);
+				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
+				if (!boundArenas) return 0;
+
+				auto *host = (const clap_host *)boundArenas->proxied_clap_host;
+				if (!host) return 0;
+
+				const void *nativeExt = host->get_extension(host, extNativeStr);
+				std::cout << "native - host.get_extension(" << extNativeStr << ") = " << nativeExt << "\n";
+				return 0;
+			}
+		} get_extension;
+
+		struct {
+			WasmP wasmP;
+			static void native(Wclap &wclap, WasmP) {
+				std::cout << "host.request_restart()\n";
+			}
+		} request_restart;
+		struct {
+			WasmP wasmP;
+			static void native(Wclap &wclap, WasmP) {
+				std::cout << "host.request_process()\n";
+			}
+		} request_process;
+		struct {
+			WasmP wasmP;
+			static void native(Wclap &wclap, WasmP) {
+				std::cout << "host.request_callback()\n";
+			}
+		} request_callback;
 
 		void registerMethods(WclapThread &thread) {
-			// This should add to the WASM instance's function table, and store (or compare) the index, so it can be used
-			//thread.addHostMethod_I(some_dummy_method, some_dummy_method_fn);
+			thread.registerFunction(get_extension);
+			thread.registerFunction(request_restart);
+			thread.registerFunction(request_process);
+			thread.registerFunction(request_callback);
 		}
-	} host_example_struct_dummy;
+	} host;
 	
 	struct {
 		WasmP wasmP;
-		static void native(WasmP) {
+		static void native(Wclap &wclap, WasmP) {
 			std::cout << "unimplemented V(P)\n";
 		}
 	} notImplementedVP;
 	struct {
 		WasmP wasmP;
-		static WasmP native(WasmP, WasmP) {
+		static WasmP native(Wclap &wclap, WasmP, WasmP) {
 			std::cout << "unimplemented P(PP)\n";
 			return 0;
 		}
@@ -187,7 +224,7 @@ struct WclapMethods {
 		thread.registerFunction(notImplementedVP);
 		thread.registerFunction(notImplementedPPP);
 
-		host_example_struct_dummy.registerMethods(thread);
+		host.registerMethods(thread);
 	}
 };
 
@@ -387,10 +424,10 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 
 	// Methods don't exist yet - this will probably crash
 	auto &methods = scoped.wclap.methods(wasmP);
-	view.get_extension() = methods.notImplementedPPP.wasmP;
-	view.request_restart() = methods.notImplementedVP.wasmP;
-	view.request_process() = methods.notImplementedVP.wasmP;
-	view.request_callback() = methods.notImplementedVP.wasmP;
+	view.get_extension() = methods.host.get_extension.wasmP;
+	view.request_restart() = methods.host.request_restart.wasmP;
+	view.request_process() = methods.host.request_process.wasmP;
+	view.request_callback() = methods.host.request_callback.wasmP;
 }
 
 template<>

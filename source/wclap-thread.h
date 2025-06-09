@@ -4,12 +4,6 @@
 
 #include "./wclap-arenas.h"
 
-#ifdef WCLAP_ENGINE_WASMTIME
-#	include "./wasmtime/call-wasm.h"
-#else
-#	error No WASM engine selected
-#endif
-
 #include <fstream>
 #include <vector>
 #include <mutex>
@@ -18,6 +12,8 @@ namespace wclap {
 
 struct Wclap;
 void wclapSetError(Wclap &, const char *message);
+
+struct WclapThreadImpl;
 
 struct WclapThread {
 	Wclap &wclap;
@@ -46,26 +42,25 @@ struct WclapThread {
 		P: pointer (deduce from the function-pointer size)
 	*/
 	
+	inline void callWasm_V(uint64_t fnP);
 	template<typename ...Args>
-	void callWasm_V(uint64_t fnP, Args ...args) {
-		_impl::callWasm_V(*this, fnP, args...);
-	}
+	void callWasm_V(uint64_t fnP, Args ...args);
+
+	inline int32_t callWasm_I(uint64_t fnP);
 	template<typename ...Args>
-	int32_t callWasm_I(uint64_t fnP, Args ...args) {
-		return _impl::callWasm_I(*this, fnP, args...);
-	}
+	int32_t callWasm_I(uint64_t fnP, Args ...args);
+	
+	inline int64_t callWasm_L(uint64_t fnP);
 	template<typename ...Args>
-	int64_t callWasm_L(uint64_t fnP, Args ...args) {
-		return _impl::callWasm_L(*this, fnP, args...);
-	}
+	int64_t callWasm_L(uint64_t fnP, Args ...args);
+
+	inline float callWasm_F(uint64_t fnP);
 	template<typename ...Args>
-	float callWasm_F(uint64_t fnP, Args ...args) {
-		return _impl::callWasm_F(*this, fnP, args...);
-	}
+	float callWasm_F(uint64_t fnP, Args ...args);
+
+	inline double callWasm_D(uint64_t fnP);
 	template<typename ...Args>
-	double callWasm_D(uint64_t fnP, Args ...args) {
-		return _impl::callWasm_D(*this, fnP, args...);
-	}
+	double callWasm_D(uint64_t fnP, Args ...args);
 	
 	template<class ...Args>
 	uint32_t callWasm_P(uint32_t fnP, Args ...args) {
@@ -76,13 +71,11 @@ struct WclapThread {
 		return callWasm_L(fnP, std::forward<Args>(args)...);
 	}
 
+	/* FnStruct has a `.wasmP` pointer and a `.native()` function */
 	template<typename FnStruct>
-	void registerFunction(FnStruct &fnStruct) {
-		_impl::registerFunction<FnStruct::native>(*this, fnStruct.wasmP);
-	}
+	void registerFunction(FnStruct &fnStruct);
 
-	struct Impl;
-	Impl *impl;
+	WclapThreadImpl *impl;
 
 private:
 	void startInstance();
@@ -99,3 +92,8 @@ struct WclapThreadWithArenas : public WclapThread {
 
 } // namespace
 
+#ifdef WCLAP_ENGINE_WASMTIME
+#	include "./wasmtime/wclap-thread-impl.h"
+#else
+#	error No WASM engine selected
+#endif

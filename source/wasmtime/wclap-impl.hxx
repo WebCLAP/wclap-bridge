@@ -9,7 +9,7 @@
 #include "../wclap32/wclap-translation.h"
 #include "../wclap64/wclap-translation.h"
 
-#include "./wclap-impl-wasmtime.h"
+#include "./common.h"
 
 #include <thread>
 #include <atomic>
@@ -89,7 +89,7 @@ static bool nameEquals(const wasm_name_t *name, const char *cName) {
 //---------- Common Wclap instance ----------//
 
 void Wclap::implCreate() {
-	impl = new Impl();
+	impl = new WclapImpl();
 }
 
 void Wclap::implDestroy() {

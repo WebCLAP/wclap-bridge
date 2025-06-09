@@ -22,6 +22,8 @@ struct WclapThread;
 struct WclapThreadWithArenas;
 struct ScopedThread;
 
+struct WclapImpl;
+
 namespace wclap32 {
 	struct WclapMethods;
 }
@@ -88,8 +90,7 @@ struct Wclap {
 		return *methods64;
 	}
 
-	struct Impl;
-	Impl *impl = nullptr;
+	WclapImpl *impl = nullptr;
 
 	bool wasm64 = false;
 private:
@@ -122,3 +123,9 @@ private:
 void wclapSetError(Wclap &wclap, const char *message);
 
 } // namespace
+
+#ifdef WCLAP_ENGINE_WASMTIME
+#	include "./wasmtime/wclap-impl.h"
+#else
+#	error No WASM engine selected
+#endif

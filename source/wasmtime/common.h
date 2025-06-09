@@ -37,13 +37,13 @@ inline bool trapIsTimeout(const wasm_trap_t *trap) {
 
 //---------- Actual implementations ----------
 
-struct Wclap::Impl {
+struct WclapImpl {
 	wasmtime_module_t *module = nullptr;
 	wasmtime_error_t *error = nullptr;
 	wasmtime_sharedmemory_t *sharedMemory = nullptr;
 };
 
-struct WclapThread::Impl {
+struct WclapThreadImpl {
 	// We should delete these (in reverse order) if they're defined
 	wasmtime_store_t *store = nullptr;
 	wasmtime_linker_t *linker = nullptr;
@@ -57,47 +57,11 @@ struct WclapThread::Impl {
 	wasmtime_func_t mallocFunc; // direct export
 	wasmtime_instance_t instance;
 
+	void registerFunctionIndex(Wclap &wclap, wasmtime_val_t fnVal, uint32_t &fnP);
+	void registerFunctionIndex(Wclap &wclap, wasmtime_val_t fnVal, uint64_t &fnP);
+
 	void setWasmDeadline();
-
-	template<typename WasmP>
-	void registerFunctionIndex(Wclap &wclap, wasmtime_val_t fnVal, WasmP &fnP) {
-		uint64_t fnIndex = WasmP(-1);
-		error = wasmtime_table_grow(context, &functionTable, 1, &fnVal, &fnIndex);
-		if (error) {
-			fnP = WasmP(-1);
-			logError(error);
-			return wclapSetError(wclap, "failed to register function");
-		}
-		
-		if (fnP == 0) {
-			fnP = WasmP(fnIndex);
-		} else if (fnP != fnIndex) {
-			fnP = WasmP(-1);
-			return wclapSetError(wclap, "index mismatch when registering function");
-		}
-	}
-
-	void callWasmFnP(Wclap &wclap, uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-		wasmtime_val_t funcVal;
-		if (!wasmtime_table_get(context, &functionTable, fnP, &funcVal)) {
-			return wclap.setError("function pointer doesn't resolve");
-		}
-		if (funcVal.kind != WASMTIME_FUNCREF) {
-			// Shouldn't ever happen, but who knows
-			return wclap.setError("function pointer doesn't resolve to a function");
-		}
-
-		setWasmDeadline();
-		error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
-		if (error) {
-			logError(error);
-			return wclap.setError("calling function failed");
-		}
-		if (trap) {
-			logTrap(trap);
-			return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");
-		}
-	}
+	void callWasmFnP(Wclap &wclap, uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);
 };
 
 } // namespace

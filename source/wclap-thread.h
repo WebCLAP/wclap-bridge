@@ -1,6 +1,5 @@
 #pragma once
 
-#include "wasmtime.h"
 #include "clap/all.h"
 
 #include "./wclap-arenas.h"
@@ -11,75 +10,34 @@
 
 namespace wclap {
 
-extern unsigned int timeLimitEpochs;
-
 struct Wclap;
 void wclapSetError(Wclap &, const char *message);
-
-inline bool trapIsTimeout(const wasm_trap_t *trap) {
-	wasmtime_trap_code_t code;
-	return wasmtime_trap_code(trap, &code) && code == WASMTIME_TRAP_CODE_INTERRUPT;
-}
 
 struct WclapThread {
 	Wclap &wclap;
 	std::mutex mutex;
 
-	// We should delete these (in reverse order) if they're defined
-	wasmtime_store_t *store = nullptr;
-	wasmtime_linker_t *linker = nullptr;
-	wasmtime_error_t *error = nullptr;
-
-	// Maybe defined, but not our job to delete it
-	wasmtime_context_t *context = nullptr;
-	wasm_trap_t *trap = nullptr;
-	wasmtime_memory_t memory;
-	wasmtime_table_t functionTable;
-	wasmtime_func_t mallocFunc; // direct export
+	struct Impl;
+	Impl *impl;
+	void implCreate();
+	void implDestroy();
 
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
-	wasmtime_instance_t instance;
 	
 	WclapThread(Wclap &wclap);
 	~WclapThread();
 	
-	static void logMessage(const wasm_message_t &message) {
-		for (size_t i = 0; i < message.size; ++i) {
-			std::cout << message.data[i];
-		}
-		std::cout << std::endl;
-	}
-	
-	static void logError(const wasmtime_error_t *error) {
-		wasm_message_t message;
-		wasmtime_error_message(error, &message);
-		logMessage(message);
-		wasm_byte_vec_delete(&message);
-	}
-	
-	static void logTrap(const wasm_trap_t *trap) {
-		wasm_message_t message;
-		wasm_trap_message(trap, &message);
-		logMessage(message);
-		wasm_byte_vec_delete(&message);
-	}
-
 	uint64_t wasmMalloc(size_t bytes);
-	
-	void setWasmDeadline() {
-		if (timeLimitEpochs) wasmtime_context_set_epoch_deadline(context, timeLimitEpochs);
-	}
 	
 	void callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);
 	
-	/* Function call signatures: (return) (args...)
+	/* Function call return types:
 		V: void
 		I: int32
 		L: int64
 		F: float
 		D: double
-		P: pointer (32-bit for now, but listed separately for future 64-bit compatibility)
-		S: string (
+		P: pointer (deduce from the function-pointer size)
 	*/
 
 	void callWasm_V(uint64_t fnP) {

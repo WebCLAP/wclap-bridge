@@ -1,6 +1,5 @@
 #pragma once
 
-#include "wasmtime.h"
 #include "clap/all.h"
 
 #include "./wclap-proxies.h"
@@ -15,17 +14,9 @@
 
 namespace wclap {
 
-extern std::atomic<wasm_engine_t *> global_wasm_engine;
 extern const char *wclap_error_message;
 extern std::string wclap_error_message_string;
-
-static bool nameEquals(const wasm_name_t *name, const char *cName) {
-	if (name->size != std::strlen(cName)) return false;
-	for (size_t i = 0; i < name->size; ++i) {
-		if (name->data[i] != cName[i]) return false;
-	}
-	return true;
-}
+extern std::atomic_flag global_config_ready;
 
 struct WclapThread;
 struct WclapThreadWithArenas;
@@ -60,6 +51,8 @@ struct Wclap {
 
 	void initWasmBytes(const uint8_t *bytes, size_t size);
 	void deinit();
+	
+	bool singleThreaded() const;
 
 	// obtains a thread for realtime calls by removing from the pool, or creating if needed
 	std::unique_ptr<WclapThread> claimRealtimeThread();
@@ -96,13 +89,13 @@ struct Wclap {
 	}
 private:
 	bool initSuccess = false;
-
-	// Wasmtime stuff
 	friend class WclapThread;
-	wasmtime_module_t *module = nullptr;
-	wasmtime_error_t *error = nullptr;
 	bool wasm64 = false;
-	wasmtime_sharedmemory_t *sharedMemory = nullptr;
+
+	struct Impl;
+	Impl *impl = nullptr;
+	void implCreate();
+	void implDestroy();
 
 	wclap32::WclapMethods *methods32 = nullptr;
 	wclap64::WclapMethods *methods64 = nullptr;

@@ -169,19 +169,23 @@ struct WclapMethods {
 		}
 	} host_example_struct_dummy;
 	
-	static void notImplementedFnVP(WasmP) {
-		std::cout << "unimplemented V(P)\n";
-	}
-	static WasmP notImplementedFnPPP(WasmP, WasmP) {
-		std::cout << "unimplemented P(PP)\n";
-		return 0;
-	}
-	WasmP notImplementedVP = 0;
-	WasmP notImplementedPPP = 0;
+	struct {
+		WasmP wasmP;
+		static void native(WasmP) {
+			std::cout << "unimplemented V(P)\n";
+		}
+	} notImplementedVP;
+	struct {
+		WasmP wasmP;
+		static WasmP native(WasmP, WasmP) {
+			std::cout << "unimplemented P(PP)\n";
+			return 0;
+		}
+	} notImplementedPPP;
 	
 	void registerHostMethods(WclapThread &thread) {
-		thread.registerFunction<notImplementedFnVP>(notImplementedVP);
-		thread.registerFunction<notImplementedFnPPP>(notImplementedPPP);
+		thread.registerFunction(notImplementedVP);
+		thread.registerFunction(notImplementedPPP);
 
 		host_example_struct_dummy.registerMethods(thread);
 	}
@@ -383,10 +387,10 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 
 	// Methods don't exist yet - this will probably crash
 	auto &methods = scoped.wclap.methods(wasmP);
-	view.get_extension() = methods.notImplementedPPP;
-	view.request_restart() = methods.notImplementedVP;
-	view.request_process() = methods.notImplementedVP;
-	view.request_callback() = methods.notImplementedVP;
+	view.get_extension() = methods.notImplementedPPP.wasmP;
+	view.request_restart() = methods.notImplementedVP.wasmP;
+	view.request_process() = methods.notImplementedVP.wasmP;
+	view.request_callback() = methods.notImplementedVP.wasmP;
 }
 
 template<>

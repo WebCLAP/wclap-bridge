@@ -87,13 +87,14 @@ struct Wclap {
 	wclap64::WclapMethods & methods(uint64_t) {
 		return *methods64;
 	}
-private:
-	bool initSuccess = false;
-	friend class WclapThread;
-	bool wasm64 = false;
 
 	struct Impl;
 	Impl *impl = nullptr;
+
+	bool wasm64 = false;
+private:
+	bool initSuccess = false;
+
 	void implCreate();
 	void implDestroy();
 

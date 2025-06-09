@@ -13,10 +13,6 @@
 
 namespace wclap {
 
-WclapThread::WclapThread(Wclap &wclap) : wclap(wclap) {
-	startInstance();
-}
-
 WclapThreadWithArenas::WclapThreadWithArenas(Wclap &wclap) : WclapThread(wclap) {
 	arenas = wclap.claimArenas(this);
 }

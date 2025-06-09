@@ -16,14 +16,6 @@ namespace wclap {
 
 std::atomic_flag global_config_ready = ATOMIC_FLAG_INIT;
 
-static bool nameEquals(const wasm_name_t *name, const char *cName) {
-	if (name->size != std::strlen(cName)) return false;
-	for (size_t i = 0; i < name->size; ++i) {
-		if (name->data[i] != cName[i]) return false;
-	}
-	return true;
-}
-
 //---------- Common Wclap instance ----------//
 
 Wclap::Wclap(const std::string &wclapDir, const std::string &presetDir, const std::string &cacheDir, const std::string &varDir, bool mustLinkDirs) : wclapDir(wclapDir), presetDir(presetDir), cacheDir(cacheDir), varDir(varDir), mustLinkDirs(mustLinkDirs) {

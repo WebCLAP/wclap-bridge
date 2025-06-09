@@ -17,20 +17,20 @@ struct WclapThread {
 	Wclap &wclap;
 	std::mutex mutex;
 
-	struct Impl;
-	Impl *impl;
-	void implCreate();
-	void implDestroy();
-
 	uint64_t clapEntryP64 = 0; // WASM pointer to clap_entry - might actually be 32-bit
 	
-	WclapThread(Wclap &wclap);
-	~WclapThread();
-	
+	WclapThread(Wclap &wclap) : wclap(wclap) {
+		implCreate();
+		startInstance();
+	}
+	~WclapThread() {
+		implDestroy();
+	}
+
+	void wasmInit();
+
 	uint64_t wasmMalloc(size_t bytes);
-	
-	void callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);
-	
+
 	/* Function call return types:
 		V: void
 		I: int32
@@ -40,195 +40,111 @@ struct WclapThread {
 		P: pointer (deduce from the function-pointer size)
 	*/
 
-	void callWasm_V(uint64_t fnP) {
-		callWasmFnP(fnP, nullptr, 0);
-	}
+	void callWasm_V(uint64_t fnP);
 	template<typename ...Args>
-	void callWasm_V(uint64_t fnP, Args ...args) {
-		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-		callWasmFnP(fnP, values, sizeof...(args));
-	}
+	void callWasm_V(uint64_t fnP, Args ...args);
 
-	int32_t callWasm_I(uint64_t fnP) {
-		wasmtime_val_raw values[1];
-		callWasmFnP(fnP, values, 1);
-		return values[0].i32;
-	}
+	int32_t callWasm_I(uint64_t fnP);
 	template<typename ...Args>
-	int32_t callWasm_I(uint64_t fnP, Args ...args) {
-		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-		callWasmFnP(fnP, values, sizeof...(args));
-		return values[0].i32;
-	}
+	int32_t callWasm_I(uint64_t fnP, Args ...args);
 	
-	int64_t callWasm_L(uint64_t fnP) {
-		wasmtime_val_raw values[1];
-		callWasmFnP(fnP, values, 1);
-		return values[0].i64;
-	}
+	int64_t callWasm_L(uint64_t fnP);
 	template<typename ...Args>
-	int64_t callWasm_L(uint64_t fnP, Args ...args) {
-		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-		callWasmFnP(fnP, values, sizeof...(args));
-		return values[0].i32;
-	}
+	int64_t callWasm_L(uint64_t fnP, Args ...args);
 
-	float callWasm_F(uint64_t fnP) {
-		wasmtime_val_raw values[1];
-		callWasmFnP(fnP, values, 1);
-		return values[0].f32;
-	}
+	float callWasm_F(uint64_t fnP);
 	template<typename ...Args>
-	float callWasm_F(uint64_t fnP, Args ...args) {
-		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-		callWasmFnP(fnP, values, sizeof...(args));
-		return values[0].f32;
-	}
+	float callWasm_F(uint64_t fnP, Args ...args);
 
-	double callWasm_D(uint64_t fnP) {
-		wasmtime_val_raw values[1];
-		callWasmFnP(fnP, values, 1);
-		return values[0].f64;
-	}
+	double callWasm_D(uint64_t fnP);
 	template<typename ...Args>
-	double callWasm_D(uint64_t fnP, Args ...args) {
-		wasmtime_val_raw values[sizeof...(args)] = {argToWasmVal(args)...};
-		callWasmFnP(fnP, values, sizeof...(args));
-		return values[0].f64;
-	}
+	double callWasm_D(uint64_t fnP, Args ...args);
+	
+// generates all 1700 callWasm_? templates up to 4 arguments
+#define WCLAP_CALLWASM_ARG4(Template, prefix, typeP, type0, type1, type2, type3, type4) // stop here
+
+#define WCLAP_CALLWASM_ARG3(Template, prefix, typeP, type0, type1, type2, type3) \
+	Template void prefix callWasm_V<type0, type1, type2, type3>(typeP, type0, type1, type2, type3); \
+	Template int32_t prefix callWasm_I<type0, type1, type2, type3>(typeP, type0, type1, type2, type3); \
+	Template int64_t prefix callWasm_L<type0, type1, type2, type3>(typeP, type0, type1, type2, type3); \
+	Template float prefix callWasm_F<type0, type1, type2, type3>(typeP, type0, type1, type2, type3); \
+	Template double prefix callWasm_D<type0, type1, type2, type3>(typeP, type0, type1, type2, type3); \
+	WCLAP_CALLWASM_ARG4(Template, prefix, typeP, type0, type1, type2, type3, uint32_t)\
+	WCLAP_CALLWASM_ARG4(Template, prefix, typeP, type0, type1, type2, type3, uint64_t)\
+	WCLAP_CALLWASM_ARG4(Template, prefix, typeP, type0, type1, type2, type3, float)\
+	WCLAP_CALLWASM_ARG4(Template, prefix, typeP, type0, type1, type2, type3, double)
+
+#define WCLAP_CALLWASM_ARG2(Template, prefix, typeP, type0, type1, type2) \
+	Template void prefix callWasm_V<type0, type1, type2>(typeP, type0, type1, type2); \
+	Template int32_t prefix callWasm_I<type0, type1, type2>(typeP, type0, type1, type2); \
+	Template int64_t prefix callWasm_L<type0, type1, type2>(typeP, type0, type1, type2); \
+	Template float prefix callWasm_F<type0, type1, type2>(typeP, type0, type1, type2); \
+	Template double prefix callWasm_D<type0, type1, type2>(typeP, type0, type1, type2); \
+	WCLAP_CALLWASM_ARG3(Template, prefix, typeP, type0, type1, type2, uint32_t)\
+	WCLAP_CALLWASM_ARG3(Template, prefix, typeP, type0, type1, type2, uint64_t)\
+	WCLAP_CALLWASM_ARG3(Template, prefix, typeP, type0, type1, type2, float)\
+	WCLAP_CALLWASM_ARG3(Template, prefix, typeP, type0, type1, type2, double)
+
+#define WCLAP_CALLWASM_ARG1(Template, prefix, typeP, type0, type1) \
+	Template void prefix callWasm_V<type0, type1>(typeP, type0, type1); \
+	Template int32_t prefix callWasm_I<type0, type1>(typeP, type0, type1); \
+	Template int64_t prefix callWasm_L<type0, type1>(typeP, type0, type1); \
+	Template float prefix callWasm_F<type0, type1>(typeP, type0, type1); \
+	Template double prefix callWasm_D<type0, type1>(typeP, type0, type1); \
+	WCLAP_CALLWASM_ARG2(Template, prefix, typeP, type0, type1, uint32_t)\
+	WCLAP_CALLWASM_ARG2(Template, prefix, typeP, type0, type1, uint64_t)\
+	WCLAP_CALLWASM_ARG2(Template, prefix, typeP, type0, type1, float)\
+	WCLAP_CALLWASM_ARG2(Template, prefix, typeP, type0, type1, double)
+
+#define WCLAP_CALLWASM_ARG0(Template, prefix, typeP, type0) \
+	Template void prefix callWasm_V<type0>(typeP, type0); \
+	Template int32_t prefix callWasm_I<type0>(typeP, type0); \
+	Template int64_t prefix callWasm_L<type0>(typeP, type0); \
+	Template float prefix callWasm_F<type0>(typeP, type0); \
+	Template double prefix callWasm_D<type0>(typeP, type0); \
+	WCLAP_CALLWASM_ARG1(Template, prefix, typeP, type0, uint32_t)\
+	WCLAP_CALLWASM_ARG1(Template, prefix, typeP, type0, uint64_t)\
+	WCLAP_CALLWASM_ARG1(Template, prefix, typeP, type0, float)\
+	WCLAP_CALLWASM_ARG1(Template, prefix, typeP, type0, double)
+
+#define WCLAP_CALLWASM_PTYPE(Template, prefix, typeP) \
+	WCLAP_CALLWASM_ARG0(Template, prefix, typeP, uint32_t) \
+	WCLAP_CALLWASM_ARG0(Template, prefix, typeP, uint64_t) \
+	WCLAP_CALLWASM_ARG0(Template, prefix, typeP, float) \
+	WCLAP_CALLWASM_ARG0(Template, prefix, typeP, double)
+
+// Everything gets cast to 64-bit index - only the `callWasm_P()` ones care about the function pointer type
+#define WCLAP_CALLWASM_SPECIALISE(Template, prefix) \
+	WCLAP_CALLWASM_PTYPE(Template, prefix, uint64_t)
+
+	WCLAP_CALLWASM_SPECIALISE(template<>,);
 
 	template<class ...Args>
 	uint32_t callWasm_P(uint32_t fnP, Args ...args) {
-		return callWasm_I(fnP, std::forward<Args>(args)...);
+		return callWasm_I(uint64_t(fnP), std::forward<Args>(args)...);
 	}
 	template<class ...Args>
 	uint64_t callWasm_P(uint64_t fnP, Args ...args) {
 		return callWasm_L(fnP, std::forward<Args>(args)...);
 	}
-	
-	void wasmInit();
-	
-	template<typename WasmP>
-	void registerFunctionIndex(wasmtime_val_t fnVal, WasmP &fnP) {
-		uint64_t fnIndex = WasmP(-1);
-		error = wasmtime_table_grow(context, &functionTable, 1, &fnVal, &fnIndex);
-		if (error) {
-			fnP = WasmP(-1);
-			return wclapSetError(wclap, "failed to register function");
-		}
-		
-		if (fnP == 0) {
-			fnP = WasmP(fnIndex);
-		} else if (fnP != fnIndex) {
-			fnP = WasmP(-1);
-			return wclapSetError(wclap, "index mismatch when registering function");
-		}
-	}
-	
+
 	template<void nativeFn(uint32_t), typename WasmP>
-	void registerFunction(WasmP &fnP) {
-		struct S {
-			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-				nativeFn(argsResults[0].i32);
-				return nullptr;
-			}
-		};
-
-		wasm_valtype_vec_t params, results;
-		wasm_valtype_vec_new_uninitialized(&params, 1);
-		params.data[0] = wasm_valtype_new(WASM_I32);
-		wasm_valtype_vec_new_empty(&results);
-		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
-
-		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-		registerFunctionIndex(fnVal, fnP);
-	}
-
+	void registerFunction(WasmP &fnP);
 	template<uint32_t nativeFn(uint32_t, uint32_t), typename WasmP>
-	void registerFunction(WasmP &fnP) {
-		struct S {
-			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-				argsResults[0].i32 = nativeFn(argsResults[0].i32, argsResults[1].i32);
-				return nullptr;
-			}
-		};
-
-		wasm_valtype_vec_t params, results;
-		wasm_valtype_vec_new_uninitialized(&params, 2);
-		params.data[0] = wasm_valtype_new(WASM_I32);
-		params.data[1] = wasm_valtype_new(WASM_I32);
-		wasm_valtype_vec_new_uninitialized(&results, 1);
-		results.data[0] = wasm_valtype_new(WASM_I32);
-		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
-
-		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-		registerFunctionIndex(fnVal, fnP);
-	}
-
+	void registerFunction(WasmP &fnP);
 	template<void nativeFn(uint64_t), typename WasmP>
-	void registerFunction(WasmP &fnP) {
-		struct S {
-			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-				nativeFn(argsResults[0].i64);
-				return nullptr;
-			}
-		};
-
-		wasm_valtype_vec_t params, results;
-		wasm_valtype_vec_new_uninitialized(&params, 1);
-		params.data[0] = wasm_valtype_new(WASM_I64);
-		wasm_valtype_vec_new_empty(&results);
-		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
-
-		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-		registerFunctionIndex(fnVal, fnP);
-	}
-
+	void registerFunction(WasmP &fnP);
 	template<uint64_t nativeFn(uint64_t, uint64_t), typename WasmP>
-	void registerFunction(WasmP &fnP) {
-		struct S {
-			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
-				argsResults[0].i64 = nativeFn(argsResults[0].i64, argsResults[1].i64);
-				return nullptr;
-			}
-		};
-
-		wasm_valtype_vec_t params, results;
-		wasm_valtype_vec_new_uninitialized(&params, 2);
-		params.data[0] = wasm_valtype_new(WASM_I64);
-		params.data[1] = wasm_valtype_new(WASM_I64);
-		wasm_valtype_vec_new_uninitialized(&results, 1);
-		results.data[0] = wasm_valtype_new(WASM_I64);
-		wasm_functype_t *fnType = wasm_functype_new(&params, &results);
-
-		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-		wasmtime_func_new_unchecked(context, fnType, S::unchecked, nullptr, nullptr, &fnVal.of.funcref);
-		registerFunctionIndex(fnVal, fnP);
-	}
+	void registerFunction(WasmP &fnP);
 private:
+	friend class Wclap;
+
 	void startInstance();
 
-	wasmtime_val_raw argToWasmVal(int32_t v) {
-		return {.i32=v};
-	}
-	wasmtime_val_raw argToWasmVal(uint32_t v) {
-		return {.i32=int32_t(v)};
-	}
-	wasmtime_val_raw argToWasmVal(int64_t v) {
-		return {.i64=v};
-	}
-	wasmtime_val_raw argToWasmVal(uint64_t v) {
-		return {.i64=int64_t(v)};
-	}
-	wasmtime_val_raw argToWasmVal(float v) {
-		return {.f32=v};
-	}
-	wasmtime_val_raw argToWasmVal(double v) {
-		return {.f64=v};
-	}
+	struct Impl;
+	Impl *impl;
+	void implCreate();
+	void implDestroy();
 };
 
 struct WclapThreadWithArenas : public WclapThread {
@@ -238,3 +154,4 @@ struct WclapThreadWithArenas : public WclapThread {
 };
 
 } // namespace
+

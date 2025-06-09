@@ -47,7 +47,7 @@ struct ScopedThread {
 		ArrayView(ScopedThread &scoped, uint64_t wasmP) : scoped(scoped), wasmP(wasmP) {}
 	
 		AutoTranslatedStruct operator[](size_t index) {
-			return scoped.view<AutoTranslatedStruct>(wasmP + index*AutoTranslatedStruct::wasmArraySize);
+			return scoped.view<AutoTranslatedStruct>(wasmP + index*AutoTranslatedStruct::wasmSize);
 		}
 		
 		operator bool() const {
@@ -71,7 +71,7 @@ struct ScopedThread {
 
 	template<class AutoTranslatedStruct, typename WasmP>
 	ArrayView<AutoTranslatedStruct> createArray(size_t count, WasmP &wasmP) {
-		auto bytes = wasmBytes(AutoTranslatedStruct::wasmArraySize*count, AutoTranslatedStruct::wasmAlign);;
+		auto bytes = wasmBytes(AutoTranslatedStruct::wasmSize*count, AutoTranslatedStruct::wasmAlign);;
 		wasmP = WasmP(bytes);
 		return arrayView<AutoTranslatedStruct>(bytes);
 	}

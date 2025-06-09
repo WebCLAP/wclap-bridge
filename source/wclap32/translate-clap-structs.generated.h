@@ -9,7 +9,6 @@ struct wclap_host {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 48;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -129,7 +128,6 @@ struct wclap_event_param_value {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 42;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -193,7 +191,6 @@ struct wclap_event_param_mod {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 42;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -263,7 +260,6 @@ struct wclap_event_midi_sysex {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 26;
-	static constexpr size_t wasmArraySize = 28;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -313,7 +309,6 @@ struct wclap_input_events {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -382,7 +377,6 @@ struct wclap_output_events {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -436,7 +430,6 @@ struct wclap_audio_buffer {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 24;
-	static constexpr size_t wasmArraySize = 24;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -488,7 +481,6 @@ struct wclap_process {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 40;
-	static constexpr size_t wasmArraySize = 40;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -556,7 +548,6 @@ struct wclap_plugin_descriptor {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 48;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -628,7 +619,6 @@ struct wclap_plugin {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 48;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -806,7 +796,6 @@ struct wclap_plugin_factory {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -894,7 +883,6 @@ struct wclap_universal_plugin_id {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -934,7 +922,6 @@ struct wclap_preset_discovery_metadata_receiver {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 44;
-	static constexpr size_t wasmArraySize = 44;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1128,7 +1115,6 @@ struct wclap_preset_discovery_filetype {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1172,7 +1158,6 @@ struct wclap_preset_discovery_location {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 16;
-	static constexpr size_t wasmArraySize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1220,7 +1205,6 @@ struct wclap_preset_discovery_soundpack {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 36;
-	static constexpr size_t wasmArraySize = 40;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1284,7 +1268,6 @@ struct wclap_preset_discovery_provider_descriptor {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 24;
-	static constexpr size_t wasmArraySize = 24;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1332,7 +1315,6 @@ struct wclap_preset_discovery_provider {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 24;
-	static constexpr size_t wasmArraySize = 24;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1438,7 +1420,6 @@ struct wclap_preset_discovery_indexer {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 48;
-	static constexpr size_t wasmArraySize = 48;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1567,7 +1548,6 @@ struct wclap_preset_discovery_factory {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1655,7 +1635,6 @@ struct wclap_plugin_entry {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 24;
-	static constexpr size_t wasmArraySize = 24;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1738,7 +1717,6 @@ struct wclap_istream {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1792,7 +1770,6 @@ struct wclap_ostream {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1848,7 +1825,6 @@ struct wclap_plugin_ambisonic {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1915,7 +1891,6 @@ struct wclap_host_ambisonic {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -1960,7 +1935,6 @@ struct wclap_audio_port_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 276;
-	static constexpr size_t wasmArraySize = 276;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2018,7 +1992,6 @@ struct wclap_plugin_audio_ports {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2081,7 +2054,6 @@ struct wclap_host_audio_ports {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2139,7 +2111,6 @@ struct wclap_plugin_audio_ports_activation {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2198,7 +2169,6 @@ struct wclap_audio_ports_config {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 286;
-	static constexpr size_t wasmArraySize = 288;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2272,7 +2242,6 @@ struct wclap_plugin_audio_ports_config {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2348,7 +2317,6 @@ struct wclap_plugin_audio_ports_config_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2411,7 +2379,6 @@ struct wclap_host_audio_ports_config {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2456,7 +2423,6 @@ struct wclap_audio_port_configuration_request {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 17;
-	static constexpr size_t wasmArraySize = 20;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2508,7 +2474,6 @@ struct wclap_plugin_configurable_audio_ports {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2577,7 +2542,6 @@ struct wclap_context_menu_entry {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 9;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2621,7 +2585,6 @@ struct wclap_context_menu_check_entry {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 10;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2669,7 +2632,6 @@ struct wclap_context_menu_item_title {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 5;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2709,7 +2671,6 @@ struct wclap_context_menu_submenu {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 5;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2749,7 +2710,6 @@ struct wclap_context_menu_builder {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2816,7 +2776,6 @@ struct wclap_plugin_context_menu {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2885,7 +2844,6 @@ struct wclap_host_context_menu {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 16;
-	static constexpr size_t wasmArraySize = 16;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -2984,7 +2942,6 @@ struct wclap_host_event_registry {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3038,7 +2995,6 @@ struct wclap_plugin_gui {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 60;
-	static constexpr size_t wasmArraySize = 60;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3306,7 +3262,6 @@ struct wclap_host_gui {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 20;
-	static constexpr size_t wasmArraySize = 20;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3402,7 +3357,6 @@ struct wclap_plugin_latency {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3448,7 +3402,6 @@ struct wclap_host_latency {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3493,7 +3446,6 @@ struct wclap_host_log {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3544,7 +3496,6 @@ struct wclap_plugin_note_name {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3607,7 +3558,6 @@ struct wclap_host_note_name {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3654,7 +3604,6 @@ struct wclap_plugin_note_ports {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3717,7 +3666,6 @@ struct wclap_host_note_ports {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3775,7 +3723,6 @@ struct wclap_plugin_param_indication {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3844,7 +3791,6 @@ struct wclap_param_info {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 1316;
-	static constexpr size_t wasmArraySize = 1320;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -3912,7 +3858,6 @@ struct wclap_plugin_params {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 24;
-	static constexpr size_t wasmArraySize = 24;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4046,7 +3991,6 @@ struct wclap_host_params {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 12;
-	static constexpr size_t wasmArraySize = 12;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4115,7 +4059,6 @@ struct wclap_plugin_preset_load {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4167,7 +4110,6 @@ struct wclap_host_preset_load {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4240,7 +4182,6 @@ struct wclap_plugin_remote_controls {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4303,7 +4244,6 @@ struct wclap_host_remote_controls {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4360,7 +4300,6 @@ struct wclap_plugin_render {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4419,7 +4358,6 @@ struct wclap_plugin_state_context {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4486,7 +4424,6 @@ struct wclap_plugin_state {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4553,7 +4490,6 @@ struct wclap_host_state {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4598,7 +4534,6 @@ struct wclap_plugin_surround {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4661,7 +4596,6 @@ struct wclap_host_surround {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4706,7 +4640,6 @@ struct wclap_plugin_tail {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4752,7 +4685,6 @@ struct wclap_host_tail {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4797,7 +4729,6 @@ struct wclap_host_thread_check {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4856,7 +4787,6 @@ struct wclap_plugin_thread_pool {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4901,7 +4831,6 @@ struct wclap_host_thread_pool {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4947,7 +4876,6 @@ struct wclap_plugin_timer_support {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -4992,7 +4920,6 @@ struct wclap_host_timer_support {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 8;
-	static constexpr size_t wasmArraySize = 8;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -5055,7 +4982,6 @@ struct wclap_track_info {
 	
 	static constexpr size_t wasmAlign = 8;
 	static constexpr size_t wasmSize = 276;
-	static constexpr size_t wasmArraySize = 280;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -5109,7 +5035,6 @@ struct wclap_plugin_track_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -5154,7 +5079,6 @@ struct wclap_host_track_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -5206,7 +5130,6 @@ struct wclap_plugin_voice_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;
@@ -5256,7 +5179,6 @@ struct wclap_host_voice_info {
 	
 	static constexpr size_t wasmAlign = 4;
 	static constexpr size_t wasmSize = 4;
-	static constexpr size_t wasmArraySize = 4;
 	
 	operator bool() const {
 		return pointerInWasm;

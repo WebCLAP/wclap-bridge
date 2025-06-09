@@ -240,7 +240,7 @@ uint64_t WclapThread::wasmMalloc(size_t bytes) {
 		args[0].of.i32 = (uint32_t)bytes;
 	}
 	
-	setWasmDeadline(validity.deadlines.malloc);
+	setWasmDeadline();
 	error = wasmtime_func_call(context, &mallocFunc, args, 1, results, 1, &trap);
 	if (error) {
 		wclap.setError("calling malloc() failed");
@@ -277,7 +277,7 @@ void WclapThread::wasmInit() {
 		}
 		wasm_functype_delete(type);
 
-		setWasmDeadline(validity.deadlines.initModule);
+		setWasmDeadline();
 		error = wasmtime_func_call(context, &item.of.func, nullptr, 0, nullptr, 0, &trap);
 		if (error) {
 			wasmtime_extern_delete(&item);
@@ -300,7 +300,7 @@ void WclapThread::callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, si
 		return wclap.setError("function pointer doesn't resolve to a function");
 	}
 
-	setWasmDeadline(validity.deadlines.other);
+	setWasmDeadline();
 	error = wasmtime_func_call_unchecked(context, &funcVal.of.funcref, argsAndResults, 1, &trap);
 	if (error) return wclap.setError("calling function failed");
 	if (trap) return wclap.setError(trapIsTimeout(trap) ? "function call timeout" : "function call threw (trapped)");

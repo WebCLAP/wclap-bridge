@@ -169,6 +169,7 @@ namespace wclap { namespace wclap${bits} {`;
 					throw Error("Couldn't parse struct field in " + name);
 				}
 			});
+			while (structType.wasmSize%structType.wasmAlign) ++structType.wasmSize;
 			
 			// Only compatible if all its fields are compatible
 			structFields.forEach(f => {
@@ -186,8 +187,6 @@ using ${wclapClass} = ${name};`;
 
 			} else {
 				let nativeType = `${name}`;
-				let arraySize = structType.wasmSize; // size, padded to alignment
-				while (arraySize%structType.wasmAlign) ++arraySize;
 				code += `
 
 struct ${wclapClass} {
@@ -195,7 +194,6 @@ struct ${wclapClass} {
 	
 	static constexpr size_t wasmAlign = ${structType.wasmAlign};
 	static constexpr size_t wasmSize = ${structType.wasmSize};
-	static constexpr size_t wasmArraySize = ${arraySize};
 	
 	operator bool() const {
 		return pointerInWasm;

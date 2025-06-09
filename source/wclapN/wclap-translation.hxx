@@ -4,14 +4,27 @@
 #endif
 // The matching `wclap-translation.h` will already be included
 
-#include "../validity.h"
 #include "../wclap-thread.h"
 #include "../wclap.h"
 
 #include "clap/all.h"
 #include <vector>
 
+#ifndef WCLAP_MAX_STRING_LENGTH
+#	define WCLAP_MAX_STRING_LENGTH 16383
+#endif
+#ifndef WCLAP_MAX_FEATURES_LENGTH
+#	define WCLAP_MAX_FEATURES_LENGTH 1000
+#endif
+
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
+
+size_t strlen(const char *str, size_t maxLength=WCLAP_MAX_STRING_LENGTH) {
+	if (!str) return 0;
+	size_t length = 0;
+	while (str[0] && length < maxLength) ++length;
+	return length;
+}
 
 ScopedThread NativeProxyContext::lock(bool realtime) const {
 	if (realtime) {
@@ -64,21 +77,12 @@ struct WclapMethods {
 			auto getPluginDescFn = wasmFactory.get_plugin_descriptor();
 
 			auto count = global.thread.callWasm_I(getPluginCountFn, factoryObjP);
-			if (validity.lengths && count > validity.maxPlugins) {
-				wclap.errorMessage = "plugin factory advertised too many plugins";
-				descriptorPointers.clear();
-				return;
-			}
 			
 			descriptorPointers.clear();
 			for (uint32_t i = 0; i < count; ++i) {
 				auto wasmP = global.thread.callWasm_P(getPluginDescFn, factoryObjP, i);
-				if (wasmP) {
-					auto *desc = wasmToNative<const clap_plugin_descriptor>(global, wasmP);
-					descriptorPointers.push_back(desc);
-				} else if (!validity.filterOnlyWorking) {
-					descriptorPointers.push_back(nullptr);
-				}
+				auto *desc = wasmToNative<const clap_plugin_descriptor>(global, wasmP);
+				descriptorPointers.push_back(desc);
 			}
 			// Keep those descriptors for the lifetime of the WCLAP module
 			global.arenas.persistNative();
@@ -195,7 +199,7 @@ void nativeToWasm<const char>(ScopedThread &scoped, const char *str, WasmP &wasm
 		wasmP = 0;
 		return;
 	}
-	size_t length = validity.strlen(str);
+	size_t length = strlen(str);
 	auto *strInWasm = scoped.createDirectArray<char>(length + 1, wasmP);
 	for (size_t i = 0; i < length; ++i) {
 		strInWasm[i] = str[i];
@@ -211,7 +215,7 @@ void wasmToNative<const char>(ScopedThread &scoped, WasmP wasmStr, const char *&
 	}
 	auto maxLength = scoped.wclap.wasmMemorySize(scoped.thread) - wasmStr;
 	auto *nativeInWasm = (char *)scoped.wasmMemory(wasmStr, maxLength);
-	size_t length = validity.strlen(nativeInWasm, maxLength);
+	size_t length = strlen(nativeInWasm, maxLength);
 	auto *nativeTmp = (char *)scoped.arenas.nativeBytes(length + 1, 1);
 	for (size_t i = 0; i < length; ++i) {
 		nativeTmp[i] = nativeInWasm[i];
@@ -229,7 +233,7 @@ void wasmToNative<const char * const>(ScopedThread &scoped, WasmP stringList, co
 	// Null-terminated array of strings
 	size_t count = 0;
 	auto *wasmStrArray = scoped.viewDirectPointer<WasmP>(stringList);
-	while (wasmStrArray[count] && (!validity.lengths || count < validity.maxFeaturesLength)) {
+	while (wasmStrArray[count] && count < WCLAP_MAX_FEATURES_LENGTH) {
 		++count;
 	}
 	auto *nativeStrArray = (const char **)scoped.arenas.nativeBytes(sizeof(const char *)*(count + 1), alignof(const char *));
@@ -248,19 +252,6 @@ void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasm
 	if (!nativeP) return;
 
 	auto *desc = (clap_plugin_descriptor *)nativeP; // Yes, un-const it.  It's ours anyway.
-	if (validity.correctInvalid) {
-		if (!validity.strlen(desc->id)) desc->id = "no-wclap-id-supplied";
-		if (!validity.strlen(desc->name)) desc->name = "(unknown WCLAP)";
-	}
-	if (validity.avoidNull) {
-		if (!desc->vendor) desc->vendor = "";
-		if (!desc->url) desc->url = "";
-		if (!desc->manual_url) desc->manual_url = "";
-		if (!desc->support_url) desc->support_url = "";
-		if (!desc->version) desc->version = "";
-		if (!desc->description) desc->description = "";
-		if (!desc->features) desc->features = validity.nullPointer<const char * const *>();
-	}
 }
 
 static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct clap_plugin *plugin, const clap_process_t *process) {
@@ -273,9 +264,6 @@ static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct
 
 	WasmP wasmProcessP = nativeToWasm(scoped, process);
 	int32_t status = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasmProcessP);
-	if ((status < 0 || status > 4) && validity.correctInvalid) {
-		status = CLAP_PROCESS_ERROR;
-	}
 	if (status == CLAP_PROCESS_ERROR) return status; // Spec says to discard output, no point copying
 
 	const uint32_t frames = process->frames_count;
@@ -302,7 +290,7 @@ static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct
 					}
 				}
 			}
-			validity.audioSafety(buffer->data32, buffer->channel_count, frames);
+//			validity.audioSafety(buffer->data32, buffer->channel_count, frames);
 		}
 		auto *wasmData64 = scoped.viewDirectPointer<WasmP>(wasmBufferView.data64());
 		if (buffer->data64 && wasmData64) {
@@ -315,7 +303,7 @@ static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct
 					}
 				}
 			}
-			validity.audioSafety(buffer->data64, buffer->channel_count, frames);
+//			validity.audioSafety(buffer->data64, buffer->channel_count, frames);
 		}
 	}
 	
@@ -374,10 +362,10 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 	auto view = scoped.create<wclap_host>(wasmP); // claim the appropriate number of bytes
 	view.clap_version() = native->clap_version;
 	view.host_data() = scoped.arenas.wasmContextP;
-	view.name() = nativeToWasm(scoped, validity.mandatoryString(native->name, "(no name provided)"));
-	view.vendor() = nativeToWasm(scoped, validity.optionalString(native->vendor));
-	view.url() = nativeToWasm(scoped, validity.optionalString(native->url));
-	view.version() = nativeToWasm(scoped, validity.mandatoryString(native->version, "0.0.0"));
+	view.name() = nativeToWasm(scoped, native->name);
+	view.vendor() = nativeToWasm(scoped, native->vendor);
+	view.url() = nativeToWasm(scoped, native->url);
+	view.version() = nativeToWasm(scoped, native->version);
 
 	// Methods don't exist yet - this will probably crash
 	view.get_extension() = 0;
@@ -392,7 +380,7 @@ void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *
 
 	view.steady_time() = native->steady_time;
 	uint32_t frames = view.frames_count() = native->frames_count;
-	nativeToWasmDirectArray(scoped, native->transport, view.transport(), 1); // sets the output to 0 if native->transport is NULL
+	nativeToWasmDirectArray(scoped, native->transport, view.transport(), 1); // sets the pointer to 0 if native->transport is NULL
 
 	view.audio_inputs_count() = native->audio_inputs_count;
 	auto inputBufferList = scoped.createArray<wclap_audio_buffer>(native->audio_inputs_count, view.audio_inputs());
@@ -432,15 +420,7 @@ void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *
 		if (buffer->data32) {
 			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data32());
 			for (uint32_t c = 0; c < channels; ++c) {
-				if (validity.correctInvalid) {
-					auto *wasmChannel = scoped.createDirectArray<float>(frames, bufferP[c]);
-					for (uint32_t i = 0; i < frames; ++i) {
-						wasmChannel[i] = 0;
-					}
-				} else {
-					// Deliberately allow the WCLAP to fail validation by not preserving the output buffer contents
-					nativeToWasmDirectArray(scoped, buffer->data32[c], bufferP[c], frames);
-				}
+				nativeToWasmDirectArray(scoped, buffer->data32[c], bufferP[c], frames);
 			}
 		} else {
 			wasmBuffer.data32() = 0;
@@ -448,14 +428,7 @@ void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *
 		if (buffer->data64) {
 			auto *bufferP = scoped.createDirectArray<WasmP>(channels, wasmBuffer.data64());
 			for (uint32_t c = 0; c < channels; ++c) {
-				if (validity.correctInvalid) {
-					auto *wasmChannel = scoped.createDirectArray<double>(frames, bufferP[c]);
-					for (uint32_t i = 0; i < frames; ++i) {
-						wasmChannel[i] = 0;
-					}
-				} else {
-					nativeToWasmDirectArray(scoped, buffer->data64[c], bufferP[c], frames);
-				}
+				nativeToWasmDirectArray(scoped, buffer->data32[c], bufferP[c], frames);
 			}
 		} else {
 			wasmBuffer.data64() = 0;

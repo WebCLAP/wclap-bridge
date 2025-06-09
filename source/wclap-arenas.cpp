@@ -1,6 +1,5 @@
 #include "./wclap-arenas.h"
 
-#include "./validity.h"
 #include "./wclap-thread.h"
 #include "./wclap.h"
 

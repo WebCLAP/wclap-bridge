@@ -108,7 +108,7 @@ private:
 		return std::unique_lock<std::shared_mutex>{mutex};
 	}
 
-	// We keep a list of all arenas, and host proxy objects (in WASM memory) reference them by index, so we can check validity
+	// We keep a list of all arenas, and host proxy objects (in WASM memory) reference them by index, instead of trusting the WCLAP to give us anything valid
 	std::vector<WclapArenas *> arenaList;
 	std::vector<std::unique_ptr<WclapArenas>> arenaPool; // removed from pool
 

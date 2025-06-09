@@ -3,7 +3,6 @@
 #include "wasmtime.h"
 #include "clap/all.h"
 
-#include "./validity.h"
 #include "./wclap-arenas.h"
 
 #include <fstream>
@@ -11,6 +10,8 @@
 #include <mutex>
 
 namespace wclap {
+
+extern unsigned int timeLimitEpochs;
 
 struct Wclap;
 
@@ -43,8 +44,8 @@ struct WclapThread {
 
 	uint64_t wasmMalloc(size_t bytes);
 	
-	void setWasmDeadline(size_t ms) {
-		if (validity.executionDeadlines) wasmtime_context_set_epoch_deadline(context, ms/10 + 2);
+	void setWasmDeadline() {
+		if (timeLimitEpochs) wasmtime_context_set_epoch_deadline(context, timeLimitEpochs);
 	}
 	
 	void callWasmFnP(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN);

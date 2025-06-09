@@ -12,7 +12,6 @@ endif()
 add_library(wclap-bridge STATIC)
 target_sources(wclap-bridge PRIVATE
 	source/scoped-thread.cpp
-	source/validity.cpp
 	source/wclap-bridge.cpp
 	source/wclap-arenas.cpp
 	source/wclap-thread.cpp

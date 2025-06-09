@@ -6,7 +6,6 @@
 #include "wclap-bridge.h"
 
 #include "./wclap.h"
-#include "./validity.h"
 
 #include <atomic>
 #include <thread>
@@ -26,18 +25,21 @@ static void epochThreadFunction() {
 }
 static std::thread globalEpochThread;
 
-bool wclap_global_init(unsigned int validityCheckLevel) {
-	wclap::validity = {validityCheckLevel};
+namespace wclap {
+	unsigned int timeLimitEpochs = 0;
+}
 
+bool wclap_global_init(unsigned int timeLimitMs) {
 	wasm_config_t *config = wasm_config_new();
 	if (!config) {
 		wclap::wclap_error_message = "couldn't create config";
 		return false;
 	}
 
-	if (wclap::validity.executionDeadlines) {
-		// enable epoch_interruption to prevent locks - has a speed cost (10% according to docs)
+	if (timeLimitMs > 0) {
+		// enable epoch_interruption to prevent WCLAPs locking everything up - has a speed cost (10% according to docs)
 		wasmtime_config_epoch_interruption_set(config, true);
+		wclap::timeLimitEpochs = timeLimitMs/10 + 2;
 	}
 	
 	wclap::global_wasm_engine = wasm_engine_new_with_config(config);
@@ -46,7 +48,7 @@ bool wclap_global_init(unsigned int validityCheckLevel) {
 		return false;
 	}
 
-	if (wclap::validity.executionDeadlines) {
+	if (timeLimitMs > 0) {
 		globalEpochRunning.test_and_set();
 		globalEpochThread = std::thread{epochThreadFunction};
 	}

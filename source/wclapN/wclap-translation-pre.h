@@ -8,6 +8,8 @@
 #include "../wclap-thread.h"
 #include "../wclap-arenas.h"
 
+#include <cstring>
+
 #ifndef LOG_EXPR
 #	include <iostream>
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
@@ -87,9 +89,7 @@ void nativeToWasmDirectArray(ScopedThread &scoped, const DirectT *native, WasmP 
 		return;
 	}
 	auto *inWasm = scoped.createDirectArray<DirectT>(length, wasmP);
-	for (size_t i = 0; i < length; ++i) {
-		inWasm[i] = native[i];
-	}
+	if (length > 0) std::memcpy(inWasm, native, length*sizeof(DirectT));
 }
 
 template<class NativeT>

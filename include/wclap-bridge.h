@@ -4,13 +4,8 @@
 extern "C" {
 #endif
 
-/*
-	0 - translate WCLAP values as closely as possible, leave validity-checking to the host
-	10 - basic range/type checks (e.g. NULL where not allowed)
-	100 - semantic checks (e.g. param IDs exist, note-off matches a note-on, etc.)
-	200 - opinionated safety checks
- */
-bool wclap_global_init(unsigned int validityCheckLevel);
+// 0 means no limit
+bool wclap_global_init(unsigned int timeLimitMs);
 void wclap_global_deinit();
 
 // Opens a WCLAP, returning an opaque identifier (or null on failure)

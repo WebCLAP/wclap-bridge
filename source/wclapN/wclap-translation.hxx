@@ -157,9 +157,12 @@ struct WclapMethods {
 		return nullptr;
 	}
 	
+	struct HostFn {
+		WasmP wasmP = 0;
+	};
+	
 	struct {
-		struct {
-			WasmP wasmP;
+		struct : public HostFn {
 			static WasmP native(Wclap &wclap, WasmP hostP, WasmP extStr) {
 				auto scoped = wclap.lockThread();
 				auto reset = scoped.arenas.scopedNativeReset();
@@ -179,20 +182,17 @@ struct WclapMethods {
 			}
 		} get_extension;
 
-		struct {
-			WasmP wasmP;
+		struct : public HostFn {
 			static void native(Wclap &wclap, WasmP) {
 				std::cout << "host.request_restart()\n";
 			}
 		} request_restart;
-		struct {
-			WasmP wasmP;
+		struct : public HostFn {
 			static void native(Wclap &wclap, WasmP) {
 				std::cout << "host.request_process()\n";
 			}
 		} request_process;
-		struct {
-			WasmP wasmP;
+		struct : public HostFn {
 			static void native(Wclap &wclap, WasmP) {
 				std::cout << "host.request_callback()\n";
 			}
@@ -206,14 +206,12 @@ struct WclapMethods {
 		}
 	} host;
 	
-	struct {
-		WasmP wasmP;
+	struct : public HostFn {
 		static void native(Wclap &wclap, WasmP) {
 			std::cout << "unimplemented V(P)\n";
 		}
 	} notImplementedVP;
-	struct {
-		WasmP wasmP;
+	struct : public HostFn {
 		static WasmP native(Wclap &wclap, WasmP, WasmP) {
 			std::cout << "unimplemented P(PP)\n";
 			return 0;

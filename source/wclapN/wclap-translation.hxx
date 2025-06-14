@@ -177,14 +177,34 @@ struct WclapMethods {
 				if (!host) return 0;
 
 				const void *nativeExt = host->get_extension(host, extNativeStr);
+				if (!nativeExt) return 0;
+				
+				if (!std::strcmp(extNativeStr, CLAP_EXT_LOG)) {
+					
+				}
+				
 				std::cout << "native - host.get_extension(" << extNativeStr << ") = " << nativeExt << "\n";
 				return 0;
 			}
 		} get_extension;
 
 		struct : public HostFn {
-			static void native(Wclap &wclap, WasmP) {
+			static void native(Wclap &wclap, WasmP hostP, uint32_t severity, WasmP msgStr) {
 				std::cout << "host.request_restart()\n";
+				auto scoped = wclap.lockThread();
+
+				auto reset = scoped.arenas.scopedNativeReset();
+				const char *nativeMsgStr = wasmToNative<const char>(scoped, msgStr);
+				if (!nativeMsgStr) return;
+
+				auto view = scoped.view<wclap_host>(hostP);
+				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
+				if (!boundArenas) return 0;
+				auto *nativeHost = (const clap_host *)boundArenas->proxied_clap_host;
+				if (!nativeHost) return 0;
+
+				clap_host_log *nativeExtLog = ???? - somehow stored in the proxied_clap_host?
+				if (nativeExtLog) nativeExtLog->log(host, severity, nativeMsgStr);
 			}
 		} request_restart;
 		struct : public HostFn {
@@ -205,6 +225,18 @@ struct WclapMethods {
 			thread.registerFunction(request_callback);
 		}
 	} host;
+
+	struct {
+		struct : public HostFn {
+			static void native(Wclap &wclap, WasmP) {
+				std::cout << "host.log()\n";
+			}
+		} log;
+
+		void registerMethods(WclapThread &thread) {
+			thread.registerFunction(log);
+		}
+	} hostExtLog;
 	
 	struct : public HostFn {
 		static void native(Wclap &wclap, WasmP) {
@@ -223,6 +255,7 @@ struct WclapMethods {
 		thread.registerFunction(notImplementedPPP);
 
 		host.registerMethods(thread);
+		hostExtLog.registerMethods(thread);
 	}
 };
 

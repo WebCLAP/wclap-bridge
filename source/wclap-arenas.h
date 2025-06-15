@@ -27,8 +27,9 @@ struct WclapArenas {
 	Wclap &wclap;
 	
 	uint64_t wasmContextP; // store this in the `void *` context field of WASM proxies
+	
 	// All the possible host objects we might get bound to (temporary or persistent) and called from WASM
-	ProxiedClapStruct<clap_host> proxied_clap_host;
+	NativeProxyList proxied;
 	
 	WclapArenas(Wclap &wclap, WclapThread &currentThread, size_t arenaIndex);
 	~WclapArenas();
@@ -131,8 +132,7 @@ struct WclapArenas {
 	void resetIncludingPersistent() {
 		nativeArenaPos = nativeArena = nativeArenaReset;
 		wasmArenaPos = wasmArena = wasmArenaReset;
-		
-		proxied_clap_host.clear();
+		proxied.clear();
 	}
 
 	template<class T>

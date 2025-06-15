@@ -115,8 +115,6 @@ void nativeToWasm<const clap_host_t>(ScopedThread &scoped, const clap_host_t *na
 template<>
 void * & nativeProxyContextPointer<clap_host_t>(const clap_host_t *native);
 
-
-
 using wclap_event_header = clap_event_header_t;
 
 using wclap_event_note = clap_event_note_t;
@@ -184,8 +182,6 @@ void nativeToWasm<const clap_event_param_value_t>(ScopedThread &scoped, const cl
 template<>
 void * & nativeProxyContextPointer<clap_event_param_value_t>(const clap_event_param_value_t *native);
 
-
-
 struct wclap_event_param_mod {
 	wclap_event_param_mod(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -247,8 +243,6 @@ void nativeToWasm<const clap_event_param_mod_t>(ScopedThread &scoped, const clap
 template<>
 void * & nativeProxyContextPointer<clap_event_param_mod_t>(const clap_event_param_mod_t *native);
 
-
-
 using wclap_event_param_gesture = clap_event_param_gesture_t;
 
 using wclap_event_transport = clap_event_transport_t;
@@ -299,8 +293,6 @@ void nativeToWasm<const clap_event_midi_sysex_t>(ScopedThread &scoped, const cla
 
 template<>
 void * & nativeProxyContextPointer<clap_event_midi_sysex_t>(const clap_event_midi_sysex_t *native);
-
-
 
 using wclap_event_midi2 = clap_event_midi2_t;
 
@@ -370,8 +362,6 @@ void nativeToWasm<const clap_input_events_t>(ScopedThread &scoped, const clap_in
 template<>
 void * & nativeProxyContextPointer<clap_input_events_t>(const clap_input_events_t *native);
 
-
-
 struct wclap_output_events {
 	wclap_output_events(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -423,8 +413,6 @@ void nativeToWasm<const clap_output_events_t>(ScopedThread &scoped, const clap_o
 template<>
 void * & nativeProxyContextPointer<clap_output_events_t>(const clap_output_events_t *native);
 
-
-
 struct wclap_audio_buffer {
 	wclap_audio_buffer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -473,8 +461,6 @@ void nativeToWasm<const clap_audio_buffer_t>(ScopedThread &scoped, const clap_au
 
 template<>
 void * & nativeProxyContextPointer<clap_audio_buffer_t>(const clap_audio_buffer_t *native);
-
-
 
 struct wclap_process {
 	wclap_process(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -540,8 +526,6 @@ void nativeToWasm<const clap_process_t>(ScopedThread &scoped, const clap_process
 
 template<>
 void * & nativeProxyContextPointer<clap_process_t>(const clap_process_t *native);
-
-
 
 struct wclap_plugin_descriptor {
 	wclap_plugin_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -611,8 +595,6 @@ void nativeToWasm<const clap_plugin_descriptor_t>(ScopedThread &scoped, const cl
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_descriptor_t>(const clap_plugin_descriptor_t *native);
-
-
 
 struct wclap_plugin {
 	wclap_plugin(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -789,8 +771,6 @@ void nativeToWasm<const clap_plugin_t>(ScopedThread &scoped, const clap_plugin_t
 template<>
 void * & nativeProxyContextPointer<clap_plugin_t>(const clap_plugin_t *native);
 
-
-
 struct wclap_plugin_factory {
 	wclap_plugin_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -876,8 +856,6 @@ void nativeToWasm<const clap_plugin_factory_t>(ScopedThread &scoped, const clap_
 template<>
 void * & nativeProxyContextPointer<clap_plugin_factory_t>(const clap_plugin_factory_t *native);
 
-
-
 struct wclap_universal_plugin_id {
 	wclap_universal_plugin_id(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -914,8 +892,6 @@ void nativeToWasm<const clap_universal_plugin_id_t>(ScopedThread &scoped, const 
 
 template<>
 void * & nativeProxyContextPointer<clap_universal_plugin_id_t>(const clap_universal_plugin_id_t *native);
-
-
 
 struct wclap_preset_discovery_metadata_receiver {
 	wclap_preset_discovery_metadata_receiver(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1108,8 +1084,6 @@ void nativeToWasm<const clap_preset_discovery_metadata_receiver_t>(ScopedThread 
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_metadata_receiver_t>(const clap_preset_discovery_metadata_receiver_t *native);
 
-
-
 struct wclap_preset_discovery_filetype {
 	wclap_preset_discovery_filetype(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1150,8 +1124,6 @@ void nativeToWasm<const clap_preset_discovery_filetype_t>(ScopedThread &scoped, 
 
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_filetype_t>(const clap_preset_discovery_filetype_t *native);
-
-
 
 struct wclap_preset_discovery_location {
 	wclap_preset_discovery_location(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1197,8 +1169,6 @@ void nativeToWasm<const clap_preset_discovery_location_t>(ScopedThread &scoped, 
 
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_location_t>(const clap_preset_discovery_location_t *native);
-
-
 
 struct wclap_preset_discovery_soundpack {
 	wclap_preset_discovery_soundpack(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1261,8 +1231,6 @@ void nativeToWasm<const clap_preset_discovery_soundpack_t>(ScopedThread &scoped,
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_soundpack_t>(const clap_preset_discovery_soundpack_t *native);
 
-
-
 struct wclap_preset_discovery_provider_descriptor {
 	wclap_preset_discovery_provider_descriptor(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1307,8 +1275,6 @@ void nativeToWasm<const clap_preset_discovery_provider_descriptor_t>(ScopedThrea
 
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_provider_descriptor_t>(const clap_preset_discovery_provider_descriptor_t *native);
-
-
 
 struct wclap_preset_discovery_provider {
 	wclap_preset_discovery_provider(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1412,8 +1378,6 @@ void nativeToWasm<const clap_preset_discovery_provider_t>(ScopedThread &scoped, 
 
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_provider_t>(const clap_preset_discovery_provider_t *native);
-
-
 
 struct wclap_preset_discovery_indexer {
 	wclap_preset_discovery_indexer(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1541,8 +1505,6 @@ void nativeToWasm<const clap_preset_discovery_indexer_t>(ScopedThread &scoped, c
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_indexer_t>(const clap_preset_discovery_indexer_t *native);
 
-
-
 struct wclap_preset_discovery_factory {
 	wclap_preset_discovery_factory(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1628,8 +1590,6 @@ void nativeToWasm<const clap_preset_discovery_factory_t>(ScopedThread &scoped, c
 template<>
 void * & nativeProxyContextPointer<clap_preset_discovery_factory_t>(const clap_preset_discovery_factory_t *native);
 
-
-
 struct wclap_plugin_entry {
 	wclap_plugin_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1708,8 +1668,6 @@ void nativeToWasm<const clap_plugin_entry_t>(ScopedThread &scoped, const clap_pl
 template<>
 void * & nativeProxyContextPointer<clap_plugin_entry_t>(const clap_plugin_entry_t *native);
 
-
-
 using wclap_color = clap_color_t;
 
 struct wclap_istream {
@@ -1763,8 +1721,6 @@ void nativeToWasm<const clap_istream_t>(ScopedThread &scoped, const clap_istream
 template<>
 void * & nativeProxyContextPointer<clap_istream_t>(const clap_istream_t *native);
 
-
-
 struct wclap_ostream {
 	wclap_ostream(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1815,8 +1771,6 @@ void nativeToWasm<const clap_ostream_t>(ScopedThread &scoped, const clap_ostream
 
 template<>
 void * & nativeProxyContextPointer<clap_ostream_t>(const clap_ostream_t *native);
-
-
 
 using wclap_ambisonic_config = clap_ambisonic_config_t;
 
@@ -1884,8 +1838,6 @@ void nativeToWasm<const clap_plugin_ambisonic_t>(ScopedThread &scoped, const cla
 template<>
 void * & nativeProxyContextPointer<clap_plugin_ambisonic_t>(const clap_plugin_ambisonic_t *native);
 
-
-
 struct wclap_host_ambisonic {
 	wclap_host_ambisonic(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -1927,8 +1879,6 @@ void nativeToWasm<const clap_host_ambisonic_t>(ScopedThread &scoped, const clap_
 
 template<>
 void * & nativeProxyContextPointer<clap_host_ambisonic_t>(const clap_host_ambisonic_t *native);
-
-
 
 struct wclap_audio_port_info {
 	wclap_audio_port_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -1984,8 +1934,6 @@ void nativeToWasm<const clap_audio_port_info_t>(ScopedThread &scoped, const clap
 
 template<>
 void * & nativeProxyContextPointer<clap_audio_port_info_t>(const clap_audio_port_info_t *native);
-
-
 
 struct wclap_plugin_audio_ports {
 	wclap_plugin_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2047,8 +1995,6 @@ void nativeToWasm<const clap_plugin_audio_ports_t>(ScopedThread &scoped, const c
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_t>(const clap_plugin_audio_ports_t *native);
 
-
-
 struct wclap_host_audio_ports {
 	wclap_host_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2103,8 +2049,6 @@ void nativeToWasm<const clap_host_audio_ports_t>(ScopedThread &scoped, const cla
 
 template<>
 void * & nativeProxyContextPointer<clap_host_audio_ports_t>(const clap_host_audio_ports_t *native);
-
-
 
 struct wclap_plugin_audio_ports_activation {
 	wclap_plugin_audio_ports_activation(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2161,8 +2105,6 @@ void nativeToWasm<const clap_plugin_audio_ports_activation_t>(ScopedThread &scop
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_activation_t>(const clap_plugin_audio_ports_activation_t *native);
-
-
 
 struct wclap_audio_ports_config {
 	wclap_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2234,8 +2176,6 @@ void nativeToWasm<const clap_audio_ports_config_t>(ScopedThread &scoped, const c
 
 template<>
 void * & nativeProxyContextPointer<clap_audio_ports_config_t>(const clap_audio_ports_config_t *native);
-
-
 
 struct wclap_plugin_audio_ports_config {
 	wclap_plugin_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2310,8 +2250,6 @@ void nativeToWasm<const clap_plugin_audio_ports_config_t>(ScopedThread &scoped, 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_config_t>(const clap_plugin_audio_ports_config_t *native);
 
-
-
 struct wclap_plugin_audio_ports_config_info {
 	wclap_plugin_audio_ports_config_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2372,8 +2310,6 @@ void nativeToWasm<const clap_plugin_audio_ports_config_info_t>(ScopedThread &sco
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_config_info_t>(const clap_plugin_audio_ports_config_info_t *native);
 
-
-
 struct wclap_host_audio_ports_config {
 	wclap_host_audio_ports_config(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2415,8 +2351,6 @@ void nativeToWasm<const clap_host_audio_ports_config_t>(ScopedThread &scoped, co
 
 template<>
 void * & nativeProxyContextPointer<clap_host_audio_ports_config_t>(const clap_host_audio_ports_config_t *native);
-
-
 
 struct wclap_audio_port_configuration_request {
 	wclap_audio_port_configuration_request(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2466,8 +2400,6 @@ void nativeToWasm<const clap_audio_port_configuration_request_t>(ScopedThread &s
 
 template<>
 void * & nativeProxyContextPointer<clap_audio_port_configuration_request_t>(const clap_audio_port_configuration_request_t *native);
-
-
 
 struct wclap_plugin_configurable_audio_ports {
 	wclap_plugin_configurable_audio_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2533,8 +2465,6 @@ void nativeToWasm<const clap_plugin_configurable_audio_ports_t>(ScopedThread &sc
 template<>
 void * & nativeProxyContextPointer<clap_plugin_configurable_audio_ports_t>(const clap_plugin_configurable_audio_ports_t *native);
 
-
-
 using wclap_context_menu_target = clap_context_menu_target_t;
 
 struct wclap_context_menu_entry {
@@ -2577,8 +2507,6 @@ void nativeToWasm<const clap_context_menu_entry_t>(ScopedThread &scoped, const c
 
 template<>
 void * & nativeProxyContextPointer<clap_context_menu_entry_t>(const clap_context_menu_entry_t *native);
-
-
 
 struct wclap_context_menu_check_entry {
 	wclap_context_menu_check_entry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2625,8 +2553,6 @@ void nativeToWasm<const clap_context_menu_check_entry_t>(ScopedThread &scoped, c
 template<>
 void * & nativeProxyContextPointer<clap_context_menu_check_entry_t>(const clap_context_menu_check_entry_t *native);
 
-
-
 struct wclap_context_menu_item_title {
 	wclap_context_menu_item_title(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2664,8 +2590,6 @@ void nativeToWasm<const clap_context_menu_item_title_t>(ScopedThread &scoped, co
 template<>
 void * & nativeProxyContextPointer<clap_context_menu_item_title_t>(const clap_context_menu_item_title_t *native);
 
-
-
 struct wclap_context_menu_submenu {
 	wclap_context_menu_submenu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2702,8 +2626,6 @@ void nativeToWasm<const clap_context_menu_submenu_t>(ScopedThread &scoped, const
 
 template<>
 void * & nativeProxyContextPointer<clap_context_menu_submenu_t>(const clap_context_menu_submenu_t *native);
-
-
 
 struct wclap_context_menu_builder {
 	wclap_context_menu_builder(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2768,8 +2690,6 @@ void nativeToWasm<const clap_context_menu_builder_t>(ScopedThread &scoped, const
 
 template<>
 void * & nativeProxyContextPointer<clap_context_menu_builder_t>(const clap_context_menu_builder_t *native);
-
-
 
 struct wclap_plugin_context_menu {
 	wclap_plugin_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2836,8 +2756,6 @@ void nativeToWasm<const clap_plugin_context_menu_t>(ScopedThread &scoped, const 
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_context_menu_t>(const clap_plugin_context_menu_t *native);
-
-
 
 struct wclap_host_context_menu {
 	wclap_host_context_menu(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -2935,8 +2853,6 @@ void nativeToWasm<const clap_host_context_menu_t>(ScopedThread &scoped, const cl
 template<>
 void * & nativeProxyContextPointer<clap_host_context_menu_t>(const clap_host_context_menu_t *native);
 
-
-
 struct wclap_host_event_registry {
 	wclap_host_event_registry(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -2985,8 +2901,6 @@ void nativeToWasm<const clap_host_event_registry_t>(ScopedThread &scoped, const 
 
 template<>
 void * & nativeProxyContextPointer<clap_host_event_registry_t>(const clap_host_event_registry_t *native);
-
-
 
 using wclap_gui_resize_hints = clap_gui_resize_hints_t;
 
@@ -3255,8 +3169,6 @@ void nativeToWasm<const clap_plugin_gui_t>(ScopedThread &scoped, const clap_plug
 template<>
 void * & nativeProxyContextPointer<clap_plugin_gui_t>(const clap_plugin_gui_t *native);
 
-
-
 struct wclap_host_gui {
 	wclap_host_gui(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3350,8 +3262,6 @@ void nativeToWasm<const clap_host_gui_t>(ScopedThread &scoped, const clap_host_g
 template<>
 void * & nativeProxyContextPointer<clap_host_gui_t>(const clap_host_gui_t *native);
 
-
-
 struct wclap_plugin_latency {
 	wclap_plugin_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3395,8 +3305,6 @@ void nativeToWasm<const clap_plugin_latency_t>(ScopedThread &scoped, const clap_
 template<>
 void * & nativeProxyContextPointer<clap_plugin_latency_t>(const clap_plugin_latency_t *native);
 
-
-
 struct wclap_host_latency {
 	wclap_host_latency(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3438,8 +3346,6 @@ void nativeToWasm<const clap_host_latency_t>(ScopedThread &scoped, const clap_ho
 
 template<>
 void * & nativeProxyContextPointer<clap_host_latency_t>(const clap_host_latency_t *native);
-
-
 
 struct wclap_host_log {
 	wclap_host_log(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -3486,8 +3392,6 @@ void nativeToWasm<const clap_host_log_t>(ScopedThread &scoped, const clap_host_l
 
 template<>
 void * & nativeProxyContextPointer<clap_host_log_t>(const clap_host_log_t *native);
-
-
 
 using wclap_note_name = clap_note_name_t;
 
@@ -3551,8 +3455,6 @@ void nativeToWasm<const clap_plugin_note_name_t>(ScopedThread &scoped, const cla
 template<>
 void * & nativeProxyContextPointer<clap_plugin_note_name_t>(const clap_plugin_note_name_t *native);
 
-
-
 struct wclap_host_note_name {
 	wclap_host_note_name(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3594,8 +3496,6 @@ void nativeToWasm<const clap_host_note_name_t>(ScopedThread &scoped, const clap_
 
 template<>
 void * & nativeProxyContextPointer<clap_host_note_name_t>(const clap_host_note_name_t *native);
-
-
 
 using wclap_note_port_info = clap_note_port_info_t;
 
@@ -3659,8 +3559,6 @@ void nativeToWasm<const clap_plugin_note_ports_t>(ScopedThread &scoped, const cl
 template<>
 void * & nativeProxyContextPointer<clap_plugin_note_ports_t>(const clap_plugin_note_ports_t *native);
 
-
-
 struct wclap_host_note_ports {
 	wclap_host_note_ports(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3715,8 +3613,6 @@ void nativeToWasm<const clap_host_note_ports_t>(ScopedThread &scoped, const clap
 
 template<>
 void * & nativeProxyContextPointer<clap_host_note_ports_t>(const clap_host_note_ports_t *native);
-
-
 
 struct wclap_plugin_param_indication {
 	wclap_plugin_param_indication(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -3784,8 +3680,6 @@ void nativeToWasm<const clap_plugin_param_indication_t>(ScopedThread &scoped, co
 template<>
 void * & nativeProxyContextPointer<clap_plugin_param_indication_t>(const clap_plugin_param_indication_t *native);
 
-
-
 struct wclap_param_info {
 	wclap_param_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -3850,8 +3744,6 @@ void nativeToWasm<const clap_param_info_t>(ScopedThread &scoped, const clap_para
 
 template<>
 void * & nativeProxyContextPointer<clap_param_info_t>(const clap_param_info_t *native);
-
-
 
 struct wclap_plugin_params {
 	wclap_plugin_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -3984,8 +3876,6 @@ void nativeToWasm<const clap_plugin_params_t>(ScopedThread &scoped, const clap_p
 template<>
 void * & nativeProxyContextPointer<clap_plugin_params_t>(const clap_plugin_params_t *native);
 
-
-
 struct wclap_host_params {
 	wclap_host_params(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4052,8 +3942,6 @@ void nativeToWasm<const clap_host_params_t>(ScopedThread &scoped, const clap_hos
 template<>
 void * & nativeProxyContextPointer<clap_host_params_t>(const clap_host_params_t *native);
 
-
-
 struct wclap_plugin_preset_load {
 	wclap_plugin_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4102,8 +3990,6 @@ void nativeToWasm<const clap_plugin_preset_load_t>(ScopedThread &scoped, const c
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_preset_load_t>(const clap_plugin_preset_load_t *native);
-
-
 
 struct wclap_host_preset_load {
 	wclap_host_preset_load(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4173,8 +4059,6 @@ void nativeToWasm<const clap_host_preset_load_t>(ScopedThread &scoped, const cla
 template<>
 void * & nativeProxyContextPointer<clap_host_preset_load_t>(const clap_host_preset_load_t *native);
 
-
-
 using wclap_remote_controls_page = clap_remote_controls_page_t;
 
 struct wclap_plugin_remote_controls {
@@ -4237,8 +4121,6 @@ void nativeToWasm<const clap_plugin_remote_controls_t>(ScopedThread &scoped, con
 template<>
 void * & nativeProxyContextPointer<clap_plugin_remote_controls_t>(const clap_plugin_remote_controls_t *native);
 
-
-
 struct wclap_host_remote_controls {
 	wclap_host_remote_controls(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4292,8 +4174,6 @@ void nativeToWasm<const clap_host_remote_controls_t>(ScopedThread &scoped, const
 
 template<>
 void * & nativeProxyContextPointer<clap_host_remote_controls_t>(const clap_host_remote_controls_t *native);
-
-
 
 struct wclap_plugin_render {
 	wclap_plugin_render(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4350,8 +4230,6 @@ void nativeToWasm<const clap_plugin_render_t>(ScopedThread &scoped, const clap_p
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_render_t>(const clap_plugin_render_t *native);
-
-
 
 struct wclap_plugin_state_context {
 	wclap_plugin_state_context(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4417,8 +4295,6 @@ void nativeToWasm<const clap_plugin_state_context_t>(ScopedThread &scoped, const
 template<>
 void * & nativeProxyContextPointer<clap_plugin_state_context_t>(const clap_plugin_state_context_t *native);
 
-
-
 struct wclap_plugin_state {
 	wclap_plugin_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4483,8 +4359,6 @@ void nativeToWasm<const clap_plugin_state_t>(ScopedThread &scoped, const clap_pl
 template<>
 void * & nativeProxyContextPointer<clap_plugin_state_t>(const clap_plugin_state_t *native);
 
-
-
 struct wclap_host_state {
 	wclap_host_state(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4526,8 +4400,6 @@ void nativeToWasm<const clap_host_state_t>(ScopedThread &scoped, const clap_host
 
 template<>
 void * & nativeProxyContextPointer<clap_host_state_t>(const clap_host_state_t *native);
-
-
 
 struct wclap_plugin_surround {
 	wclap_plugin_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4589,8 +4461,6 @@ void nativeToWasm<const clap_plugin_surround_t>(ScopedThread &scoped, const clap
 template<>
 void * & nativeProxyContextPointer<clap_plugin_surround_t>(const clap_plugin_surround_t *native);
 
-
-
 struct wclap_host_surround {
 	wclap_host_surround(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4632,8 +4502,6 @@ void nativeToWasm<const clap_host_surround_t>(ScopedThread &scoped, const clap_h
 
 template<>
 void * & nativeProxyContextPointer<clap_host_surround_t>(const clap_host_surround_t *native);
-
-
 
 struct wclap_plugin_tail {
 	wclap_plugin_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4678,8 +4546,6 @@ void nativeToWasm<const clap_plugin_tail_t>(ScopedThread &scoped, const clap_plu
 template<>
 void * & nativeProxyContextPointer<clap_plugin_tail_t>(const clap_plugin_tail_t *native);
 
-
-
 struct wclap_host_tail {
 	wclap_host_tail(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4721,8 +4587,6 @@ void nativeToWasm<const clap_host_tail_t>(ScopedThread &scoped, const clap_host_
 
 template<>
 void * & nativeProxyContextPointer<clap_host_tail_t>(const clap_host_tail_t *native);
-
-
 
 struct wclap_host_thread_check {
 	wclap_host_thread_check(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4780,8 +4644,6 @@ void nativeToWasm<const clap_host_thread_check_t>(ScopedThread &scoped, const cl
 template<>
 void * & nativeProxyContextPointer<clap_host_thread_check_t>(const clap_host_thread_check_t *native);
 
-
-
 struct wclap_plugin_thread_pool {
 	wclap_plugin_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4823,8 +4685,6 @@ void nativeToWasm<const clap_plugin_thread_pool_t>(ScopedThread &scoped, const c
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_thread_pool_t>(const clap_plugin_thread_pool_t *native);
-
-
 
 struct wclap_host_thread_pool {
 	wclap_host_thread_pool(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4869,8 +4729,6 @@ void nativeToWasm<const clap_host_thread_pool_t>(ScopedThread &scoped, const cla
 template<>
 void * & nativeProxyContextPointer<clap_host_thread_pool_t>(const clap_host_thread_pool_t *native);
 
-
-
 struct wclap_plugin_timer_support {
 	wclap_plugin_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -4912,8 +4770,6 @@ void nativeToWasm<const clap_plugin_timer_support_t>(ScopedThread &scoped, const
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_timer_support_t>(const clap_plugin_timer_support_t *native);
-
-
 
 struct wclap_host_timer_support {
 	wclap_host_timer_support(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -4975,8 +4831,6 @@ void nativeToWasm<const clap_host_timer_support_t>(ScopedThread &scoped, const c
 template<>
 void * & nativeProxyContextPointer<clap_host_timer_support_t>(const clap_host_timer_support_t *native);
 
-
-
 struct wclap_track_info {
 	wclap_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -5028,8 +4882,6 @@ void nativeToWasm<const clap_track_info_t>(ScopedThread &scoped, const clap_trac
 template<>
 void * & nativeProxyContextPointer<clap_track_info_t>(const clap_track_info_t *native);
 
-
-
 struct wclap_plugin_track_info {
 	wclap_plugin_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -5071,8 +4923,6 @@ void nativeToWasm<const clap_plugin_track_info_t>(ScopedThread &scoped, const cl
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_track_info_t>(const clap_plugin_track_info_t *native);
-
-
 
 struct wclap_host_track_info {
 	wclap_host_track_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
@@ -5120,8 +4970,6 @@ void nativeToWasm<const clap_host_track_info_t>(ScopedThread &scoped, const clap
 
 template<>
 void * & nativeProxyContextPointer<clap_host_track_info_t>(const clap_host_track_info_t *native);
-
-
 
 using wclap_voice_info = clap_voice_info_t;
 
@@ -5172,8 +5020,6 @@ void nativeToWasm<const clap_plugin_voice_info_t>(ScopedThread &scoped, const cl
 template<>
 void * & nativeProxyContextPointer<clap_plugin_voice_info_t>(const clap_plugin_voice_info_t *native);
 
-
-
 struct wclap_host_voice_info {
 	wclap_host_voice_info(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
 	
@@ -5215,6 +5061,5 @@ void nativeToWasm<const clap_host_voice_info_t>(ScopedThread &scoped, const clap
 
 template<>
 void * & nativeProxyContextPointer<clap_host_voice_info_t>(const clap_host_voice_info_t *native);
-
-
+	
 }} // namespace

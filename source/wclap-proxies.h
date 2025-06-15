@@ -5,40 +5,82 @@
 #	define WCLAP_ENGINE_WASMTIME
 #endif
 
-#include <mutex>
+#include "./class-id.generated.h"
+
+#include <shared_mutex>
 #include <atomic>
+#include <vector>
 
 namespace wclap {
 
-struct WclapArenas;
+struct NativeProxyList {
 
-template<class ClapStruct>
-struct ProxiedClapStruct {
-	~ProxiedClapStruct() {
-		if (assigned.test()) mutex.unlock();
+	NativeProxyList() {
+		items.reserve(1);
 	}
-	
-	std::atomic<const ClapStruct *> native;
-	
-	void assign(const ClapStruct *n) {
-		mutex.lock(); // so temporary use doesn't cross over
-		native.store(n);
-		assigned.test_and_set();
-	}
-	void clear() { // safe to call even if nothing's stored
-		if (assigned.test()) {
-			assigned.clear();
-			native.store(nullptr);
-			mutex.unlock();
+
+	template<class ClapStruct>
+	const ClapStruct * getNative() const {
+		ClassId classId = getClassId<ClapStruct>();
+		auto lock = readLock();
+		for (auto &item : items) {
+			if (item.classId == classId) {
+				return (ClapStruct *)item.hostNative.load();
+			}
 		}
+		return nullptr;
+	}
+
+	// Returns whether an existing proxy was found, and sets the WASM pointer to it if so
+	template<class ClapStruct, typename WasmP>
+	bool update(const ClapStruct * ptr, WasmP &wasmP) {
+		ClassId classId = getClassId<ClapStruct>();
+		auto lock = readLock();
+		for (auto &item : items) {
+			if (item.classId == classId) {
+				item.hostNative.store(ptr);
+				wasmP = (WasmP)item.wasmP;
+				return true;
+			}
+		}
+		wasmP = 0;
+		return false;
 	}
 	
-	operator const ClapStruct *() const {
-		return native.load();
+	template<class ClapStruct, typename WasmP>
+	void add(const ClapStruct * ptr, WasmP wasmP) {
+		ClassId classId = getClassId<ClapStruct>();
+		auto lock = writeLock();
+		items.emplace_back(classId, ptr, wasmP);
 	}
+
+	__attribute__((cdecl)) // __cdecl on Microsoft
+	void clear() {
+		auto lock = writeLock();
+		items.clear();
+	}
+
 private:
-	std::atomic_flag assigned = ATOMIC_FLAG_INIT;
-	std::mutex mutex;
+	struct Item {
+		ClassId classId;
+		// Atomic because we allow it to be updated with only the "read" lock
+		std::atomic<const void *> hostNative;
+		size_t wasmP;
+		
+		Item(ClassId classId, const void *native, size_t wasmP) : classId(classId), hostNative(native), wasmP(wasmP) {}
+		// Allow move-construction, since it should only happen when we have the write-lock
+		Item(Item &&other) : classId(other.classId), hostNative(other.hostNative.load()), wasmP(other.wasmP) {}
+	};
+
+	std::vector<Item> items;
+
+	mutable std::shared_mutex mutex;
+	std::shared_lock<std::shared_mutex> readLock() const {
+		return std::shared_lock<std::shared_mutex>{mutex};
+	}
+	std::unique_lock<std::shared_mutex> writeLock() {
+		return std::unique_lock<std::shared_mutex>{mutex};
+	}
 };
 
 } // namespace

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "./common.h"
 
 namespace wclap {
@@ -80,6 +82,12 @@ double WclapThread::callWasm_D(uint64_t fnP, Args ...args) {
 	return values[0].f64;
 }
 
+//template<auto nativeFn /* hooray for C++17 */, typename WasmP, typename Return, class ...Args>
+//void registerFunctionOnThread(WclapThread &thread, WasmP &fnP, const std::function<Return(Args...)> &/*ignored, just used for its type*/) {
+//	fnP = 0;
+//}
+
+//*
 template<void nativeFn(Wclap &, uint32_t), typename WasmP>
 void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {
@@ -163,9 +171,12 @@ void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	wasmtime_func_new_unchecked(thread.impl->context, fnType, S::unchecked, &thread.wclap, nullptr, &fnVal.of.funcref);
 	thread.impl->registerFunctionIndex(thread.wclap, fnVal, fnP);
 }
+//*/
 
 template<typename FnStruct>
 void WclapThread::registerFunction(FnStruct &fnStruct) {
+//	using NativeFnType = decltype(std::function{FnStruct::native});
+//	registerFunctionOnThread<FnStruct::native>(*this, fnStruct.wasmP, NativeFnType{});
 	registerFunctionOnThread<FnStruct::native>(*this, fnStruct.wasmP);
 }
 

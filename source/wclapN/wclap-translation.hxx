@@ -110,19 +110,18 @@ struct WclapMethods {
 
 			// Proxy the host, and make it persistent
 			WasmP wasmHostP = nativeToWasm(scoped, host);
-			scoped.arenas.proxied_clap_host.assign(host);
+			scoped.arenas.proxied.add(host, wasmHostP); // shouldn't exist because the arena was just taken from the pool.
 			scoped.arenas.persistWasm();
 
-			// Attempt to create the plugin;
-			WasmP &wasmPluginP = context.wasmObjP;
+			// Attempt to create the plugin
 			{
 				auto wasmReset = scoped.arenas.scopedWasmReset();
 				auto wasmPluginId = nativeToWasm(scoped, plugin_id);
-				wasmPluginP = scoped.thread.callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
+				context.wasmObjP = scoped.thread.callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
 			}
-			if (!wasmPluginP) return nullptr;
+			if (!context.wasmObjP) return nullptr;
 
-			const clap_plugin_t *nativePlugin = wasmToNative<const clap_plugin>(scoped, wasmPluginP);
+			const clap_plugin_t *nativePlugin = wasmToNative<const clap_plugin>(scoped, context.wasmObjP);
 			scoped.arenas.persistNative();
 			
 			createNativeProxyContext(scoped, nativePlugin, std::move(context));
@@ -173,7 +172,7 @@ struct WclapMethods {
 				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
 				if (!boundArenas) return 0;
 
-				auto *host = (const clap_host *)boundArenas->proxied_clap_host;
+				auto *host = boundArenas->proxied.getNative<clap_host>();
 				if (!host) return 0;
 
 				const void *nativeExt = host->get_extension(host, extNativeStr);
@@ -183,38 +182,45 @@ struct WclapMethods {
 					
 				}
 				
-				std::cout << "native - host.get_extension(" << extNativeStr << ") = " << nativeExt << "\n";
+				std::cout << "native: host.get_extension(" << extNativeStr << ") = " << nativeExt << "\n";
 				return 0;
 			}
 		} get_extension;
 
 		struct : public HostFn {
-			static void native(Wclap &wclap, WasmP hostP, uint32_t severity, WasmP msgStr) {
+			static void native(Wclap &wclap, WasmP hostP) {
 				std::cout << "host.request_restart()\n";
 				auto scoped = wclap.lockThread();
-
-				auto reset = scoped.arenas.scopedNativeReset();
-				const char *nativeMsgStr = wasmToNative<const char>(scoped, msgStr);
-				if (!nativeMsgStr) return;
-
 				auto view = scoped.view<wclap_host>(hostP);
 				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
-				if (!boundArenas) return 0;
-				auto *nativeHost = (const clap_host *)boundArenas->proxied_clap_host;
-				if (!nativeHost) return 0;
-
-				clap_host_log *nativeExtLog = ???? - somehow stored in the proxied_clap_host?
-				if (nativeExtLog) nativeExtLog->log(host, severity, nativeMsgStr);
+				if (!boundArenas) return;
+				auto *nativeHost = boundArenas->proxied.getNative<clap_host>();
+				if (!nativeHost) return;
+				nativeHost->request_restart(nativeHost);
 			}
 		} request_restart;
 		struct : public HostFn {
-			static void native(Wclap &wclap, WasmP) {
+			static void native(Wclap &wclap, WasmP hostP) {
 				std::cout << "host.request_process()\n";
+				auto scoped = wclap.lockThread();
+				auto view = scoped.view<wclap_host>(hostP);
+				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
+				if (!boundArenas) return;
+				auto *nativeHost = boundArenas->proxied.getNative<clap_host>();
+				if (!nativeHost) return;
+				nativeHost->request_process(nativeHost);
 			}
 		} request_process;
 		struct : public HostFn {
-			static void native(Wclap &wclap, WasmP) {
+			static void native(Wclap &wclap, WasmP hostP) {
 				std::cout << "host.request_callback()\n";
+				auto scoped = wclap.lockThread();
+				auto view = scoped.view<wclap_host>(hostP);
+				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
+				if (!boundArenas) return;
+				auto *nativeHost = boundArenas->proxied.getNative<clap_host>();
+				if (!nativeHost) return;
+				nativeHost->request_callback(nativeHost);
 			}
 		} request_callback;
 
@@ -228,13 +234,28 @@ struct WclapMethods {
 
 	struct {
 		struct : public HostFn {
-			static void native(Wclap &wclap, WasmP) {
+			static void native(Wclap &wclap, WasmP hostP, uint32_t severity, WasmP msgStr) {
 				std::cout << "host.log()\n";
+				auto scoped = wclap.lockThread();
+
+				auto reset = scoped.arenas.scopedNativeReset();
+				const char *nativeMsgStr = wasmToNative<const char>(scoped, msgStr);
+				if (!nativeMsgStr) return;
+
+				auto view = scoped.view<wclap_host>(hostP);
+				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
+				if (!boundArenas) return;
+				auto *nativeHost = boundArenas->proxied.getNative<clap_host>();
+				if (!nativeHost) return;
+
+				const clap_host_log *nativeExtLog = boundArenas->proxied.getNative<clap_host_log>();
+				LOG_EXPR(nativeExtLog);
+				if (nativeExtLog) nativeExtLog->log(nativeHost, severity, nativeMsgStr);
 			}
 		} log;
 
 		void registerMethods(WclapThread &thread) {
-			thread.registerFunction(log);
+//			thread.registerFunction(log);
 		}
 	} hostExtLog;
 	
@@ -453,7 +474,6 @@ void nativeToWasm<const clap_host>(ScopedThread &scoped, const clap_host *native
 	view.url() = nativeToWasm(scoped, native->url);
 	view.version() = nativeToWasm(scoped, native->version);
 
-	// Methods don't exist yet - this will probably crash
 	auto &methods = scoped.wclap.methods(wasmP);
 	view.get_extension() = methods.host.get_extension.wasmP;
 	view.request_restart() = methods.host.request_restart.wasmP;

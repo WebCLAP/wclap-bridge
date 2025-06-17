@@ -31,20 +31,18 @@ struct NativeProxyList {
 		return nullptr;
 	}
 
-	// Returns whether an existing proxy was found, and sets the WASM pointer to it if so
-	template<class ClapStruct, typename WasmP>
-	bool update(const ClapStruct * ptr, WasmP &wasmP) {
+	// Returns the WASM proxy for a given type, updating the native proxy (which shouldn't *actually* change, but whatever)
+	template<class ClapStruct>
+	size_t getWasm(const void *ptr) const {
 		ClassId classId = getClassId<ClapStruct>();
 		auto lock = readLock();
 		for (auto &item : items) {
 			if (item.classId == classId) {
 				item.hostNative.store(ptr);
-				wasmP = (WasmP)item.wasmP;
-				return true;
+				return item.wasmP;
 			}
 		}
-		wasmP = 0;
-		return false;
+		return 0;
 	}
 	
 	template<class ClapStruct, typename WasmP>
@@ -63,8 +61,8 @@ struct NativeProxyList {
 private:
 	struct Item {
 		ClassId classId;
-		// Atomic because we allow it to be updated with only the "read" lock
-		std::atomic<const void *> hostNative;
+		// mutable atomic because we allow it to be updated with only the "read" lock
+		mutable std::atomic<const void *> hostNative;
 		size_t wasmP;
 		
 		Item(ClassId classId, const void *native, size_t wasmP) : classId(classId), hostNative(native), wasmP(wasmP) {}

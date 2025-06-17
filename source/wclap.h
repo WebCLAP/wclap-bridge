@@ -66,7 +66,7 @@ struct Wclap {
 	std::unique_ptr<WclapArenas> claimArenas(WclapThread *lockedThread);
 	void returnArenas(std::unique_ptr<WclapArenas> &arenas);
 
-	WclapArenas * arenasForWasmContext(uint64_t wasmContextP);
+	const WclapArenas * arenasForWasmContext(uint64_t wasmContextP);
 
 	// Used to lock a specific thread (e.g. a realtime one owned by a plugin/whatever)
 	ScopedThread lockThread(WclapThread *ptr, WclapArenas &arenas);
@@ -110,9 +110,9 @@ private:
 		return std::unique_lock<std::shared_mutex>{mutex};
 	}
 
-	// We keep a list of all arenas, and host proxy objects (in WASM memory) reference them by index, instead of trusting the WCLAP to give us anything valid
-	std::vector<WclapArenas *> arenaList;
-	std::vector<std::unique_ptr<WclapArenas>> arenaPool; // removed from pool
+	// We keep a list of all arenas, and host proxy objects (in WASM memory) reference them by index, instead of trusting the WCLAP to give us anything valid - but they're const, because even if that object *has* associated realtime thread, it's not appropriate to lock it for all calls
+	std::vector<const WclapArenas *> arenaList;
+	std::vector<std::unique_ptr<WclapArenas>> arenaPool; // arenas are removed from pool when used
 
 	std::unique_ptr<WclapThread> globalThread;
 	std::unique_ptr<WclapArenas> globalArenas;

@@ -110,7 +110,7 @@ struct WclapMethods {
 
 			// Proxy the host, and make it persistent
 			WasmP wasmHostP = nativeToWasm(scoped, host);
-			scoped.arenas.proxied.add(host, wasmHostP); // shouldn't exist because the arena was just taken from the pool.
+			scoped.arenas.proxied.add(host, wasmHostP); // won't exist because the arena was just taken from the pool.
 			scoped.arenas.persistWasm();
 
 			// Attempt to create the plugin
@@ -169,20 +169,22 @@ struct WclapMethods {
 				if (!extNativeStr) return 0;
 
 				auto view = scoped.view<wclap_host>(hostP);
+				// This is be the arena owned by the plugin, since that's where the WASM-side host proxy was created
 				auto *boundArenas = wclap.arenasForWasmContext(view.host_data());
 				if (!boundArenas) return 0;
 
+				// Fast even with naïve lookup, since it should be first in the list
 				auto *host = boundArenas->proxied.getNative<clap_host>();
 				if (!host) return 0;
 
-				const void *nativeExt = host->get_extension(host, extNativeStr);
-				if (!nativeExt) return 0;
+				const void *ext = host->get_extension(host, extNativeStr);
+				if (!ext) return 0;
 				
 				if (!std::strcmp(extNativeStr, CLAP_EXT_LOG)) {
-					
+					return (WasmP)boundArenas->proxied.getWasm<clap_host_log>(ext);
 				}
 				
-				std::cout << "native: host.get_extension(" << extNativeStr << ") = " << nativeExt << "\n";
+				std::cout << "native: host.get_extension(" << extNativeStr << ") = " << ext << "\n";
 				return 0;
 			}
 		} get_extension;

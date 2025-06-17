@@ -94,7 +94,7 @@ void Wclap::returnArenas(std::unique_ptr<WclapArenas> &arenas) {
 	arenaPool.emplace_back(std::move(arenas));
 }
 
-WclapArenas * Wclap::arenasForWasmContext(uint64_t wasmContextP) {
+const WclapArenas * Wclap::arenasForWasmContext(uint64_t wasmContextP) {
 	size_t index = *lockThread().viewDirectPointer<size_t>(wasmContextP);
 	auto lock = readLock();
 	if (index < arenaList.size()) return arenaList[index];

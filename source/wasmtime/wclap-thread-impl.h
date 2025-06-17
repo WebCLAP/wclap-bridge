@@ -87,7 +87,7 @@ double WclapThread::callWasm_D(uint64_t fnP, Args ...args) {
 //	fnP = 0;
 //}
 
-//*
+//*/
 template<void nativeFn(Wclap &, uint32_t), typename WasmP>
 void registerFunctionOnThread(WclapThread &thread, WasmP &fnP) {
 	struct S {

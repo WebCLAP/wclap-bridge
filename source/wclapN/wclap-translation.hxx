@@ -257,7 +257,7 @@ struct WclapMethods {
 		} log;
 
 		void registerMethods(WclapThread &thread) {
-//			thread.registerFunction(log);
+			thread.registerFunction(log);
 		}
 	} hostExtLog;
 	

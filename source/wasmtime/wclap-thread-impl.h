@@ -170,7 +170,7 @@ template <class ...Args, size_t ...Is>
 std::tuple<Wclap &, Args...> argsAsTuple(Wclap &wclap, wasmtime_val_raw_t *wasmArgs, std::index_sequence<Is...>) {
     return {wclap, wasmValToArg<Args>(wasmArgs[Is])...};
 }
-template<auto nativeFn /* hooray for C++17 */, typename WasmP, typename Return, class ...Args>
+template<auto nativeFn, typename WasmP, typename Return, class ...Args>
 void registerFunctionOnThread(WclapThread &thread, WasmP &fnP, const std::function<Return(Wclap &, Args...)> &/*ignored, just used for its type*/) {
 	struct S {
 		static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {

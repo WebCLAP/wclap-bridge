@@ -20,6 +20,9 @@ bool wclap_close(void *);
 // Returns a pointer to the opened WCLAP's CLAP API version
 const struct clap_version * wclap_version(void *);
 
+// The CLAP version which this bridge supports (as completely as possible)
+const struct clap_version * wclap_bridge_version();
+
 // Gets a factory (if supported by both the WCLAP and the bridge)
 const void * wclap_get_factory(void *, const char *factory_id);
 

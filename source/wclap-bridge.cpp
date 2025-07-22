@@ -75,7 +75,7 @@ bool wclap_close(void *wclap) {
 	delete (wclap::Wclap *)wclap;
 	return true;
 }
-const clap_version_t * wclap_version(void *wclap) {
+const clap_version * wclap_version(void *wclap) {
 	if (!wclap) {
 		wclap::wclap_error_message = "null pointer";
 		return nullptr;
@@ -90,3 +90,7 @@ const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	return ((wclap::Wclap *)wclap)->getFactory(factory_id);
 }
 
+static const clap_version bridgeVersion{1, 2, 7};
+const clap_version * wclap_bridge_version() {
+	return &bridgeVersion;
+}

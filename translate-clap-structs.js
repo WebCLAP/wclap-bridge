@@ -95,6 +95,9 @@ namespace wclap { namespace wclap${bits} {`;
 		let parts = cpp.split('\ntypedef struct ');
 		parts.slice(1).forEach(cpp => {
 			let cppName = cpp.split(' ', 1)[0];
+			let isHostStruct = /^clap_host(_|$)/.test(cppName);
+			let isPluginStruct = /^clap_plugin(_|$)/.test(cppName);
+
 			let name = cppName + "_t";
 			if (skipType[cppName]) return;
 			if (structTypes[name]) throw Error("double definition: " + name);
@@ -182,7 +185,7 @@ namespace wclap { namespace wclap${bits} {`;
 			
 			let wclapClass = `w${name}`.replace(/_t$/, '');
 			classIdEnum[name.replace(/_t$/, '')] = true;
-
+			
 			if (structType.compatible) {
 				code += `
 
@@ -231,6 +234,8 @@ struct ${wclapClass} {
 
 				let isFirstMethod = true;
 				structFields.forEach(field => {
+					if (isHostStruct) return;
+
 					let fieldType = getType(field.type);
 					if (field.argTypes) {
 						if (isFirstMethod) {
@@ -249,12 +254,22 @@ struct ${wclapClass} {
 								needsWasmArena = true;
 							}
 						}
+						// Our context should be able to look up the following two objects
+						// the struct in which this method is defined (which we take the actual function pointer from)
+						let contextMethodGroupField = "wasmMap." + name.replace(/_t$/, '').replace(/^clap_/, '');
+						// and the object pointer itself
+						let contextObjectField = field.argTypes[0] || "unknown";
+						contextObjectField = contextObjectField.replace(/\s*\**$/, '');
+						contextObjectField = contextObjectField.replace(/^.*\s+/, '');
+						contextObjectField = contextObjectField.replace(/_t$/, '').replace(/^clap_/, '');
+						contextObjectField = "wasmMap." + contextObjectField;
+						
 						code += `
 	template<bool realtime=false>
 	static ${field.returnType || 'void'} nativeProxy_${field.name}(${argsCode}) {
 		auto &context = getNativeProxyContext(${field.argNames[0] || ('(' + name + ' *)nullptr')});
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<${wclapClass}>(context.wasmObjP).${field.name}();
+		WasmP wasmFn = scoped.view<${wclapClass}>(context.${contextMethodGroupField}).${field.name}();
 		`;
 						if (needsWasmArena || needsNativeArena) {
 							code += `
@@ -271,10 +286,10 @@ struct ${wclapClass} {
 						}
 						if (field.returnType) {
 							code += `
-		${getWasmType(field.returnType)} wasmResult = scoped.thread.callWasm_${wasmTypeCode(field.returnType)}(wasmFn, context.wasmObjP`;
+		${getWasmType(field.returnType)} wasmResult = scoped.thread.callWasm_${wasmTypeCode(field.returnType)}(wasmFn, context.${contextObjectField}`;
 						} else {
 							code += `
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP`;
+		scoped.thread.callWasm_V(wasmFn, context.${contextObjectField}`;
 						}
 						for (let i = 1; i < field.argTypes.length; ++i) {
 							let argType = getType(field.argTypes[i]);
@@ -307,7 +322,9 @@ struct ${wclapClass} {
 				code += `
 private:
 	unsigned char *pointerInWasm;
-};
+};`;
+				if (!isHostStruct) {
+					code += `
 
 template<>
 void wasmToNative<const ${name}>(ScopedThread &scoped, WasmP wasmP, const ${name} *&nativeP);
@@ -316,38 +333,44 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const ${na
 	auto wasm = scoped.view<${wclapClass}>(wasmP);
 	auto *native = scoped.arenas.nativeTyped<${name}>();
 	constNativeP = native;`;
-				structFields.forEach(field => {
-					let fieldType = getType(field.type);
-					if (fieldType.compatible) {
-						if (field.arrayCount) {
-							code += `
+					structFields.forEach(field => {
+						let fieldType = getType(field.type);
+						if (fieldType.compatible) {
+							if (field.arrayCount) {
+								code += `
 	for (size_t i = 0; i < ${field.arrayCount}; ++i) {
 		native->${field.name}[i] = wasm.${field.name}(i);
 	}`;
-						} else {
-							code += `
+							} else {
+								code += `
 	native->${field.name} = wasm.${field.name}();`;
-						}
-					} else if (field.argTypes) {
-						code += `
-	native->${field.name} = ${wclapClass}::nativeProxy_${field.name}<false>;`;
-					} else {
-						if (field.arrayCount) {
+							}
+						} else if (field.argTypes) {
 							code += `
+	native->${field.name} = ${wclapClass}::nativeProxy_${field.name}<false>;`;
+						} else {
+							if (field.arrayCount) {
+								code += `
 	for (size_t i = 0; i < ${field.arrayCount}; ++i) {
 		wasmToNative(scoped, wasm.${field.name}(i), native->${field.name}[i]);
 	}`;
-						} else {
-							code += `
+							} else {
+								code += `
 	wasmToNative(scoped, wasm.${field.name}(), native->${field.name});`;
+							}
 						}
-					}
-				});
-				code += `
-}
+					});
+					code += `
+}`
+				}
+
+				if (!isPluginStruct) {
+					code += `
 
 template<>
-void nativeToWasm<const ${name}>(ScopedThread &scoped, const ${name} *native, WasmP &wasmP);
+void nativeToWasm<const ${name}>(ScopedThread &scoped, const ${name} *native, WasmP &wasmP);`;
+				}
+				code += `
 
 template<>
 void * & nativeProxyContextPointer<${name}>(const ${name} *native);`;
@@ -419,6 +442,9 @@ void * & nativeProxyContextPointer<${name}>(const ${name} *native);`;
 	addFile("ext/timer-support.h");
 	addFile("ext/track-info.h");
 	addFile("ext/voice-info.h");
+
+	// Skip most drafts, but this one is extremely useful for WCLAP
+	addFile("ext/draft/webview.h");
 
 	code += `
 	

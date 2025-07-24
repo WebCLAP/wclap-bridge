@@ -17,17 +17,68 @@
 
 namespace wclap { namespace WCLAP_MULTIPLE_INCLUDES_NAMESPACE {
 
-// This is what we store in the `void *` context fields of native proxies
+// This is what we store in the `void *` context fields of native proxies, and associate with the arenas stored in the WASM proxies
 struct NativeProxyContext {
 	Wclap *wclap = nullptr;
-	WasmP wasmObjP = 0;
 	std::unique_ptr<WclapArenas> arenas = nullptr;
 	std::unique_ptr<WclapThread> realtimeThread = nullptr;
 	
+	// This context can be associated with at most one WASM value (e.g. clap_plugin) of each type
+	struct WasmMap {
+		WasmP plugin = 0;
+		WasmP plugin_ambisonic = 0;
+		WasmP plugin_audio_ports = 0;
+		WasmP plugin_audio_ports_activation = 0;
+		WasmP plugin_audio_ports_config = 0;
+		WasmP plugin_audio_ports_config_info = 0;
+		WasmP plugin_configurable_audio_ports = 0;
+		WasmP context_menu_builder = 0;
+		WasmP plugin_context_menu = 0;
+		WasmP plugin_gui = 0;
+		WasmP plugin_latency = 0;
+		WasmP plugin_note_name = 0;
+		WasmP plugin_note_ports = 0;
+		WasmP plugin_params = 0;
+		WasmP plugin_param_indication = 0;
+		WasmP plugin_preset_load = 0;
+		WasmP plugin_remote_controls = 0;
+		WasmP plugin_render = 0;
+		WasmP plugin_state = 0;
+		WasmP plugin_state_context = 0;
+		WasmP plugin_surround = 0;
+		WasmP plugin_tail = 0;
+		WasmP plugin_thread_pool = 0;
+		WasmP plugin_timer_support = 0;
+		WasmP plugin_track_info = 0;
+		WasmP plugin_voice_info = 0;
+		WasmP plugin_webview = 0;
+		
+		WasmP input_events = 0, output_events = 0;
+		
+		WasmP istream = 0, ostream = 0;
+		
+		WasmP preset_discovery_provider = 0;
+		WasmP preset_discovery_indexer = 0;
+		
+		// Anything we don't expect to actually use here, but might still want translatable
+		union {
+			WasmP plugin_entry;
+			WasmP plugin_factory;
+			WasmP preset_discovery_factory;
+			WasmP preset_discovery_metadata_receiver;
+		};
+	} wasmMap;
+	struct NativeMap {
+		const clap_host *host = nullptr;
+		const clap_host_log *host_log = nullptr;
+	} nativeMap;
+
 	NativeProxyContext() {}
-	NativeProxyContext(Wclap *wclap, WasmP wasmObjP) : wclap(wclap), wasmObjP(wasmObjP) {}
-	NativeProxyContext(Wclap *wclap, WasmP wasmObjP, std::unique_ptr<WclapArenas> &&arenas) : wclap(wclap), wasmObjP(wasmObjP), arenas(std::move(arenas)) {}
-	NativeProxyContext(Wclap *wclap, WasmP wasmObjP, std::unique_ptr<WclapArenas> &&arenas, std::unique_ptr<WclapThread> &&rtThread) : wclap(wclap), wasmObjP(wasmObjP), arenas(std::move(arenas)), realtimeThread(std::move(rtThread)) {}
+	NativeProxyContext(Wclap *wclap) : wclap(wclap) {}
+	NativeProxyContext(Wclap *wclap, std::unique_ptr<WclapArenas> &&arenas) : wclap(wclap), arenas(std::move(arenas)) {}
+	NativeProxyContext(Wclap *wclap, std::unique_ptr<WclapArenas> &&arenas, std::unique_ptr<WclapThread> &&rtThread) : wclap(wclap), arenas(std::move(arenas)), realtimeThread(std::move(rtThread)) {
+		arenas->currentContext = this;
+	}
 
 	// Move only, no copy
 	NativeProxyContext(NativeProxyContext &&other) {
@@ -35,21 +86,23 @@ struct NativeProxyContext {
 	}
 	NativeProxyContext & operator=(NativeProxyContext &&other) {
 		wclap = other.wclap;
-		wasmObjP = other.wasmObjP;
 		arenas = std::move(other.arenas);
+		arenas->currentContext = this;
 		realtimeThread = std::move(other.realtimeThread);
+		wasmMap = other.wasmMap;
+		nativeMap = other.nativeMap;
 		return *this;
 	}
 	
-	// Only gets called when it's a temporary variable on the stack
+	// Only gets called when it's a temporary variable on the stack, or the whole WASM instance/module is being destroyed
 	~NativeProxyContext() {
 		reset();
 	}
 
-	static NativeProxyContext claimRealtime(Wclap &wclap, WasmP wasmObjP=0) {
+	static NativeProxyContext claimRealtime(Wclap &wclap) {
 		auto rtThread = wclap.claimRealtimeThread();
 		auto arenas = wclap.claimArenas(rtThread.get());
-		return {&wclap, wasmObjP, std::move(arenas), std::move(rtThread)};
+		return {&wclap, std::move(arenas), std::move(rtThread)};
 	}
 	
 	ScopedThread lock(bool realtime=false) const;
@@ -61,6 +114,8 @@ struct NativeProxyContext {
 			LOG_EXPR(wclap);
 			abort();
 		}
+		wasmMap = {};
+		nativeMap = {};
 		if (arenas) wclap->returnArenas(arenas);
 		if (realtimeThread) wclap->returnRealtimeThread(realtimeThread);
 	}

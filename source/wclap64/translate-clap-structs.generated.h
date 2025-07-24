@@ -44,70 +44,9 @@ struct wclap_host {
 	WasmP & request_callback() {
 		return *(WasmP *)(pointerInWasm + 80);
 	}
-
-	template<bool realtime=false>
-	static const void * nativeProxy_get_extension(const struct clap_host *host, const char *extension_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host>(context.wasmObjP).get_extension();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_extension_id;
-		nativeToWasm(scoped, extension_id, wasm_extension_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
-
-		auto resetN = scoped.arenas.scopedNativeReset();
-		const void *nativeResult;
-		wasmToNative(scoped, wasmResult, nativeResult);
-		return nativeResult;
-	}
-	template<bool realtime=false>
-	static void nativeProxy_request_restart(const struct clap_host *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host>(context.wasmObjP).request_restart();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
-	template<bool realtime=false>
-	static void nativeProxy_request_process(const struct clap_host *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host>(context.wasmObjP).request_process();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
-	template<bool realtime=false>
-	static void nativeProxy_request_callback(const struct clap_host *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host>(context.wasmObjP).request_callback();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_t>();
-	constNativeP = native;
-	native->clap_version = wasm.clap_version();
-	wasmToNative(scoped, wasm.host_data(), native->host_data);
-	wasmToNative(scoped, wasm.name(), native->name);
-	wasmToNative(scoped, wasm.vendor(), native->vendor);
-	wasmToNative(scoped, wasm.url(), native->url);
-	wasmToNative(scoped, wasm.version(), native->version);
-	native->get_extension = wclap_host::nativeProxy_get_extension<false>;
-	native->request_restart = wclap_host::nativeProxy_request_restart<false>;
-	native->request_process = wclap_host::nativeProxy_request_process<false>;
-	native->request_callback = wclap_host::nativeProxy_request_callback<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_t>(ScopedThread &scoped, const clap_host_t *native, WasmP &wasmP);
@@ -320,20 +259,20 @@ struct wclap_input_events {
 	static uint32_t nativeProxy_size(const struct clap_input_events *list) {
 		auto &context = getNativeProxyContext(list);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_input_events>(context.wasmObjP).size();
+		WasmP wasmFn = scoped.view<wclap_input_events>(context.wasmMap.input_events).size();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.input_events);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static const clap_event_header_t * nativeProxy_get(const struct clap_input_events *list, uint32_t index) {
 		auto &context = getNativeProxyContext(list);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_input_events>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_input_events>(context.wasmMap.input_events).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.input_events, index);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const clap_event_header_t *nativeResult;
@@ -383,13 +322,13 @@ struct wclap_output_events {
 	static bool nativeProxy_try_push(const struct clap_output_events *list, const clap_event_header_t *event) {
 		auto &context = getNativeProxyContext(list);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_output_events>(context.wasmObjP).try_push();
+		WasmP wasmFn = scoped.view<wclap_output_events>(context.wasmMap.output_events).try_push();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_event;
 		nativeToWasm(scoped, event, wasm_event);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_event);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.output_events, wasm_event);
 		return wasmResult;
 	}
 private:
@@ -591,9 +530,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_descriptor_t>(ScopedThread &scoped, const clap_plugin_descriptor_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_descriptor_t>(const clap_plugin_descriptor_t *native);
 
 struct wclap_plugin {
@@ -647,85 +583,85 @@ struct wclap_plugin {
 	static bool nativeProxy_init(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).init();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).init();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_destroy(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).destroy();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).destroy();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}   
 	template<bool realtime=false>
 	static bool nativeProxy_activate(const struct clap_plugin *plugin, double sample_rate, uint32_t min_frames_count, uint32_t max_frames_count) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).activate();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).activate();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, sample_rate, min_frames_count, max_frames_count);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, sample_rate, min_frames_count, max_frames_count);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_deactivate(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).deactivate();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).deactivate();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_start_processing(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).start_processing();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).start_processing();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_stop_processing(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).stop_processing();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).stop_processing();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_reset(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).reset();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).reset();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}
 	template<bool realtime=false>
 	static clap_process_status nativeProxy_process(const struct clap_plugin *plugin, const clap_process_t *process) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).process();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).process();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_process;
 		nativeToWasm(scoped, process, wasm_process);
-		int32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_process);
+		int32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_process);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static const void * nativeProxy_get_extension(const struct clap_plugin *plugin, const char *id) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).get_extension();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).get_extension();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_id;
 		nativeToWasm(scoped, id, wasm_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.plugin, wasm_id);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const void *nativeResult;
@@ -736,9 +672,9 @@ struct wclap_plugin {
 	static void nativeProxy_on_main_thread(const struct clap_plugin *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmObjP).on_main_thread();
+		WasmP wasmFn = scoped.view<wclap_plugin>(context.wasmMap.plugin).on_main_thread();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -764,9 +700,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->get_extension = wclap_plugin::nativeProxy_get_extension<false>;
 	native->on_main_thread = wclap_plugin::nativeProxy_on_main_thread<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_t>(ScopedThread &scoped, const clap_plugin_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_t>(const clap_plugin_t *native);
@@ -795,20 +728,20 @@ struct wclap_plugin_factory {
 	static uint32_t nativeProxy_get_plugin_count(const struct clap_plugin_factory *factory) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmObjP).get_plugin_count();
+		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmMap.plugin_factory).get_plugin_count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin_factory);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static const clap_plugin_descriptor_t * nativeProxy_get_plugin_descriptor(const struct clap_plugin_factory *factory, uint32_t index) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmObjP).get_plugin_descriptor();
+		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmMap.plugin_factory).get_plugin_descriptor();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.plugin_factory, index);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const clap_plugin_descriptor_t *nativeResult;
@@ -819,7 +752,7 @@ struct wclap_plugin_factory {
 	static const clap_plugin_t * nativeProxy_create_plugin(const struct clap_plugin_factory *factory, const clap_host_t *host, const char *plugin_id) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmObjP).create_plugin();
+		WasmP wasmFn = scoped.view<wclap_plugin_factory>(context.wasmMap.plugin_factory).create_plugin();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -827,7 +760,7 @@ struct wclap_plugin_factory {
 		nativeToWasm(scoped, host, wasm_host);
 		WasmP wasm_plugin_id;
 		nativeToWasm(scoped, plugin_id, wasm_plugin_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_host, wasm_plugin_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.plugin_factory, wasm_host, wasm_plugin_id);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const clap_plugin_t *nativeResult;
@@ -849,9 +782,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->get_plugin_descriptor = wclap_plugin_factory::nativeProxy_get_plugin_descriptor<false>;
 	native->create_plugin = wclap_plugin_factory::nativeProxy_create_plugin<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_factory_t>(ScopedThread &scoped, const clap_plugin_factory_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_factory_t>(const clap_plugin_factory_t *native);
@@ -941,19 +871,19 @@ struct wclap_preset_discovery_metadata_receiver {
 	static void nativeProxy_on_error(const struct clap_preset_discovery_metadata_receiver *receiver, int32_t os_error, const char *error_message) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).on_error();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).on_error();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_error_message;
 		nativeToWasm(scoped, error_message, wasm_error_message);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, os_error, wasm_error_message);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, os_error, wasm_error_message);
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_begin_preset(const struct clap_preset_discovery_metadata_receiver *receiver, const char *name, const char *load_key) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).begin_preset();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).begin_preset();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -961,90 +891,90 @@ struct wclap_preset_discovery_metadata_receiver {
 		nativeToWasm(scoped, name, wasm_name);
 		WasmP wasm_load_key;
 		nativeToWasm(scoped, load_key, wasm_load_key);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_name, wasm_load_key);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_name, wasm_load_key);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_add_plugin_id(const struct clap_preset_discovery_metadata_receiver *receiver, const clap_universal_plugin_id_t *plugin_id) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_plugin_id();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).add_plugin_id();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_plugin_id;
 		nativeToWasm(scoped, plugin_id, wasm_plugin_id);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_plugin_id);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_plugin_id);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_set_soundpack_id(const struct clap_preset_discovery_metadata_receiver *receiver, const char *soundpack_id) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_soundpack_id();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).set_soundpack_id();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_soundpack_id;
 		nativeToWasm(scoped, soundpack_id, wasm_soundpack_id);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_soundpack_id);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_soundpack_id);
 	} 
 	template<bool realtime=false>
 	static void nativeProxy_set_flags(const struct clap_preset_discovery_metadata_receiver *receiver, uint32_t flags) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_flags();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).set_flags();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, flags);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_add_creator(const struct clap_preset_discovery_metadata_receiver *receiver, const char *creator) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_creator();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).add_creator();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_creator;
 		nativeToWasm(scoped, creator, wasm_creator);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_creator);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_creator);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_set_description(const struct clap_preset_discovery_metadata_receiver *receiver, const char *description) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_description();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).set_description();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_description;
 		nativeToWasm(scoped, description, wasm_description);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_description);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_description);
 	}  
 	template<bool realtime=false>
 	static void nativeProxy_set_timestamps(const struct clap_preset_discovery_metadata_receiver *receiver, clap_timestamp creation_time, clap_timestamp modification_time) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).set_timestamps();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).set_timestamps();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, creation_time, modification_time);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, creation_time, modification_time);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_add_feature(const struct clap_preset_discovery_metadata_receiver *receiver, const char *feature) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_feature();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).add_feature();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_feature;
 		nativeToWasm(scoped, feature, wasm_feature);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_feature);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_feature);
 	}
 	template<bool realtime=false>
 	static void nativeProxy_add_extra_info(const struct clap_preset_discovery_metadata_receiver *receiver, const char *key, const char *value) {
 		auto &context = getNativeProxyContext(receiver);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmObjP).add_extra_info();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_metadata_receiver>(context.wasmMap.preset_discovery_metadata_receiver).add_extra_info();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -1052,7 +982,7 @@ struct wclap_preset_discovery_metadata_receiver {
 		nativeToWasm(scoped, key, wasm_key);
 		WasmP wasm_value;
 		nativeToWasm(scoped, value, wasm_value);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_key, wasm_value);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_metadata_receiver, wasm_key, wasm_value);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -1309,24 +1239,24 @@ struct wclap_preset_discovery_provider {
 	static bool nativeProxy_init(const struct clap_preset_discovery_provider *provider) {
 		auto &context = getNativeProxyContext(provider);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmObjP).init();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmMap.preset_discovery_provider).init();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_provider);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_destroy(const struct clap_preset_discovery_provider *provider) {
 		auto &context = getNativeProxyContext(provider);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmObjP).destroy();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmMap.preset_discovery_provider).destroy();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.preset_discovery_provider);
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get_metadata(const struct clap_preset_discovery_provider *provider, uint32_t location_kind, const char *location, const clap_preset_discovery_metadata_receiver_t *metadata_receiver) {
 		auto &context = getNativeProxyContext(provider);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmObjP).get_metadata();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmMap.preset_discovery_provider).get_metadata();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -1334,20 +1264,20 @@ struct wclap_preset_discovery_provider {
 		nativeToWasm(scoped, location, wasm_location);
 		WasmP wasm_metadata_receiver;
 		nativeToWasm(scoped, metadata_receiver, wasm_metadata_receiver);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_metadata_receiver);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_provider, location_kind, wasm_location, wasm_metadata_receiver);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static const void * nativeProxy_get_extension(const struct clap_preset_discovery_provider *provider, const char *extension_id) {
 		auto &context = getNativeProxyContext(provider);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmObjP).get_extension();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_provider>(context.wasmMap.preset_discovery_provider).get_extension();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_extension_id;
 		nativeToWasm(scoped, extension_id, wasm_extension_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.preset_discovery_provider, wasm_extension_id);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const void *nativeResult;
@@ -1424,52 +1354,52 @@ struct wclap_preset_discovery_indexer {
 	static bool nativeProxy_declare_filetype(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_filetype_t *filetype) {
 		auto &context = getNativeProxyContext(indexer);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_filetype();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmMap.preset_discovery_indexer).declare_filetype();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_filetype;
 		nativeToWasm(scoped, filetype, wasm_filetype);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_filetype);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_indexer, wasm_filetype);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_declare_location(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_location_t *location) {
 		auto &context = getNativeProxyContext(indexer);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_location();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmMap.preset_discovery_indexer).declare_location();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_location;
 		nativeToWasm(scoped, location, wasm_location);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_location);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_indexer, wasm_location);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_declare_soundpack(const struct clap_preset_discovery_indexer *indexer, const clap_preset_discovery_soundpack_t *soundpack) {
 		auto &context = getNativeProxyContext(indexer);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmObjP).declare_soundpack();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmMap.preset_discovery_indexer).declare_soundpack();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_soundpack;
 		nativeToWasm(scoped, soundpack, wasm_soundpack);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_soundpack);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_indexer, wasm_soundpack);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static const void * nativeProxy_get_extension(const struct clap_preset_discovery_indexer *indexer, const char *extension_id) {
 		auto &context = getNativeProxyContext(indexer);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmObjP).get_extension();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_indexer>(context.wasmMap.preset_discovery_indexer).get_extension();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_extension_id;
 		nativeToWasm(scoped, extension_id, wasm_extension_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_extension_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.preset_discovery_indexer, wasm_extension_id);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const void *nativeResult;
@@ -1529,20 +1459,20 @@ struct wclap_preset_discovery_factory {
 	static uint32_t nativeProxy_count(const struct clap_preset_discovery_factory *factory) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmMap.preset_discovery_factory).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.preset_discovery_factory);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static const clap_preset_discovery_provider_descriptor_t * nativeProxy_get_descriptor(const struct clap_preset_discovery_factory *factory, uint32_t index) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmObjP).get_descriptor();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmMap.preset_discovery_factory).get_descriptor();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, index);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.preset_discovery_factory, index);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const clap_preset_discovery_provider_descriptor_t *nativeResult;
@@ -1553,7 +1483,7 @@ struct wclap_preset_discovery_factory {
 	static const clap_preset_discovery_provider_t * nativeProxy_create(const struct clap_preset_discovery_factory *factory, const clap_preset_discovery_indexer_t *indexer, const char *provider_id) {
 		auto &context = getNativeProxyContext(factory);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmObjP).create();
+		WasmP wasmFn = scoped.view<wclap_preset_discovery_factory>(context.wasmMap.preset_discovery_factory).create();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -1561,7 +1491,7 @@ struct wclap_preset_discovery_factory {
 		nativeToWasm(scoped, indexer, wasm_indexer);
 		WasmP wasm_provider_id;
 		nativeToWasm(scoped, provider_id, wasm_provider_id);
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP, wasm_indexer, wasm_provider_id);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.preset_discovery_factory, wasm_indexer, wasm_provider_id);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const clap_preset_discovery_provider_t *nativeResult;
@@ -1617,28 +1547,28 @@ struct wclap_plugin_entry {
 	static bool nativeProxy_init(const char *plugin_path) {
 		auto &context = getNativeProxyContext(plugin_path);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmObjP).init();
+		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).init();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.char);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_deinit() {
 		auto &context = getNativeProxyContext((clap_plugin_entry_t *)nullptr);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmObjP).deinit();
+		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).deinit();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.unknown);
 	}
 	template<bool realtime=false>
 	static const void * nativeProxy_get_factory(const char *factory_id) {
 		auto &context = getNativeProxyContext(factory_id);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmObjP).get_factory();
+		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).get_factory();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmObjP);
+		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.char);
 
 		auto resetN = scoped.arenas.scopedNativeReset();
 		const void *nativeResult;
@@ -1661,9 +1591,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->deinit = wclap_plugin_entry::nativeProxy_deinit<false>;
 	native->get_factory = wclap_plugin_entry::nativeProxy_get_factory<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_entry_t>(ScopedThread &scoped, const clap_plugin_entry_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_entry_t>(const clap_plugin_entry_t *native);
@@ -1691,13 +1618,13 @@ struct wclap_istream {
 	static int64_t nativeProxy_read(const struct clap_istream *stream, void *buffer, uint64_t size) {
 		auto &context = getNativeProxyContext(stream);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_istream>(context.wasmObjP).read();
+		WasmP wasmFn = scoped.view<wclap_istream>(context.wasmMap.istream).read();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_buffer;
 		nativeToWasm(scoped, buffer, wasm_buffer);
-		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmObjP, wasm_buffer, size);
+		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmMap.istream, wasm_buffer, size);
 		return wasmResult;
 	}
 private:
@@ -1742,13 +1669,13 @@ struct wclap_ostream {
 	static int64_t nativeProxy_write(const struct clap_ostream *stream, const void *buffer, uint64_t size) {
 		auto &context = getNativeProxyContext(stream);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_ostream>(context.wasmObjP).write();
+		WasmP wasmFn = scoped.view<wclap_ostream>(context.wasmMap.ostream).write();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_buffer;
 		nativeToWasm(scoped, buffer, wasm_buffer);
-		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmObjP, wasm_buffer, size);
+		int64_t wasmResult = scoped.thread.callWasm_L(wasmFn, context.wasmMap.ostream, wasm_buffer, size);
 		return wasmResult;
 	}
 private:
@@ -1795,26 +1722,26 @@ struct wclap_plugin_ambisonic {
 	static bool nativeProxy_is_config_supported(const clap_plugin_t *plugin, const clap_ambisonic_config_t *config) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_ambisonic>(context.wasmObjP).is_config_supported();
+		WasmP wasmFn = scoped.view<wclap_plugin_ambisonic>(context.wasmMap.plugin_ambisonic).is_config_supported();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(scoped, config, wasm_config);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_config);
 		return wasmResult;
 	}  
 	template<bool realtime=false>
 	static bool nativeProxy_get_config(const clap_plugin_t *plugin, bool is_input, uint32_t port_index, clap_ambisonic_config_t *config) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_ambisonic>(context.wasmObjP).get_config();
+		WasmP wasmFn = scoped.view<wclap_plugin_ambisonic>(context.wasmMap.plugin_ambisonic).get_config();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(scoped, config, wasm_config);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, is_input, port_index, wasm_config);
 		return wasmResult;
 	}
 private:
@@ -1833,9 +1760,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_ambisonic_t>(ScopedThread &scoped, const clap_plugin_ambisonic_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_ambisonic_t>(const clap_plugin_ambisonic_t *native);
 
 struct wclap_host_ambisonic {
@@ -1851,28 +1775,9 @@ struct wclap_host_ambisonic {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_ambisonic>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_ambisonic_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_ambisonic_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_ambisonic_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_ambisonic>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_ambisonic_t>();
-	constNativeP = native;
-	native->changed = wclap_host_ambisonic::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_ambisonic_t>(ScopedThread &scoped, const clap_host_ambisonic_t *native, WasmP &wasmP);
@@ -1956,22 +1861,22 @@ struct wclap_plugin_audio_ports {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin, bool is_input) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports>(context.wasmMap.plugin_audio_ports).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, is_input);
 		return wasmResult;
 	}  
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t index, bool is_input, clap_audio_port_info_t *info) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports>(context.wasmMap.plugin_audio_ports).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(scoped, info, wasm_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, is_input, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, index, is_input, wasm_info);
 		return wasmResult;
 	}
 private:
@@ -1988,9 +1893,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->count = wclap_plugin_audio_ports::nativeProxy_count<false>;
 	native->get = wclap_plugin_audio_ports::nativeProxy_get<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_audio_ports_t>(ScopedThread &scoped, const clap_plugin_audio_ports_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_t>(const clap_plugin_audio_ports_t *native);
@@ -2011,38 +1913,9 @@ struct wclap_host_audio_ports {
 	WasmP & rescan() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
- 
-	template<bool realtime=false>
-	static bool nativeProxy_is_rescan_flag_supported(const clap_host_t *host, uint32_t flag) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_audio_ports>(context.wasmObjP).is_rescan_flag_supported();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, flag);
-		return wasmResult;
-	} 
-	template<bool realtime=false>
-	static void nativeProxy_rescan(const clap_host_t *host, uint32_t flags) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_audio_ports>(context.wasmObjP).rescan();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_audio_ports_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_audio_ports_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_audio_ports_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_audio_ports>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_audio_ports_t>();
-	constNativeP = native;
-	native->is_rescan_flag_supported = wclap_host_audio_ports::nativeProxy_is_rescan_flag_supported<false>;
-	native->rescan = wclap_host_audio_ports::nativeProxy_rescan<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_audio_ports_t>(ScopedThread &scoped, const clap_host_audio_ports_t *native, WasmP &wasmP);
@@ -2071,18 +1944,18 @@ struct wclap_plugin_audio_ports_activation {
 	static bool nativeProxy_can_activate_while_processing(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_activation>(context.wasmObjP).can_activate_while_processing();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_activation>(context.wasmMap.plugin_audio_ports_activation).can_activate_while_processing();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}    
 	template<bool realtime=false>
 	static bool nativeProxy_set_active(const clap_plugin_t *plugin, bool is_input, uint32_t port_index, bool is_active, uint32_t sample_size) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_activation>(context.wasmObjP).set_active();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_activation>(context.wasmMap.plugin_audio_ports_activation).set_active();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, is_active, sample_size);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, is_input, port_index, is_active, sample_size);
 		return wasmResult;
 	}
 private:
@@ -2099,9 +1972,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->can_activate_while_processing = wclap_plugin_audio_ports_activation::nativeProxy_can_activate_while_processing<false>;
 	native->set_active = wclap_plugin_audio_ports_activation::nativeProxy_set_active<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_audio_ports_activation_t>(ScopedThread &scoped, const clap_plugin_audio_ports_activation_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_activation_t>(const clap_plugin_audio_ports_activation_t *native);
@@ -2201,31 +2071,31 @@ struct wclap_plugin_audio_ports_config {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmMap.plugin_audio_ports_config).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t index, clap_audio_ports_config_t *config) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmMap.plugin_audio_ports_config).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_config;
 		nativeToWasm(scoped, config, wasm_config);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, wasm_config);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, index, wasm_config);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_select(const clap_plugin_t *plugin, clap_id config_id) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmObjP).select();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config>(context.wasmMap.plugin_audio_ports_config).select();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, config_id);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, config_id);
 		return wasmResult;
 	}
 private:
@@ -2243,9 +2113,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->get = wclap_plugin_audio_ports_config::nativeProxy_get<false>;
 	native->select = wclap_plugin_audio_ports_config::nativeProxy_select<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_audio_ports_config_t>(ScopedThread &scoped, const clap_plugin_audio_ports_config_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_config_t>(const clap_plugin_audio_ports_config_t *native);
@@ -2271,22 +2138,22 @@ struct wclap_plugin_audio_ports_config_info {
 	static clap_id nativeProxy_current_config(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config_info>(context.wasmObjP).current_config();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config_info>(context.wasmMap.plugin_audio_ports_config_info).current_config();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}   
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, clap_id config_id, uint32_t port_index, bool is_input, clap_audio_port_info_t *info) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config_info>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_audio_ports_config_info>(context.wasmMap.plugin_audio_ports_config_info).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(scoped, info, wasm_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, config_id, port_index, is_input, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, config_id, port_index, is_input, wasm_info);
 		return wasmResult;
 	}
 private:
@@ -2305,9 +2172,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_audio_ports_config_info_t>(ScopedThread &scoped, const clap_plugin_audio_ports_config_info_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_audio_ports_config_info_t>(const clap_plugin_audio_ports_config_info_t *native);
 
 struct wclap_host_audio_ports_config {
@@ -2323,28 +2187,9 @@ struct wclap_host_audio_ports_config {
 	WasmP & rescan() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_rescan(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_audio_ports_config>(context.wasmObjP).rescan();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_audio_ports_config_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_audio_ports_config_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_audio_ports_config_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_audio_ports_config>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_audio_ports_config_t>();
-	constNativeP = native;
-	native->rescan = wclap_host_audio_ports_config::nativeProxy_rescan<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_audio_ports_config_t>(ScopedThread &scoped, const clap_host_audio_ports_config_t *native, WasmP &wasmP);
@@ -2422,26 +2267,26 @@ struct wclap_plugin_configurable_audio_ports {
 	static bool nativeProxy_can_apply_configuration(const clap_plugin_t *plugin, const struct clap_audio_port_configuration_request *requests, uint32_t request_count) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).can_apply_configuration();
+		WasmP wasmFn = scoped.view<wclap_plugin_configurable_audio_ports>(context.wasmMap.plugin_configurable_audio_ports).can_apply_configuration();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_requests;
 		nativeToWasm(scoped, requests, wasm_requests);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_requests, request_count);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_requests, request_count);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_apply_configuration(const clap_plugin_t *plugin, const struct clap_audio_port_configuration_request *requests, uint32_t request_count) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_configurable_audio_ports>(context.wasmObjP).apply_configuration();
+		WasmP wasmFn = scoped.view<wclap_plugin_configurable_audio_ports>(context.wasmMap.plugin_configurable_audio_ports).apply_configuration();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_requests;
 		nativeToWasm(scoped, requests, wasm_requests);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_requests, request_count);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_requests, request_count);
 		return wasmResult;
 	}
 private:
@@ -2458,9 +2303,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->can_apply_configuration = wclap_plugin_configurable_audio_ports::nativeProxy_can_apply_configuration<false>;
 	native->apply_configuration = wclap_plugin_configurable_audio_ports::nativeProxy_apply_configuration<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_configurable_audio_ports_t>(ScopedThread &scoped, const clap_plugin_configurable_audio_ports_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_configurable_audio_ports_t>(const clap_plugin_configurable_audio_ports_t *native);
@@ -2651,22 +2493,22 @@ struct wclap_context_menu_builder {
 	static bool nativeProxy_add_item(const struct clap_context_menu_builder *builder, clap_context_menu_item_kind_t item_kind, const void *item_data) {
 		auto &context = getNativeProxyContext(builder);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_context_menu_builder>(context.wasmObjP).add_item();
+		WasmP wasmFn = scoped.view<wclap_context_menu_builder>(context.wasmMap.context_menu_builder).add_item();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_item_data;
 		nativeToWasm(scoped, item_data, wasm_item_data);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, item_kind, wasm_item_data);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.context_menu_builder, item_kind, wasm_item_data);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_supports(const struct clap_context_menu_builder *builder, clap_context_menu_item_kind_t item_kind) {
 		auto &context = getNativeProxyContext(builder);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_context_menu_builder>(context.wasmObjP).supports();
+		WasmP wasmFn = scoped.view<wclap_context_menu_builder>(context.wasmMap.context_menu_builder).supports();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, item_kind);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.context_menu_builder, item_kind);
 		return wasmResult;
 	}
 private:
@@ -2712,7 +2554,7 @@ struct wclap_plugin_context_menu {
 	static bool nativeProxy_populate(const clap_plugin_t *plugin, const clap_context_menu_target_t *target, const clap_context_menu_builder_t *builder) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_context_menu>(context.wasmObjP).populate();
+		WasmP wasmFn = scoped.view<wclap_plugin_context_menu>(context.wasmMap.plugin_context_menu).populate();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -2720,20 +2562,20 @@ struct wclap_plugin_context_menu {
 		nativeToWasm(scoped, target, wasm_target);
 		WasmP wasm_builder;
 		nativeToWasm(scoped, builder, wasm_builder);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, wasm_builder);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_target, wasm_builder);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_perform(const clap_plugin_t *plugin, const clap_context_menu_target_t *target, clap_id action_id) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_context_menu>(context.wasmObjP).perform();
+		WasmP wasmFn = scoped.view<wclap_plugin_context_menu>(context.wasmMap.plugin_context_menu).perform();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_target;
 		nativeToWasm(scoped, target, wasm_target);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, action_id);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_target, action_id);
 		return wasmResult;
 	}
 private:
@@ -2750,9 +2592,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->populate = wclap_plugin_context_menu::nativeProxy_populate<false>;
 	native->perform = wclap_plugin_context_menu::nativeProxy_perform<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_context_menu_t>(ScopedThread &scoped, const clap_plugin_context_menu_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_context_menu_t>(const clap_plugin_context_menu_t *native);
@@ -2779,73 +2618,9 @@ struct wclap_host_context_menu {
 	WasmP & popup() {
 		return *(WasmP *)(pointerInWasm + 24);
 	}
-
-	template<bool realtime=false>
-	static bool nativeProxy_populate(const clap_host_t *host, const clap_context_menu_target_t *target, const clap_context_menu_builder_t *builder) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_context_menu>(context.wasmObjP).populate();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_target;
-		nativeToWasm(scoped, target, wasm_target);
-		WasmP wasm_builder;
-		nativeToWasm(scoped, builder, wasm_builder);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, wasm_builder);
-		return wasmResult;
-	} 
-	template<bool realtime=false>
-	static bool nativeProxy_perform(const clap_host_t *host, const clap_context_menu_target_t *target, clap_id action_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_context_menu>(context.wasmObjP).perform();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_target;
-		nativeToWasm(scoped, target, wasm_target);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, action_id);
-		return wasmResult;
-	}
-	template<bool realtime=false>
-	static bool nativeProxy_can_popup(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_context_menu>(context.wasmObjP).can_popup();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	}   
-	template<bool realtime=false>
-	static bool nativeProxy_popup(const clap_host_t *host, const clap_context_menu_target_t *target, int32_t screen_index, int32_t x, int32_t y) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_context_menu>(context.wasmObjP).popup();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_target;
-		nativeToWasm(scoped, target, wasm_target);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_target, screen_index, x, y);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_context_menu_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_context_menu_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_context_menu_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_context_menu>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_context_menu_t>();
-	constNativeP = native;
-	native->populate = wclap_host_context_menu::nativeProxy_populate<false>;
-	native->perform = wclap_host_context_menu::nativeProxy_perform<false>;
-	native->can_popup = wclap_host_context_menu::nativeProxy_can_popup<false>;
-	native->popup = wclap_host_context_menu::nativeProxy_popup<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_context_menu_t>(ScopedThread &scoped, const clap_host_context_menu_t *native, WasmP &wasmP);
@@ -2866,35 +2641,9 @@ struct wclap_host_event_registry {
 	WasmP & query() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static bool nativeProxy_query(const clap_host_t *host, const char *space_name, uint16_t *space_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_event_registry>(context.wasmObjP).query();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_space_name;
-		nativeToWasm(scoped, space_name, wasm_space_name);
-		WasmP wasm_space_id;
-		nativeToWasm(scoped, space_id, wasm_space_id);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_space_name, wasm_space_id);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_event_registry_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_event_registry_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_event_registry_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_event_registry>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_event_registry_t>();
-	constNativeP = native;
-	native->query = wclap_host_event_registry::nativeProxy_query<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_event_registry_t>(ScopedThread &scoped, const clap_host_event_registry_t *native, WasmP &wasmP);
@@ -2964,20 +2713,20 @@ struct wclap_plugin_gui {
 	static bool nativeProxy_is_api_supported(const clap_plugin_t *plugin, const char *api, bool is_floating) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).is_api_supported();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).is_api_supported();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_api;
 		nativeToWasm(scoped, api, wasm_api);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, is_floating);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_api, is_floating);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_get_preferred_api(const clap_plugin_t *plugin, const char **api, bool *is_floating) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).get_preferred_api();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).get_preferred_api();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -2985,44 +2734,44 @@ struct wclap_plugin_gui {
 		nativeToWasm(scoped, api, wasm_api);
 		WasmP wasm_is_floating;
 		nativeToWasm(scoped, is_floating, wasm_is_floating);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, wasm_is_floating);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_api, wasm_is_floating);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_create(const clap_plugin_t *plugin, const char *api, bool is_floating) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).create();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).create();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_api;
 		nativeToWasm(scoped, api, wasm_api);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_api, is_floating);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_api, is_floating);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_destroy(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).destroy();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).destroy();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_set_scale(const clap_plugin_t *plugin, double scale) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).set_scale();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).set_scale();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, scale);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, scale);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_get_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).get_size();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).get_size();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3030,36 +2779,36 @@ struct wclap_plugin_gui {
 		nativeToWasm(scoped, width, wasm_width);
 		WasmP wasm_height;
 		nativeToWasm(scoped, height, wasm_height);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_width, wasm_height);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_width, wasm_height);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_can_resize(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).can_resize();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).can_resize();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_get_resize_hints(const clap_plugin_t *plugin, clap_gui_resize_hints_t *hints) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).get_resize_hints();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).get_resize_hints();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_hints;
 		nativeToWasm(scoped, hints, wasm_hints);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_hints);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_hints);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_adjust_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).adjust_size();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).adjust_size();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3067,72 +2816,72 @@ struct wclap_plugin_gui {
 		nativeToWasm(scoped, width, wasm_width);
 		WasmP wasm_height;
 		nativeToWasm(scoped, height, wasm_height);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_width, wasm_height);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_width, wasm_height);
 		return wasmResult;
 	}  
 	template<bool realtime=false>
 	static bool nativeProxy_set_size(const clap_plugin_t *plugin, uint32_t width, uint32_t height) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).set_size();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).set_size();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, width, height);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, width, height);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_set_parent(const clap_plugin_t *plugin, const clap_window_t *window) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).set_parent();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).set_parent();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_window;
 		nativeToWasm(scoped, window, wasm_window);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_window);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_window);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_set_transient(const clap_plugin_t *plugin, const clap_window_t *window) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).set_transient();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).set_transient();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_window;
 		nativeToWasm(scoped, window, wasm_window);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_window);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_window);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_suggest_title(const clap_plugin_t *plugin, const char *title) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).suggest_title();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).suggest_title();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_title;
 		nativeToWasm(scoped, title, wasm_title);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_title);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, wasm_title);
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_show(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).show();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).show();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_hide(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmObjP).hide();
+		WasmP wasmFn = scoped.view<wclap_plugin_gui>(context.wasmMap.plugin_gui).hide();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 private:
@@ -3164,9 +2913,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_gui_t>(ScopedThread &scoped, const clap_plugin_gui_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_gui_t>(const clap_plugin_gui_t *native);
 
 struct wclap_host_gui {
@@ -3194,67 +2940,9 @@ struct wclap_host_gui {
 	WasmP & closed() {
 		return *(WasmP *)(pointerInWasm + 32);
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_resize_hints_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_gui>(context.wasmObjP).resize_hints_changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}  
-	template<bool realtime=false>
-	static bool nativeProxy_request_resize(const clap_host_t *host, uint32_t width, uint32_t height) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_gui>(context.wasmObjP).request_resize();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, width, height);
-		return wasmResult;
-	}
-	template<bool realtime=false>
-	static bool nativeProxy_request_show(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_gui>(context.wasmObjP).request_show();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	}
-	template<bool realtime=false>
-	static bool nativeProxy_request_hide(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_gui>(context.wasmObjP).request_hide();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	} 
-	template<bool realtime=false>
-	static void nativeProxy_closed(const clap_host_t *host, bool was_destroyed) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_gui>(context.wasmObjP).closed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, was_destroyed);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_gui_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_gui_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_gui_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_gui>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_gui_t>();
-	constNativeP = native;
-	native->resize_hints_changed = wclap_host_gui::nativeProxy_resize_hints_changed<false>;
-	native->request_resize = wclap_host_gui::nativeProxy_request_resize<false>;
-	native->request_show = wclap_host_gui::nativeProxy_request_show<false>;
-	native->request_hide = wclap_host_gui::nativeProxy_request_hide<false>;
-	native->closed = wclap_host_gui::nativeProxy_closed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_gui_t>(ScopedThread &scoped, const clap_host_gui_t *native, WasmP &wasmP);
@@ -3280,9 +2968,9 @@ struct wclap_plugin_latency {
 	static uint32_t nativeProxy_get(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_latency>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_latency>(context.wasmMap.plugin_latency).get();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 private:
@@ -3300,9 +2988,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_latency_t>(ScopedThread &scoped, const clap_plugin_latency_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_latency_t>(const clap_plugin_latency_t *native);
 
 struct wclap_host_latency {
@@ -3318,28 +3003,9 @@ struct wclap_host_latency {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_latency>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_latency_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_latency_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_latency_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_latency>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_latency_t>();
-	constNativeP = native;
-	native->changed = wclap_host_latency::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_latency_t>(ScopedThread &scoped, const clap_host_latency_t *native, WasmP &wasmP);
@@ -3360,32 +3026,9 @@ struct wclap_host_log {
 	WasmP & log() {
 		return *(WasmP *)pointerInWasm;
 	}
- 
-	template<bool realtime=false>
-	static void nativeProxy_log(const clap_host_t *host, clap_log_severity severity, const char *msg) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_log>(context.wasmObjP).log();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_msg;
-		nativeToWasm(scoped, msg, wasm_msg);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, severity, wasm_msg);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_log_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_log_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_log_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_log>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_log_t>();
-	constNativeP = native;
-	native->log = wclap_host_log::nativeProxy_log<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_log_t>(ScopedThread &scoped, const clap_host_log_t *native, WasmP &wasmP);
@@ -3416,22 +3059,22 @@ struct wclap_plugin_note_name {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_note_name>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_note_name>(context.wasmMap.plugin_note_name).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t index, clap_note_name_t *note_name) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_note_name>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_note_name>(context.wasmMap.plugin_note_name).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_note_name;
 		nativeToWasm(scoped, note_name, wasm_note_name);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, wasm_note_name);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, index, wasm_note_name);
 		return wasmResult;
 	}
 private:
@@ -3450,9 +3093,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_note_name_t>(ScopedThread &scoped, const clap_plugin_note_name_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_note_name_t>(const clap_plugin_note_name_t *native);
 
 struct wclap_host_note_name {
@@ -3468,28 +3108,9 @@ struct wclap_host_note_name {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_note_name>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_note_name_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_note_name_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_note_name_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_note_name>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_note_name_t>();
-	constNativeP = native;
-	native->changed = wclap_host_note_name::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_note_name_t>(ScopedThread &scoped, const clap_host_note_name_t *native, WasmP &wasmP);
@@ -3520,22 +3141,22 @@ struct wclap_plugin_note_ports {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin, bool is_input) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_note_ports>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_note_ports>(context.wasmMap.plugin_note_ports).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, is_input);
 		return wasmResult;
 	}  
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t index, bool is_input, clap_note_port_info_t *info) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_note_ports>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_note_ports>(context.wasmMap.plugin_note_ports).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(scoped, info, wasm_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, index, is_input, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, index, is_input, wasm_info);
 		return wasmResult;
 	}
 private:
@@ -3552,9 +3173,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->count = wclap_plugin_note_ports::nativeProxy_count<false>;
 	native->get = wclap_plugin_note_ports::nativeProxy_get<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_note_ports_t>(ScopedThread &scoped, const clap_plugin_note_ports_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_note_ports_t>(const clap_plugin_note_ports_t *native);
@@ -3575,38 +3193,9 @@ struct wclap_host_note_ports {
 	WasmP & rescan() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
-
-	template<bool realtime=false>
-	static uint32_t nativeProxy_supported_dialects(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_note_ports>(context.wasmObjP).supported_dialects();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	} 
-	template<bool realtime=false>
-	static void nativeProxy_rescan(const clap_host_t *host, uint32_t flags) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_note_ports>(context.wasmObjP).rescan();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_note_ports_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_note_ports_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_note_ports_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_note_ports>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_note_ports_t>();
-	constNativeP = native;
-	native->supported_dialects = wclap_host_note_ports::nativeProxy_supported_dialects<false>;
-	native->rescan = wclap_host_note_ports::nativeProxy_rescan<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_note_ports_t>(ScopedThread &scoped, const clap_host_note_ports_t *native, WasmP &wasmP);
@@ -3635,7 +3224,7 @@ struct wclap_plugin_param_indication {
 	static void nativeProxy_set_mapping(const clap_plugin_t *plugin, clap_id param_id, bool has_mapping, const clap_color_t *color, const char *label, const char *description) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_param_indication>(context.wasmObjP).set_mapping();
+		WasmP wasmFn = scoped.view<wclap_plugin_param_indication>(context.wasmMap.plugin_param_indication).set_mapping();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3645,19 +3234,19 @@ struct wclap_plugin_param_indication {
 		nativeToWasm(scoped, label, wasm_label);
 		WasmP wasm_description;
 		nativeToWasm(scoped, description, wasm_description);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, has_mapping, wasm_color, wasm_label, wasm_description);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, param_id, has_mapping, wasm_color, wasm_label, wasm_description);
 	}  
 	template<bool realtime=false>
 	static void nativeProxy_set_automation(const clap_plugin_t *plugin, clap_id param_id, uint32_t automation_state, const clap_color_t *color) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_param_indication>(context.wasmObjP).set_automation();
+		WasmP wasmFn = scoped.view<wclap_plugin_param_indication>(context.wasmMap.plugin_param_indication).set_automation();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_color;
 		nativeToWasm(scoped, color, wasm_color);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, automation_state, wasm_color);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, param_id, automation_state, wasm_color);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -3673,9 +3262,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->set_mapping = wclap_plugin_param_indication::nativeProxy_set_mapping<false>;
 	native->set_automation = wclap_plugin_param_indication::nativeProxy_set_automation<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_param_indication_t>(ScopedThread &scoped, const clap_plugin_param_indication_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_param_indication_t>(const clap_plugin_param_indication_t *native);
@@ -3778,55 +3364,55 @@ struct wclap_plugin_params {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get_info(const clap_plugin_t *plugin, uint32_t param_index, clap_param_info_t *param_info) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).get_info();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).get_info();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_param_info;
 		nativeToWasm(scoped, param_info, wasm_param_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_index, wasm_param_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, param_index, wasm_param_info);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get_value(const clap_plugin_t *plugin, clap_id param_id, double *out_value) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).get_value();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).get_value();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_out_value;
 		nativeToWasm(scoped, out_value, wasm_out_value);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, wasm_out_value);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, param_id, wasm_out_value);
 		return wasmResult;
 	}   
 	template<bool realtime=false>
 	static bool nativeProxy_value_to_text(const clap_plugin_t *plugin, clap_id param_id, double value, char *out_buffer, uint32_t out_buffer_capacity) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).value_to_text();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).value_to_text();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_out_buffer;
 		nativeToWasm(scoped, out_buffer, wasm_out_buffer);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, value, wasm_out_buffer, out_buffer_capacity);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, param_id, value, wasm_out_buffer, out_buffer_capacity);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_text_to_value(const clap_plugin_t *plugin, clap_id param_id, const char *param_value_text, double *out_value) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).text_to_value();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).text_to_value();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3834,14 +3420,14 @@ struct wclap_plugin_params {
 		nativeToWasm(scoped, param_value_text, wasm_param_value_text);
 		WasmP wasm_out_value;
 		nativeToWasm(scoped, out_value, wasm_out_value);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, param_id, wasm_param_value_text, wasm_out_value);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, param_id, wasm_param_value_text, wasm_out_value);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static void nativeProxy_flush(const clap_plugin_t *plugin, const clap_input_events_t *in, const clap_output_events_t *out) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmObjP).flush();
+		WasmP wasmFn = scoped.view<wclap_plugin_params>(context.wasmMap.plugin_params).flush();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3849,7 +3435,7 @@ struct wclap_plugin_params {
 		nativeToWasm(scoped, in, wasm_in);
 		WasmP wasm_out;
 		nativeToWasm(scoped, out, wasm_out);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, wasm_in, wasm_out);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, wasm_in, wasm_out);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -3869,9 +3455,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->text_to_value = wclap_plugin_params::nativeProxy_text_to_value<false>;
 	native->flush = wclap_plugin_params::nativeProxy_flush<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_params_t>(ScopedThread &scoped, const clap_plugin_params_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_params_t>(const clap_plugin_params_t *native);
@@ -3895,46 +3478,9 @@ struct wclap_host_params {
 	WasmP & request_flush() {
 		return *(WasmP *)(pointerInWasm + 16);
 	}
- 
-	template<bool realtime=false>
-	static void nativeProxy_rescan(const clap_host_t *host, clap_param_rescan_flags flags) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_params>(context.wasmObjP).rescan();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, flags);
-	}  
-	template<bool realtime=false>
-	static void nativeProxy_clear(const clap_host_t *host, clap_id param_id, clap_param_clear_flags flags) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_params>(context.wasmObjP).clear();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, param_id, flags);
-	}
-	template<bool realtime=false>
-	static void nativeProxy_request_flush(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_params>(context.wasmObjP).request_flush();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_params_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_params_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_params_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_params>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_params_t>();
-	constNativeP = native;
-	native->rescan = wclap_host_params::nativeProxy_rescan<false>;
-	native->clear = wclap_host_params::nativeProxy_clear<false>;
-	native->request_flush = wclap_host_params::nativeProxy_request_flush<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_params_t>(ScopedThread &scoped, const clap_host_params_t *native, WasmP &wasmP);
@@ -3960,7 +3506,7 @@ struct wclap_plugin_preset_load {
 	static bool nativeProxy_from_location(const clap_plugin_t *plugin, uint32_t location_kind, const char *location, const char *load_key) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_preset_load>(context.wasmObjP).from_location();
+		WasmP wasmFn = scoped.view<wclap_plugin_preset_load>(context.wasmMap.plugin_preset_load).from_location();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
@@ -3968,7 +3514,7 @@ struct wclap_plugin_preset_load {
 		nativeToWasm(scoped, location, wasm_location);
 		WasmP wasm_load_key;
 		nativeToWasm(scoped, load_key, wasm_load_key);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, location_kind, wasm_location, wasm_load_key);
 		return wasmResult;
 	}
 private:
@@ -3984,9 +3530,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	constNativeP = native;
 	native->from_location = wclap_plugin_preset_load::nativeProxy_from_location<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_preset_load_t>(ScopedThread &scoped, const clap_plugin_preset_load_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_preset_load_t>(const clap_plugin_preset_load_t *native);
@@ -4007,51 +3550,9 @@ struct wclap_host_preset_load {
 	WasmP & loaded() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
-  
-	template<bool realtime=false>
-	static void nativeProxy_on_error(const clap_host_t *host, uint32_t location_kind, const char *location, const char *load_key, int32_t os_error, const char *msg) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_preset_load>(context.wasmObjP).on_error();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_location;
-		nativeToWasm(scoped, location, wasm_location);
-		WasmP wasm_load_key;
-		nativeToWasm(scoped, load_key, wasm_load_key);
-		WasmP wasm_msg;
-		nativeToWasm(scoped, msg, wasm_msg);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key, os_error, wasm_msg);
-	} 
-	template<bool realtime=false>
-	static void nativeProxy_loaded(const clap_host_t *host, uint32_t location_kind, const char *location, const char *load_key) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_preset_load>(context.wasmObjP).loaded();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_location;
-		nativeToWasm(scoped, location, wasm_location);
-		WasmP wasm_load_key;
-		nativeToWasm(scoped, load_key, wasm_load_key);
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, location_kind, wasm_location, wasm_load_key);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_preset_load_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_preset_load_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_preset_load_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_preset_load>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_preset_load_t>();
-	constNativeP = native;
-	native->on_error = wclap_host_preset_load::nativeProxy_on_error<false>;
-	native->loaded = wclap_host_preset_load::nativeProxy_loaded<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_preset_load_t>(ScopedThread &scoped, const clap_host_preset_load_t *native, WasmP &wasmP);
@@ -4082,22 +3583,22 @@ struct wclap_plugin_remote_controls {
 	static uint32_t nativeProxy_count(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_remote_controls>(context.wasmObjP).count();
+		WasmP wasmFn = scoped.view<wclap_plugin_remote_controls>(context.wasmMap.plugin_remote_controls).count();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_get(const clap_plugin_t *plugin, uint32_t page_index, clap_remote_controls_page_t *page) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_remote_controls>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_remote_controls>(context.wasmMap.plugin_remote_controls).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_page;
 		nativeToWasm(scoped, page, wasm_page);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, page_index, wasm_page);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, page_index, wasm_page);
 		return wasmResult;
 	}
 private:
@@ -4114,9 +3615,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->count = wclap_plugin_remote_controls::nativeProxy_count<false>;
 	native->get = wclap_plugin_remote_controls::nativeProxy_get<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_remote_controls_t>(ScopedThread &scoped, const clap_plugin_remote_controls_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_remote_controls_t>(const clap_plugin_remote_controls_t *native);
@@ -4137,37 +3635,9 @@ struct wclap_host_remote_controls {
 	WasmP & suggest_page() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_remote_controls>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	} 
-	template<bool realtime=false>
-	static void nativeProxy_suggest_page(const clap_host_t *host, clap_id page_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_remote_controls>(context.wasmObjP).suggest_page();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, page_id);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_remote_controls_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_remote_controls_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_remote_controls_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_remote_controls>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_remote_controls_t>();
-	constNativeP = native;
-	native->changed = wclap_host_remote_controls::nativeProxy_changed<false>;
-	native->suggest_page = wclap_host_remote_controls::nativeProxy_suggest_page<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_remote_controls_t>(ScopedThread &scoped, const clap_host_remote_controls_t *native, WasmP &wasmP);
@@ -4196,18 +3666,18 @@ struct wclap_plugin_render {
 	static bool nativeProxy_has_hard_realtime_requirement(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_render>(context.wasmObjP).has_hard_realtime_requirement();
+		WasmP wasmFn = scoped.view<wclap_plugin_render>(context.wasmMap.plugin_render).has_hard_realtime_requirement();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_set(const clap_plugin_t *plugin, clap_plugin_render_mode mode) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_render>(context.wasmObjP).set();
+		WasmP wasmFn = scoped.view<wclap_plugin_render>(context.wasmMap.plugin_render).set();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, mode);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, mode);
 		return wasmResult;
 	}
 private:
@@ -4224,9 +3694,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->has_hard_realtime_requirement = wclap_plugin_render::nativeProxy_has_hard_realtime_requirement<false>;
 	native->set = wclap_plugin_render::nativeProxy_set<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_render_t>(ScopedThread &scoped, const clap_plugin_render_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_render_t>(const clap_plugin_render_t *native);
@@ -4252,26 +3719,26 @@ struct wclap_plugin_state_context {
 	static bool nativeProxy_save(const clap_plugin_t *plugin, const clap_ostream_t *stream, uint32_t context_type) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_state_context>(context.wasmObjP).save();
+		WasmP wasmFn = scoped.view<wclap_plugin_state_context>(context.wasmMap.plugin_state_context).save();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(scoped, stream, wasm_stream);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream, context_type);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_stream, context_type);
 		return wasmResult;
 	} 
 	template<bool realtime=false>
 	static bool nativeProxy_load(const clap_plugin_t *plugin, const clap_istream_t *stream, uint32_t context_type) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_state_context>(context.wasmObjP).load();
+		WasmP wasmFn = scoped.view<wclap_plugin_state_context>(context.wasmMap.plugin_state_context).load();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(scoped, stream, wasm_stream);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream, context_type);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_stream, context_type);
 		return wasmResult;
 	}
 private:
@@ -4288,9 +3755,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	native->save = wclap_plugin_state_context::nativeProxy_save<false>;
 	native->load = wclap_plugin_state_context::nativeProxy_load<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_state_context_t>(ScopedThread &scoped, const clap_plugin_state_context_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_state_context_t>(const clap_plugin_state_context_t *native);
@@ -4316,26 +3780,26 @@ struct wclap_plugin_state {
 	static bool nativeProxy_save(const clap_plugin_t *plugin, const clap_ostream_t *stream) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_state>(context.wasmObjP).save();
+		WasmP wasmFn = scoped.view<wclap_plugin_state>(context.wasmMap.plugin_state).save();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(scoped, stream, wasm_stream);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_stream);
 		return wasmResult;
 	}
 	template<bool realtime=false>
 	static bool nativeProxy_load(const clap_plugin_t *plugin, const clap_istream_t *stream) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_state>(context.wasmObjP).load();
+		WasmP wasmFn = scoped.view<wclap_plugin_state>(context.wasmMap.plugin_state).load();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_stream;
 		nativeToWasm(scoped, stream, wasm_stream);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_stream);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_stream);
 		return wasmResult;
 	}
 private:
@@ -4354,9 +3818,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_state_t>(ScopedThread &scoped, const clap_plugin_state_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_state_t>(const clap_plugin_state_t *native);
 
 struct wclap_host_state {
@@ -4372,28 +3833,9 @@ struct wclap_host_state {
 	WasmP & mark_dirty() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_mark_dirty(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_state>(context.wasmObjP).mark_dirty();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_state_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_state_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_state_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_state>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_state_t>();
-	constNativeP = native;
-	native->mark_dirty = wclap_host_state::nativeProxy_mark_dirty<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_state_t>(ScopedThread &scoped, const clap_host_state_t *native, WasmP &wasmP);
@@ -4422,22 +3864,22 @@ struct wclap_plugin_surround {
 	static bool nativeProxy_is_channel_mask_supported(const clap_plugin_t *plugin, uint64_t channel_mask) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_surround>(context.wasmObjP).is_channel_mask_supported();
+		WasmP wasmFn = scoped.view<wclap_plugin_surround>(context.wasmMap.plugin_surround).is_channel_mask_supported();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, channel_mask);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, channel_mask);
 		return wasmResult;
 	}   
 	template<bool realtime=false>
 	static uint32_t nativeProxy_get_channel_map(const clap_plugin_t *plugin, bool is_input, uint32_t port_index, uint8_t *channel_map, uint32_t channel_map_capacity) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_surround>(context.wasmObjP).get_channel_map();
+		WasmP wasmFn = scoped.view<wclap_plugin_surround>(context.wasmMap.plugin_surround).get_channel_map();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_channel_map;
 		nativeToWasm(scoped, channel_map, wasm_channel_map);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, is_input, port_index, wasm_channel_map, channel_map_capacity);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, is_input, port_index, wasm_channel_map, channel_map_capacity);
 		return wasmResult;
 	}
 private:
@@ -4456,9 +3898,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_surround_t>(ScopedThread &scoped, const clap_plugin_surround_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_surround_t>(const clap_plugin_surround_t *native);
 
 struct wclap_host_surround {
@@ -4474,28 +3913,9 @@ struct wclap_host_surround {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_surround>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_surround_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_surround_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_surround_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_surround>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_surround_t>();
-	constNativeP = native;
-	native->changed = wclap_host_surround::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_surround_t>(ScopedThread &scoped, const clap_host_surround_t *native, WasmP &wasmP);
@@ -4521,9 +3941,9 @@ struct wclap_plugin_tail {
 	static uint32_t nativeProxy_get(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_tail>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_tail>(context.wasmMap.plugin_tail).get();
 		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin);
 		return wasmResult;
 	}
 private:
@@ -4541,9 +3961,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_tail_t>(ScopedThread &scoped, const clap_plugin_tail_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_tail_t>(const clap_plugin_tail_t *native);
 
 struct wclap_host_tail {
@@ -4559,28 +3976,9 @@ struct wclap_host_tail {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_tail>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_tail_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_tail_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_tail_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_tail>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_tail_t>();
-	constNativeP = native;
-	native->changed = wclap_host_tail::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_tail_t>(ScopedThread &scoped, const clap_host_tail_t *native, WasmP &wasmP);
@@ -4604,39 +4002,9 @@ struct wclap_host_thread_check {
 	WasmP & is_audio_thread() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
-
-	template<bool realtime=false>
-	static bool nativeProxy_is_main_thread(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_thread_check>(context.wasmObjP).is_main_thread();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	}
-	template<bool realtime=false>
-	static bool nativeProxy_is_audio_thread(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_thread_check>(context.wasmObjP).is_audio_thread();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_thread_check_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_thread_check_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_thread_check_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_thread_check>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_thread_check_t>();
-	constNativeP = native;
-	native->is_main_thread = wclap_host_thread_check::nativeProxy_is_main_thread<false>;
-	native->is_audio_thread = wclap_host_thread_check::nativeProxy_is_audio_thread<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_thread_check_t>(ScopedThread &scoped, const clap_host_thread_check_t *native, WasmP &wasmP);
@@ -4662,9 +4030,9 @@ struct wclap_plugin_thread_pool {
 	static void nativeProxy_exec(const clap_plugin_t *plugin, uint32_t task_index) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_thread_pool>(context.wasmObjP).exec();
+		WasmP wasmFn = scoped.view<wclap_plugin_thread_pool>(context.wasmMap.plugin_thread_pool).exec();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, task_index);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, task_index);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -4679,9 +4047,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	constNativeP = native;
 	native->exec = wclap_plugin_thread_pool::nativeProxy_exec<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_thread_pool_t>(ScopedThread &scoped, const clap_plugin_thread_pool_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_thread_pool_t>(const clap_plugin_thread_pool_t *native);
@@ -4699,29 +4064,9 @@ struct wclap_host_thread_pool {
 	WasmP & request_exec() {
 		return *(WasmP *)pointerInWasm;
 	}
- 
-	template<bool realtime=false>
-	static bool nativeProxy_request_exec(const clap_host_t *host, uint32_t num_tasks) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_thread_pool>(context.wasmObjP).request_exec();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, num_tasks);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_thread_pool_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_thread_pool_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_thread_pool_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_thread_pool>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_thread_pool_t>();
-	constNativeP = native;
-	native->request_exec = wclap_host_thread_pool::nativeProxy_request_exec<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_thread_pool_t>(ScopedThread &scoped, const clap_host_thread_pool_t *native, WasmP &wasmP);
@@ -4747,9 +4092,9 @@ struct wclap_plugin_timer_support {
 	static void nativeProxy_on_timer(const clap_plugin_t *plugin, clap_id timer_id) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_timer_support>(context.wasmObjP).on_timer();
+		WasmP wasmFn = scoped.view<wclap_plugin_timer_support>(context.wasmMap.plugin_timer_support).on_timer();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP, timer_id);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin, timer_id);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -4764,9 +4109,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	constNativeP = native;
 	native->on_timer = wclap_plugin_timer_support::nativeProxy_on_timer<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_timer_support_t>(ScopedThread &scoped, const clap_plugin_timer_support_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_timer_support_t>(const clap_plugin_timer_support_t *native);
@@ -4787,43 +4129,9 @@ struct wclap_host_timer_support {
 	WasmP & unregister_timer() {
 		return *(WasmP *)(pointerInWasm + 8);
 	}
- 
-	template<bool realtime=false>
-	static bool nativeProxy_register_timer(const clap_host_t *host, uint32_t period_ms, clap_id *timer_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_timer_support>(context.wasmObjP).register_timer();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_timer_id;
-		nativeToWasm(scoped, timer_id, wasm_timer_id);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, period_ms, wasm_timer_id);
-		return wasmResult;
-	} 
-	template<bool realtime=false>
-	static bool nativeProxy_unregister_timer(const clap_host_t *host, clap_id timer_id) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_timer_support>(context.wasmObjP).unregister_timer();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, timer_id);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_timer_support_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_timer_support_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_timer_support_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_timer_support>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_timer_support_t>();
-	constNativeP = native;
-	native->register_timer = wclap_host_timer_support::nativeProxy_register_timer<false>;
-	native->unregister_timer = wclap_host_timer_support::nativeProxy_unregister_timer<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_timer_support_t>(ScopedThread &scoped, const clap_host_timer_support_t *native, WasmP &wasmP);
@@ -4900,9 +4208,9 @@ struct wclap_plugin_track_info {
 	static void nativeProxy_changed(const clap_plugin_t *plugin) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_track_info>(context.wasmObjP).changed();
+		WasmP wasmFn = scoped.view<wclap_plugin_track_info>(context.wasmMap.plugin_track_info).changed();
 		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
+		scoped.thread.callWasm_V(wasmFn, context.wasmMap.plugin);
 	}
 private:
 	unsigned char *pointerInWasm;
@@ -4917,9 +4225,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 	constNativeP = native;
 	native->changed = wclap_plugin_track_info::nativeProxy_changed<false>;
 }
-
-template<>
-void nativeToWasm<const clap_plugin_track_info_t>(ScopedThread &scoped, const clap_plugin_track_info_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_track_info_t>(const clap_plugin_track_info_t *native);
@@ -4937,33 +4242,9 @@ struct wclap_host_track_info {
 	WasmP & get() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static bool nativeProxy_get(const clap_host_t *host, clap_track_info_t *info) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_track_info>(context.wasmObjP).get();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasm_info;
-		nativeToWasm(scoped, info, wasm_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_info);
-		return wasmResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_track_info_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_track_info_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_track_info_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_track_info>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_track_info_t>();
-	constNativeP = native;
-	native->get = wclap_host_track_info::nativeProxy_get<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_track_info_t>(ScopedThread &scoped, const clap_host_track_info_t *native, WasmP &wasmP);
@@ -4991,13 +4272,13 @@ struct wclap_plugin_voice_info {
 	static bool nativeProxy_get(const clap_plugin_t *plugin, clap_voice_info_t *info) {
 		auto &context = getNativeProxyContext(plugin);
 		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_voice_info>(context.wasmObjP).get();
+		WasmP wasmFn = scoped.view<wclap_plugin_voice_info>(context.wasmMap.plugin_voice_info).get();
 		
 		auto resetW = scoped.arenas.scopedWasmReset();
 		
 		WasmP wasm_info;
 		nativeToWasm(scoped, info, wasm_info);
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmObjP, wasm_info);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_info);
 		return wasmResult;
 	}
 private:
@@ -5015,9 +4296,6 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap
 }
 
 template<>
-void nativeToWasm<const clap_plugin_voice_info_t>(ScopedThread &scoped, const clap_plugin_voice_info_t *native, WasmP &wasmP);
-
-template<>
 void * & nativeProxyContextPointer<clap_plugin_voice_info_t>(const clap_plugin_voice_info_t *native);
 
 struct wclap_host_voice_info {
@@ -5033,33 +4311,98 @@ struct wclap_host_voice_info {
 	WasmP & changed() {
 		return *(WasmP *)pointerInWasm;
 	}
-
-	template<bool realtime=false>
-	static void nativeProxy_changed(const clap_host_t *host) {
-		auto &context = getNativeProxyContext(host);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_host_voice_info>(context.wasmObjP).changed();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmObjP);
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_host_voice_info_t>(ScopedThread &scoped, WasmP wasmP, const clap_host_voice_info_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_host_voice_info_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_host_voice_info>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_host_voice_info_t>();
-	constNativeP = native;
-	native->changed = wclap_host_voice_info::nativeProxy_changed<false>;
-}
 
 template<>
 void nativeToWasm<const clap_host_voice_info_t>(ScopedThread &scoped, const clap_host_voice_info_t *native, WasmP &wasmP);
 
 template<>
 void * & nativeProxyContextPointer<clap_host_voice_info_t>(const clap_host_voice_info_t *native);
+
+struct wclap_plugin_webview {
+	wclap_plugin_webview(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
+	static constexpr size_t wasmSize = 16;
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & get_uri() {
+		return *(WasmP *)pointerInWasm;
+	}
+	WasmP & receive() {
+		return *(WasmP *)(pointerInWasm + 8);
+	}
+ 
+	template<bool realtime=false>
+	static int32_t  nativeProxy_get_uri(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity) {
+		auto &context = getNativeProxyContext(plugin);
+		auto scoped = context.lock(realtime);
+		WasmP wasmFn = scoped.view<wclap_plugin_webview>(context.wasmMap.plugin_webview).get_uri();
+		
+		auto resetW = scoped.arenas.scopedWasmReset();
+		
+		WasmP wasm_uri;
+		nativeToWasm(scoped, uri, wasm_uri);
+		int32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_uri, uri_capacity);
+		return wasmResult;
+	} 
+	template<bool realtime=false>
+	static bool nativeProxy_receive(const clap_plugin_t *plugin, const void *buffer, uint32_t size) {
+		auto &context = getNativeProxyContext(plugin);
+		auto scoped = context.lock(realtime);
+		WasmP wasmFn = scoped.view<wclap_plugin_webview>(context.wasmMap.plugin_webview).receive();
+		
+		auto resetW = scoped.arenas.scopedWasmReset();
+		
+		WasmP wasm_buffer;
+		nativeToWasm(scoped, buffer, wasm_buffer);
+		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.plugin, wasm_buffer, size);
+		return wasmResult;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+template<>
+void wasmToNative<const clap_plugin_webview_t>(ScopedThread &scoped, WasmP wasmP, const clap_plugin_webview_t *&nativeP);
+
+inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_plugin_webview_t *&constNativeP) {
+	auto wasm = scoped.view<wclap_plugin_webview>(wasmP);
+	auto *native = scoped.arenas.nativeTyped<clap_plugin_webview_t>();
+	constNativeP = native;
+	native->get_uri = wclap_plugin_webview::nativeProxy_get_uri<false>;
+	native->receive = wclap_plugin_webview::nativeProxy_receive<false>;
+}
+
+template<>
+void * & nativeProxyContextPointer<clap_plugin_webview_t>(const clap_plugin_webview_t *native);
+
+struct wclap_host_webview {
+	wclap_host_webview(unsigned char *pointerInWasm) : pointerInWasm(pointerInWasm) {}
+	
+	static constexpr size_t wasmAlign = 8;
+	static constexpr size_t wasmSize = 8;
+	
+	operator bool() const {
+		return pointerInWasm;
+	}
+
+	WasmP & send() {
+		return *(WasmP *)pointerInWasm;
+	}
+private:
+	unsigned char *pointerInWasm;
+};
+
+template<>
+void nativeToWasm<const clap_host_webview_t>(ScopedThread &scoped, const clap_host_webview_t *native, WasmP &wasmP);
+
+template<>
+void * & nativeProxyContextPointer<clap_host_webview_t>(const clap_host_webview_t *native);
 	
 }} // namespace

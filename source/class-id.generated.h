@@ -48,6 +48,7 @@ enum class ClassId {
 	clap_host_timer_support,
 	clap_host_track_info,
 	clap_host_voice_info,
+	clap_host_webview,
 	clap_input_events,
 	clap_istream,
 	clap_note_name,
@@ -83,6 +84,7 @@ enum class ClassId {
 	clap_plugin_timer_support,
 	clap_plugin_track_info,
 	clap_plugin_voice_info,
+	clap_plugin_webview,
 	clap_preset_discovery_factory,
 	clap_preset_discovery_filetype,
 	clap_preset_discovery_indexer,
@@ -328,6 +330,11 @@ inline constexpr ClassId getClassId<clap_host_voice_info>() {
 }
 
 template<>
+inline constexpr ClassId getClassId<clap_host_webview>() {
+	return ClassId::clap_host_webview;
+}
+
+template<>
 inline constexpr ClassId getClassId<clap_input_events>() {
 	return ClassId::clap_input_events;
 }
@@ -500,6 +507,11 @@ inline constexpr ClassId getClassId<clap_plugin_track_info>() {
 template<>
 inline constexpr ClassId getClassId<clap_plugin_voice_info>() {
 	return ClassId::clap_plugin_voice_info;
+}
+
+template<>
+inline constexpr ClassId getClassId<clap_plugin_webview>() {
+	return ClassId::clap_plugin_webview;
 }
 
 template<>

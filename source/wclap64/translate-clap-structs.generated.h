@@ -1542,55 +1542,9 @@ struct wclap_plugin_entry {
 	WasmP & get_factory() {
 		return *(WasmP *)(pointerInWasm + 32);
 	}
-
-	template<bool realtime=false>
-	static bool nativeProxy_init(const char *plugin_path) {
-		auto &context = getNativeProxyContext(plugin_path);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).init();
-		
-		uint32_t wasmResult = scoped.thread.callWasm_I(wasmFn, context.wasmMap.char);
-		return wasmResult;
-	}
-	template<bool realtime=false>
-	static void nativeProxy_deinit() {
-		auto &context = getNativeProxyContext((clap_plugin_entry_t *)nullptr);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).deinit();
-		
-		scoped.thread.callWasm_V(wasmFn, context.wasmMap.unknown);
-	}
-	template<bool realtime=false>
-	static const void * nativeProxy_get_factory(const char *factory_id) {
-		auto &context = getNativeProxyContext(factory_id);
-		auto scoped = context.lock(realtime);
-		WasmP wasmFn = scoped.view<wclap_plugin_entry>(context.wasmMap.plugin_entry).get_factory();
-		
-		auto resetW = scoped.arenas.scopedWasmReset();
-		
-		WasmP wasmResult = scoped.thread.callWasm_P(wasmFn, context.wasmMap.char);
-
-		auto resetN = scoped.arenas.scopedNativeReset();
-		const void *nativeResult;
-		wasmToNative(scoped, wasmResult, nativeResult);
-		return nativeResult;
-	}
 private:
 	unsigned char *pointerInWasm;
 };
-
-template<>
-void wasmToNative<const clap_plugin_entry_t>(ScopedThread &scoped, WasmP wasmP, const clap_plugin_entry_t *&nativeP);
-
-inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const clap_plugin_entry_t *&constNativeP) {
-	auto wasm = scoped.view<wclap_plugin_entry>(wasmP);
-	auto *native = scoped.arenas.nativeTyped<clap_plugin_entry_t>();
-	constNativeP = native;
-	native->clap_version = wasm.clap_version();
-	native->init = wclap_plugin_entry::nativeProxy_init<false>;
-	native->deinit = wclap_plugin_entry::nativeProxy_deinit<false>;
-	native->get_factory = wclap_plugin_entry::nativeProxy_get_factory<false>;
-}
 
 template<>
 void * & nativeProxyContextPointer<clap_plugin_entry_t>(const clap_plugin_entry_t *native);

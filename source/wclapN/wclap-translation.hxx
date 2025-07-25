@@ -377,13 +377,22 @@ void wasmToNative<const char * const>(ScopedThread &scoped, WasmP stringList, co
 
 //-------------- Translating CLAP structs: WASM -> Native
 
-//template<>
-//void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasmP, const clap_plugin_descriptor *&nativeP) {
-//	generated_wasmToNative(scoped, wasmP, nativeP);
-//	if (!nativeP) return;
-//
-//	auto *desc = (clap_plugin_descriptor *)nativeP; // Yes, un-const it.  It's ours anyway.
-//}
+template<>
+void wasmToNative<const clap_plugin_descriptor>(ScopedThread &scoped, WasmP wasmP, const clap_plugin_descriptor *&nativeP) {
+	generated_wasmToNative(scoped, wasmP, nativeP);
+	if (!nativeP) return;
+
+	// Append ` (WCLAP)` to the name
+	auto *desc = (clap_plugin_descriptor *)nativeP; // Yes, un-const it.  It's ours anyway.
+	const char *name = desc->name;
+	if (!name) name = "unknown";
+	size_t nameLength = strlen(name);
+	size_t newNameLength = nameLength + strlen(" (WCLAP)");
+	auto *newName = (char *)scoped.arenas.nativeBytes(newNameLength + 1, 1);
+	std::strcpy(newName, name);
+	std::strcpy(newName + nameLength, " (WCLAP)");
+	desc->name = newName;
+}
 
 static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct clap_plugin *plugin, const clap_process_t *process) {
 	auto &context = getNativeProxyContext(plugin);

@@ -95,8 +95,10 @@ namespace wclap { namespace wclap${bits} {`;
 		let parts = cpp.split('\ntypedef struct ');
 		parts.slice(1).forEach(cpp => {
 			let cppName = cpp.split(' ', 1)[0];
-			let isHostStruct = /^clap_host(_|$)/.test(cppName);
-			let isPluginStruct = /^clap_plugin(_|$)/.test(cppName);
+			let isNativeOnly = /^clap_host(_|$)/.test(cppName);
+			let isWasmOnly = /^clap_plugin(_|$)/.test(cppName);
+			let noTranslation = false;
+			if (cppName == 'clap_plugin_entry') noTranslation = true;
 
 			let name = cppName + "_t";
 			if (skipType[cppName]) return;
@@ -234,7 +236,7 @@ struct ${wclapClass} {
 
 				let isFirstMethod = true;
 				structFields.forEach(field => {
-					if (isHostStruct) return;
+					if (isNativeOnly || noTranslation) return;
 
 					let fieldType = getType(field.type);
 					if (field.argTypes) {
@@ -323,7 +325,7 @@ struct ${wclapClass} {
 private:
 	unsigned char *pointerInWasm;
 };`;
-				if (!isHostStruct) {
+				if (!isNativeOnly && !noTranslation) {
 					code += `
 
 template<>
@@ -364,7 +366,7 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const ${na
 }`
 				}
 
-				if (!isPluginStruct) {
+				if (!isWasmOnly && !noTranslation) {
 					code += `
 
 template<>

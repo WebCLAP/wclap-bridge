@@ -77,7 +77,7 @@ struct NativeProxyContext {
 	NativeProxyContext(Wclap *wclap) : wclap(wclap) {}
 	NativeProxyContext(Wclap *wclap, std::unique_ptr<WclapArenas> &&arenas) : wclap(wclap), arenas(std::move(arenas)) {}
 	NativeProxyContext(Wclap *wclap, std::unique_ptr<WclapArenas> &&arenas, std::unique_ptr<WclapThread> &&rtThread) : wclap(wclap), arenas(std::move(arenas)), realtimeThread(std::move(rtThread)) {
-		arenas->currentContext = this;
+		this->arenas->currentContext = this;
 	}
 
 	// Move only, no copy

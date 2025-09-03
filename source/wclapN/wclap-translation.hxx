@@ -130,7 +130,44 @@ struct WclapMethods {
 			const clap_plugin_t *nativePlugin = wasmToNative<const clap_plugin>(scoped, wasmPluginP);
 			scoped.arenas.persistNative();
 			// so we can find the context from the proxy
-			createNativeProxyContext(scoped, nativePlugin, std::move(context));
+			auto &pluginContext = createNativeProxyContext(scoped, nativePlugin, std::move(context));
+
+			auto pluginGetExtensionFn = scoped.view<wclap_plugin>(wasmPluginP).get_extension();
+			if (pluginGetExtensionFn) {
+				auto getExtP = [&](const char *){
+					auto wasmReset = scoped.arenas.scopedWasmReset();
+					auto wasmPluginId = nativeToWasm(scoped, plugin_id);
+					WasmP extP = scoped.thread.callWasm_P(createPluginFn, factory.factoryObjP, wasmHostP, wasmPluginId);
+					return extP;
+				};
+				// Load all known extensions
+				pluginContext.wasmMap.plugin_ambisonic = getExtP(CLAP_EXT_AMBISONIC);
+				pluginContext.wasmMap.plugin_audio_ports = getExtP(CLAP_EXT_AUDIO_PORTS);
+				pluginContext.wasmMap.plugin_audio_ports_activation = getExtP(CLAP_EXT_AUDIO_PORTS_ACTIVATION);
+				pluginContext.wasmMap.plugin_audio_ports_config = getExtP(CLAP_EXT_AUDIO_PORTS_CONFIG);
+				pluginContext.wasmMap.plugin_audio_ports_config_info = getExtP(CLAP_EXT_AUDIO_PORTS_CONFIG_INFO);
+				pluginContext.wasmMap.plugin_configurable_audio_ports = getExtP(CLAP_EXT_CONFIGURABLE_AUDIO_PORTS);
+				pluginContext.wasmMap.plugin_context_menu = getExtP(CLAP_EXT_CONTEXT_MENU);
+				pluginContext.wasmMap.plugin_gui = getExtP(CLAP_EXT_GUI);
+				pluginContext.wasmMap.plugin_latency = getExtP(CLAP_EXT_LATENCY);
+				pluginContext.wasmMap.plugin_note_name = getExtP(CLAP_EXT_NOTE_NAME);
+				pluginContext.wasmMap.plugin_note_ports = getExtP(CLAP_EXT_NOTE_PORTS);
+				pluginContext.wasmMap.plugin_params = getExtP(CLAP_EXT_PARAMS);
+				pluginContext.wasmMap.plugin_param_indication = getExtP(CLAP_EXT_PARAM_INDICATION);
+				pluginContext.wasmMap.plugin_preset_load = getExtP(CLAP_EXT_PRESET_LOAD);
+				pluginContext.wasmMap.plugin_remote_controls = getExtP(CLAP_EXT_REMOTE_CONTROLS);
+				pluginContext.wasmMap.plugin_render = getExtP(CLAP_EXT_RENDER);
+				pluginContext.wasmMap.plugin_state = getExtP(CLAP_EXT_STATE);
+				pluginContext.wasmMap.plugin_state_context = getExtP(CLAP_EXT_STATE_CONTEXT);
+				pluginContext.wasmMap.plugin_surround = getExtP(CLAP_EXT_SURROUND);
+				pluginContext.wasmMap.plugin_tail = getExtP(CLAP_EXT_TAIL);
+				pluginContext.wasmMap.plugin_thread_pool = getExtP(CLAP_EXT_THREAD_POOL);
+				pluginContext.wasmMap.plugin_timer_support = getExtP(CLAP_EXT_TIMER_SUPPORT);
+				pluginContext.wasmMap.plugin_track_info = getExtP(CLAP_EXT_TRACK_INFO);
+				pluginContext.wasmMap.plugin_voice_info = getExtP(CLAP_EXT_VOICE_INFO);
+				pluginContext.wasmMap.plugin_webview = getExtP(CLAP_EXT_WEBVIEW);
+			}
+
 			return nativePlugin;
 		}
 	};
@@ -282,7 +319,37 @@ struct WclapMethods {
 			thread.registerFunction(log);
 		}
 	} hostExtLog;
-	
+
+	struct {
+		struct : public HostFn {
+			static uint32_t native(Wclap &wclap, WasmP inputEventsP) {
+				return 0;
+			}
+		} size;
+		struct : public HostFn {
+			static WasmP native(Wclap &wclap, WasmP inputEventsP, uint32_t index) {
+				return 0;
+			}
+		} get;
+
+		void registerMethods(WclapThread &thread) {
+			thread.registerFunction(size);
+			thread.registerFunction(get);
+		}
+	} inputEvents;
+
+	struct {
+		struct : public HostFn {
+			static uint32_t native(Wclap &wclap, WasmP inputEventsP, WasmP eventP) {
+				return 0;
+			}
+		} try_push;
+
+		void registerMethods(WclapThread &thread) {
+			thread.registerFunction(try_push);
+		}
+	} outputEvents;
+
 	struct : public HostFn {
 		static void native(Wclap &wclap, WasmP) {
 			std::cout << "unimplemented V(P)\n";
@@ -301,6 +368,8 @@ struct WclapMethods {
 
 		host.registerMethods(thread);
 		hostExtLog.registerMethods(thread);
+		inputEvents.registerMethods(thread);
+		outputEvents.registerMethods(thread);
 	}
 };
 
@@ -451,8 +520,198 @@ static clap_process_status nativeProxy_plugin_process_andCopyOutput(const struct
 static const void * nativeProxy_plugin_get_extension_fromWclap(const struct clap_plugin *plugin, const char *extId) {
 	auto &context = getNativeProxyContext(plugin);
 	auto &wclap = *context.wclap;
-	// TODO: The central Wclap should have spaces to proxy all the WASM extensions (since they're just bundles of functions)
-	// but we'll need to check the plugin to see which ones it actually supports before returning a proxy
+
+	if (!std::strcmp(extId, CLAP_EXT_PARAMS)) {
+		static clap_plugin_params proxy{
+			.count=wclap_plugin_params::nativeProxy_count<false>,
+			.get_info=wclap_plugin_params::nativeProxy_get_info<false>,
+			.get_value=wclap_plugin_params::nativeProxy_get_value<false>,
+			.value_to_text=wclap_plugin_params::nativeProxy_value_to_text<false>,
+			.text_to_value=wclap_plugin_params::nativeProxy_text_to_value<false>,
+			.flush=wclap_plugin_params::nativeProxy_flush<true>
+		};
+
+		auto extP = context.wasmMap.plugin_params;
+		return extP ? &proxy : nullptr;
+	}
+
+/*
+	if (!std::strcmp(extId, CLAP_EXT_AMBISONIC)) {
+		auto extP = context.wasmMap.plugin_ambisonic;
+		static clap_$1 ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_AUDIO_PORTS)) {
+		auto extP = context.wasmMap.plugin_audio_ports;
+		static clap_plugin_audio_ports ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_AUDIO_PORTS_ACTIVATION)) {
+		auto extP = context.wasmMap.plugin_audio_ports_activation;
+		static clap_plugin_audio_ports_activation ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_AUDIO_PORTS_CONFIG)) {
+		auto extP = context.wasmMap.plugin_audio_ports_config;
+		static clap_plugin_audio_ports_config ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_AUDIO_PORTS_CONFIG_INFO)) {
+		auto extP = context.wasmMap.plugin_audio_ports_config_info;
+		static clap_plugin_audio_ports_config_info ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS)) {
+		auto extP = context.wasmMap.plugin_configurable_audio_ports;
+		static clap_plugin_configurable_audio_ports ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_CONTEXT_MENU)) {
+		auto extP = context.wasmMap.plugin_context_menu;
+		static clap_plugin_context_menu ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_GUI)) {
+		auto extP = context.wasmMap.plugin_gui;
+		static clap_plugin_gui ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_LATENCY)) {
+		auto extP = context.wasmMap.plugin_latency;
+		static clap_plugin_latency ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_NOTE_NAME)) {
+		auto extP = context.wasmMap.plugin_note_name;
+		static clap_plugin_note_name ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_NOTE_PORTS)) {
+		auto extP = context.wasmMap.plugin_note_ports;
+		static clap_plugin_note_ports ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_PARAMS)) {
+		auto extP = context.wasmMap.plugin_params;
+		static clap_plugin_params ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_PARAM_INDICATION)) {
+		auto extP = context.wasmMap.plugin_param_indication;
+		static clap_plugin_param_indication ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_PRESET_LOAD)) {
+		auto extP = context.wasmMap.plugin_preset_load;
+		static clap_plugin_preset_load ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_REMOTE_CONTROLS)) {
+		auto extP = context.wasmMap.plugin_remote_controls;
+		static clap_plugin_remote_controls ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_RENDER)) {
+		auto extP = context.wasmMap.plugin_render;
+		static clap_plugin_render ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_STATE)) {
+		auto extP = context.wasmMap.plugin_state;
+		static clap_plugin_state ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_STATE_CONTEXT)) {
+		auto extP = context.wasmMap.plugin_state_context;
+		static clap_plugin_state_context ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_SURROUND)) {
+		auto extP = context.wasmMap.plugin_surround;
+		static clap_plugin_surround ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_TAIL)) {
+		auto extP = context.wasmMap.plugin_tail;
+		static clap_plugin_tail ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_THREAD_POOL)) {
+		auto extP = context.wasmMap.plugin_thread_pool;
+		static clap_plugin_thread_pool ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_TIMER_SUPPORT)) {
+		auto extP = context.wasmMap.plugin_timer_support;
+		static clap_plugin_timer_support ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_TRACK_INFO)) {
+		auto extP = context.wasmMap.plugin_track_info;
+		static clap_plugin_track_info ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_VOICE_INFO)) {
+		auto extP = context.wasmMap.plugin_voice_info;
+		static clap_plugin_voice_info ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+	if (!std::strcmp(extId, CLAP_EXT_WEBVIEW)) {
+		auto extP = context.wasmMap.plugin_webview;
+		static clap_plugin_webview ext {
+		
+		};
+		return extP ? &ext : nullptr;
+	}
+*/
 	return nullptr;
 }
 
@@ -501,6 +760,13 @@ void wasmToNative<const clap_plugin>(ScopedThread &scoped, WasmP wasmP, const cl
 template<>
 void * & nativeProxyContextPointer<clap_plugin>(const clap_plugin *plugin) {
 	return (void * &)plugin->plugin_data;
+}
+
+// We translate all the structs here, even if they just forward to the generated one, to ensure we've *actually* checked them (in particular, whether methods should obtain a realtime lock or not)
+
+template<>
+void wasmToNative<const clap_param_info>(ScopedThread &scoped, WasmP wasmP, const clap_param_info_t *&nativeP) {
+	return generated_wasmToNative(scoped, wasmP, nativeP);
 }
 
 //-------------- Translating CLAP structs: Native -> WASM
@@ -584,10 +850,23 @@ void nativeToWasm<const clap_process>(ScopedThread &scoped, const clap_process *
 			wasmBuffer.data64() = 0;
 		}
 	}
-//	nativeToWasm(scoped, native->in_events, view.in_events());
-//	nativeToWasm(scoped, native->out_events, view.out_events());
-	view.in_events() = 0;
-	view.out_events() = 0;
+	nativeToWasm(scoped, native->in_events, view.in_events());
+	nativeToWasm(scoped, native->out_events, view.out_events());
+}
+
+template<>
+void nativeToWasm<const clap_input_events_t>(ScopedThread &scoped, const clap_input_events_t *native, WasmP &wasmP) {
+	auto view = scoped.create<wclap_input_events>(wasmP);
+	view.ctx() = 0;
+	view.size() = scoped.wclap.methods(wasmP).inputEvents.size.wasmP;
+	view.get() = scoped.wclap.methods(wasmP).inputEvents.get.wasmP;
+}
+
+template<>
+void nativeToWasm<const clap_output_events_t>(ScopedThread &scoped, const clap_output_events_t *native, WasmP &wasmP) {
+	auto view = scoped.create<wclap_output_events>(wasmP);
+	view.ctx() = 0;
+	view.try_push() = scoped.wclap.methods(wasmP).outputEvents.try_push.wasmP;
 }
 
 }} // namespace

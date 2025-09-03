@@ -95,7 +95,7 @@ namespace wclap { namespace wclap${bits} {`;
 		let parts = cpp.split('\ntypedef struct ');
 		parts.slice(1).forEach(cpp => {
 			let cppName = cpp.split(' ', 1)[0];
-			let isNativeOnly = /^clap_host(_|$)/.test(cppName);
+			let isNativeOnly = /^clap_host(_|$)/.test(cppName) || /^clap_(input|output)_events(_t)?/.test(cppName);
 			let isWasmOnly = /^clap_plugin(_|$)/.test(cppName);
 			let noTranslation = false;
 			if (cppName == 'clap_plugin_entry') noTranslation = true;
@@ -282,8 +282,14 @@ struct ${wclapClass} {
 							let argType = getType(field.argTypes[i]);
 							if (!argType.compatible) {
 								code += `
-		${getWasmType(field.argTypes[i])} wasm_${field.argNames[i]};
+		${getWasmType(field.argTypes[i])} wasm_${field.argNames[i]};`;
+								if (/^const\s/.test(field.argTypes[i])) {
+									code += `
 		nativeToWasm(scoped, ${field.argNames[i]}, wasm_${field.argNames[i]});`;
+								} else {
+									code += `
+		scoped.create<wclap_process>(wasm_${field.argNames[i]});`
+								}
 							}
 						}
 						if (field.returnType) {
@@ -302,6 +308,17 @@ struct ${wclapClass} {
 							}
 						}
 						code += `);`;
+
+						for (let i = 1; i < field.argTypes.length; ++i) {
+							let argType = getType(field.argTypes[i]);
+							if (!argType.compatible) {
+								if (!/^const\s/.test(field.argTypes[i])) {
+									code += `
+		wasmToNative(scoped, wasm_${field.argNames[i]}, (const ${field.argTypes[i]})${field.argNames[i]});`;
+								}
+							}
+						}
+
 						if (field.returnType) {
 							if (getType(field.returnType).compatible) {
 								code += `
@@ -326,7 +343,23 @@ private:
 	unsigned char *pointerInWasm;
 };`;
 				if (!isNativeOnly && !noTranslation) {
-					code += `
+					let methods = structFields.filter(field => field.argTypes);
+					if (methods.length && methods.length == structFields.length) {
+						code += `
+
+template<bool realtime>
+${name.replace(/_t$/, '')} * generated_nativeProxy_${name.replace(/_t$/, '')}() {
+	static ${name.replace(/_t$/, '')} proxy{`;
+						code += methods.map(field => {
+							return `
+		.${field.name}=${wclapClass}::nativeProxy_${field.name}<realtime>`;
+						}).join(',');
+						code += `
+	};
+	return &proxy;
+}`;
+					} else {
+						code += `
 
 template<>
 void wasmToNative<const ${name}>(ScopedThread &scoped, WasmP wasmP, const ${name} *&nativeP);
@@ -335,35 +368,36 @@ inline void generated_wasmToNative(ScopedThread &scoped, WasmP wasmP, const ${na
 	auto wasm = scoped.view<${wclapClass}>(wasmP);
 	auto *native = scoped.arenas.nativeTyped<${name}>();
 	constNativeP = native;`;
-					structFields.forEach(field => {
-						let fieldType = getType(field.type);
-						if (fieldType.compatible) {
-							if (field.arrayCount) {
-								code += `
+						structFields.forEach(field => {
+							let fieldType = getType(field.type);
+							if (fieldType.compatible) {
+								if (field.arrayCount) {
+									code += `
 	for (size_t i = 0; i < ${field.arrayCount}; ++i) {
 		native->${field.name}[i] = wasm.${field.name}(i);
 	}`;
-							} else {
-								code += `
+								} else {
+									code += `
 	native->${field.name} = wasm.${field.name}();`;
-							}
-						} else if (field.argTypes) {
-							code += `
-	native->${field.name} = ${wclapClass}::nativeProxy_${field.name}<false>;`;
-						} else {
-							if (field.arrayCount) {
+								}
+							} else if (field.argTypes) {
 								code += `
+	native->${field.name} = ${wclapClass}::nativeProxy_${field.name}<false>;`;
+							} else {
+								if (field.arrayCount) {
+									code += `
 	for (size_t i = 0; i < ${field.arrayCount}; ++i) {
 		wasmToNative(scoped, wasm.${field.name}(i), native->${field.name}[i]);
 	}`;
-							} else {
-								code += `
+								} else {
+									code += `
 	wasmToNative(scoped, wasm.${field.name}(), native->${field.name});`;
+								}
 							}
-						}
-					});
-					code += `
-}`
+						});
+						code += `
+}`;
+					}
 				}
 
 				if (!isWasmOnly && !noTranslation) {

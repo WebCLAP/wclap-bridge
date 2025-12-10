@@ -1,4 +1,6 @@
 # These people intend to maintain the project until at least these dates
 # https://github.com/geraintluff/SUPPORT.txt
 
-2025-08-01 Geraint <geraint@signalsmith-audio.co.uk>
+
+2026-06-01 Geraint <geraint@signalsmith-audio.co.uk>
+It's still fairly experimental, tbh

@@ -3,9 +3,6 @@ all: translate-structs cmake
 clean:
 	rm -rf out
 
-translate-structs:
-	node translate-clap-structs.js
-
 cmake:
 	mkdir -p out/static
 	cp include/* out/static/

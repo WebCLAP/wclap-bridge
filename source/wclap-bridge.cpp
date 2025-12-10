@@ -7,8 +7,6 @@
 
 #include "./wclap.h"
 
-#include <atomic>
-
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;
 	if (dir.size() && dir.back() != '/') dir += "/";
@@ -75,12 +73,12 @@ bool wclap_close(void *wclap) {
 	delete (wclap::Wclap *)wclap;
 	return true;
 }
-const clap_version * wclap_version(void *wclap) {
+const wclap_version_triple * wclap_version(void *wclap) {
 	if (!wclap) {
 		wclap::wclap_error_message = "null pointer";
 		return nullptr;
 	}
-	return &((wclap::Wclap *)wclap)->clapVersion;
+	return (const wclap_version_triple *)&((wclap::Wclap *)wclap)->clapVersion;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {
@@ -90,7 +88,7 @@ const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	return ((wclap::Wclap *)wclap)->getFactory(factory_id);
 }
 
-static const clap_version bridgeVersion{1, 2, 7};
-const clap_version * wclap_bridge_version() {
+static const wclap_version_triple bridgeVersion{1, 2, 7};
+const wclap_version_triple * wclap_bridge_version() {
 	return &bridgeVersion;
 }

@@ -1,7 +1,10 @@
 #pragma once
 
 #ifdef __cplusplus
+#include <cstdint>
 extern "C" {
+#else
+#include <stdint.h>
 #endif
 
 // 0 means no limit
@@ -17,11 +20,16 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 // Closes a WCLAP using its opaque identifier.  Unlike clap_entry::deinit(), this MUST be called exactly once after the corresponding wclap_open.
 bool wclap_close(void *);
 
+// identical to `clap_version`
+typedef struct wclap_version_triple {
+   uint32_t major, minor, revision;
+} wclap_version_triple_t;
+
 // Returns a pointer to the opened WCLAP's CLAP API version
-const struct clap_version * wclap_version(void *);
+const struct wclap_version_triple * wclap_version(void *);
 
 // The CLAP version which this bridge supports (as completely as possible)
-const struct clap_version * wclap_bridge_version();
+const struct wclap_version_triple * wclap_bridge_version();
 
 // Gets a factory (if supported by both the WCLAP and the bridge)
 const void * wclap_get_factory(void *, const char *factory_id);

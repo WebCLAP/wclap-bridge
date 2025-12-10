@@ -17,7 +17,8 @@ struct wclap_wasmtime {
 		}
 	
 		// `handle` is added by `wclap::Instance`, other constructor arguments are passed through
-		InstanceImpl(void *handle, const char *wasmPath) : handle(handle), wasmPath(wasmPath) {
+		InstanceImpl(void *handle, const unsigned char *wasmBytes, size_t wasmLength, const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir) : handle(handle) {
+			// TODO: WASI directories
 		}
 		InstanceImpl(const InstanceImpl &other) = delete;
 		~InstanceImpl() {

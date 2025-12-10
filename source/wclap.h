@@ -10,6 +10,7 @@
 namespace wclap_bridge {
 
 struct Wclap {
+	
 };
 
-};
+}; // namespace

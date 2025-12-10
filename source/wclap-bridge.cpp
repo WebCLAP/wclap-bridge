@@ -9,6 +9,7 @@
 #include "./wclap.h"
 
 #include <mutex>
+#include <fstream>
 
 std::mutex globalInitMutex;
 std::atomic<size_t> globalInitMs = 0;

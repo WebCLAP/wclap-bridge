@@ -1,11 +1,45 @@
+#include <iostream>
 #ifndef LOG_EXPR
-#	include <iostream>
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 #endif
 
 #include "wclap-bridge.h"
 
+#include "./instance.h"
 #include "./wclap.h"
+
+#include <mutex>
+
+std::mutex globalInitMutex;
+std::atomic<size_t> globalInitMs = 0;
+std::atomic<size_t> activeWclapCount = 0;
+std::atomic<bool> globalInitOK = false;
+
+bool wclap_global_init(unsigned int timeLimitMs) {
+	std::lock_guard<std::mutex> lock{globalInitMutex};
+	auto ms = (size_t)timeLimitMs;
+	if (globalInitOK) {
+		if (ms == globalInitMs) return true;
+		if (activeWclapCount > 0) {
+			std::cerr << "Tried to reconfigure WCLAP bridge while WCLAPs are still active\n";
+			abort();
+		}
+		wclap_bridge::Wclap::globalDeinit();
+	}
+	globalInitMs = ms;
+	globalInitOK = wclap_bridge::Wclap::globalInit(ms);
+	return globalInitOK;
+}
+void wclap_global_deinit() {
+	std::lock_guard<std::mutex> lock{globalInitMutex};
+	if (!globalInitOK) return;
+	if (activeWclapCount > 0) {
+		std::cerr << "Tried to de-init WCLAP bridge while WCLAPs are still active\n";
+		abort();
+	}
+	wclap_bridge::Wclap::globalDeinit();
+	globalInitOK = false;
+}
 
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;
@@ -13,25 +47,13 @@ static std::string ensureTrailingSlash(const char *dirC) {
 	return dir;
 }
 
-namespace wclap {
-	unsigned int timeLimitEpochs = 0;
-	const char *wclap_error_message;
-	std::string wclap_error_message_string;
-}
-
-const char * wclap_error() {
-	auto *message = wclap::wclap_error_message;
-	wclap::wclap_error_message = nullptr;
-	return message;
-}
-
 void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir) {
-	if (!wclap::global_config_ready.test()) {
-		wclap::wclap_error_message = "WASM engine not configured - did wclap_global_init() succeed?";
+	if (!globalInitOK) {
+		std::cerr << "WASM engine not configured - did wclap_global_init() succeed?\n";
 		return nullptr;
 	}
 	if (!wclapDir) {
-		wclap::wclap_error_message = "WCLAP path was null";
+		std::cerr << "WCLAP path was null\n";
 		return nullptr;
 	}
 
@@ -41,54 +63,57 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 		if (wasmFile) wclapDir = nullptr; // if it's not a bundle, don't provide /plugin/
 	}
 	if (!wasmFile) {
-		wclap::wclap_error_message = "Couldn't open ?.wclap/module.wasm or ?.wclap";
+		std::cerr << "Couldn't open ?.wclap/module.wasm or ?.wclap\n";
 		return nullptr;
 	}
 	std::vector<char> wasmBytes{std::istreambuf_iterator<char>{wasmFile}, {}};
 	if (!wasmBytes.size()) {
-		wclap::wclap_error_message = "Couldn't read WASM file";
+		std::cerr << "Couldn't read WASM file\n";
 		return nullptr;
 	}
 
-	auto *wclap = new wclap::Wclap(wclapDir ? wclapDir : "", presetDir ? presetDir : "", cacheDir ? cacheDir : "", varDir ? varDir : "", true);
-
-	wclap->initWasmBytes((uint8_t *)wasmBytes.data(), wasmBytes.size());
-	if (wclap->errorMessage) {
-		wclap::wclap_error_message_string = wclap->errorMessage;
-		wclap::wclap_error_message = wclap::wclap_error_message_string.c_str();
-		delete wclap;
+	auto *instance = createInstance((unsigned char *)wasmBytes.data(), wasmBytes.size(), wclapDir, presetDir, cacheDir, varDir);
+	auto error = instance->error();
+	if (error) {
+		std::cerr << *error << std::endl;
+		delete instance;
 		return nullptr;
 	}
-
-	return wclap;
+	
+	++activeWclapCount;
+	return new wclap_bridge::Wclap(instance);
 }
 void * wclap_open(const char *wclapDir) {
 	return wclap_open_with_dirs(wclapDir, nullptr, nullptr, nullptr);
 }
+bool wclap_get_error(void *wclap, char *buffer, size_t bufferCapacity) {
+	return ((wclap_bridge::Wclap *)wclap)->getError(buffer, bufferCapacity);
+}
 bool wclap_close(void *wclap) {
 	if (!wclap) {
-		wclap::wclap_error_message = "null pointer";
-		return false;
+		std::cerr << "null WCLAP pointer\n";
+		abort();
 	}
-	delete (wclap::Wclap *)wclap;
+	--activeWclapCount;
+	delete (wclap_bridge::Wclap *)wclap;
 	return true;
 }
 const wclap_version_triple * wclap_version(void *wclap) {
 	if (!wclap) {
-		wclap::wclap_error_message = "null pointer";
-		return nullptr;
+		std::cerr << "null WCLAP pointer\n";
+		abort();
 	}
-	return (const wclap_version_triple *)&((wclap::Wclap *)wclap)->clapVersion;
+	return (const wclap_version_triple *)&((wclap_bridge::Wclap *)wclap)->clapVersion;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {
-		wclap::wclap_error_message = "null pointer";
-		return nullptr;
+		std::cerr << "null WCLAP pointer\n";
+		abort();
 	}
-	return ((wclap::Wclap *)wclap)->getFactory(factory_id);
+	return ((wclap_bridge::Wclap *)wclap)->getFactory(factory_id);
 }
 
-static const wclap_version_triple bridgeVersion{1, 2, 7};
+static const wclap_version_triple bridgeVersion = WCLAP_VERSION_INIT;
 const wclap_version_triple * wclap_bridge_version() {
 	return &bridgeVersion;
 }

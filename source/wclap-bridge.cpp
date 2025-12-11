@@ -25,10 +25,10 @@ bool wclap_global_init(unsigned int timeLimitMs) {
 			std::cerr << "Tried to reconfigure WCLAP bridge while WCLAPs are still active\n";
 			abort();
 		}
-		wclap_bridge::Wclap::globalDeinit();
+		instanceGlobalDeinit();
 	}
 	globalInitMs = ms;
-	globalInitOK = wclap_bridge::Wclap::globalInit(ms);
+	globalInitOK = instanceGlobalInit(ms);
 	return globalInitOK;
 }
 void wclap_global_deinit() {
@@ -38,7 +38,7 @@ void wclap_global_deinit() {
 		std::cerr << "Tried to de-init WCLAP bridge while WCLAPs are still active\n";
 		abort();
 	}
-	wclap_bridge::Wclap::globalDeinit();
+	instanceGlobalDeinit();
 	globalInitOK = false;
 }
 
@@ -87,8 +87,8 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 void * wclap_open(const char *wclapDir) {
 	return wclap_open_with_dirs(wclapDir, nullptr, nullptr, nullptr);
 }
-bool wclap_get_error(void *wclap, char *buffer, size_t bufferCapacity) {
-	return ((wclap_bridge::Wclap *)wclap)->getError(buffer, bufferCapacity);
+bool wclap_get_error(void *wclap, char *buffer, uint32_t bufferCapacity) {
+	return ((wclap_bridge::Wclap *)wclap)->getError(buffer, (size_t)bufferCapacity);
 }
 bool wclap_close(void *wclap) {
 	if (!wclap) {

@@ -18,7 +18,7 @@ void * wclap_open(const char *wclapDir);
 void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir);
 
 // Thread safe, non-blocking unless there's an error (in which case the buffer is filled, and `true` returned)
-bool wclap_get_error(void *, char *buffer, size_t bufferCapacity);
+bool wclap_get_error(void *, char *buffer, uint32_t bufferCapacity);
 
 // Closes a WCLAP using its opaque identifier.  Unlike clap_entry::deinit(), this MUST be called exactly once after the corresponding wclap_open.
 // This really *shouldn't* fail - if it does, then there might be a memory leak.  Normally this would be an `abort()`-worthy bug, but we might not want to lose user data

@@ -271,7 +271,7 @@ void WclapThread::startInstance() {
 	}
 }
 
-void WclapThread::wasmInit() {
+void WclapThread::wasiInit() {
 	wasmtime_extern_t item;
 
 	// Call the WASI entry-point `_initialize()` if it exists - WCLAPs don't *have* to use WASI, so it's fine not to

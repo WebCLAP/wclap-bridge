@@ -8,3 +8,9 @@ Instance * createInstance(const unsigned char *wasmBytes, size_t wasmLength, con
 	return new Instance(wasmBytes, wasmLength, wclapDir, presetDir, cacheDir, varDir);
 }
 
+bool instanceGlobalInit(unsigned int timeLimitMs) {
+	return wclap_wasmtime::InstanceImpl::globalInit(timeLimitMs);
+}
+void instanceGlobalDeinit() {
+	return wclap_wasmtime::InstanceImpl::globalDeinit();
+}

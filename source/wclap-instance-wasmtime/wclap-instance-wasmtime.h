@@ -243,6 +243,7 @@ struct InstanceImpl {
 	struct Thread {
 		InstanceImpl &instance;
 		uint64_t wclapEntryAs64;
+		std::mutex mutex;
 
 		// Delete these (in reverse order) if they're defined
 		wasmtime_store_t *wtStore = nullptr;
@@ -294,6 +295,7 @@ struct InstanceImpl {
 		}
 
 		void call(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
+			std::lock_guard<std::mutex> lock(mutex);
 			if (wtError || wtTrap || instance.wtError || instance.constantErrorMessage) {
 				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 				return;

@@ -6,7 +6,7 @@
 #include "wclap-bridge.h"
 
 #include "./instance.h"
-#include "./wclap.h"
+#include "./wclap-module.h"
 
 #include <mutex>
 #include <fstream>
@@ -82,13 +82,13 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 	}
 	
 	++activeWclapCount;
-	return new wclap_bridge::Wclap(instance);
+	return new wclap_bridge::WclapModule(instance);
 }
 void * wclap_open(const char *wclapDir) {
 	return wclap_open_with_dirs(wclapDir, nullptr, nullptr, nullptr);
 }
 bool wclap_get_error(void *wclap, char *buffer, uint32_t bufferCapacity) {
-	return ((wclap_bridge::Wclap *)wclap)->getError(buffer, (size_t)bufferCapacity);
+	return ((wclap_bridge::WclapModule *)wclap)->getError(buffer, (size_t)bufferCapacity);
 }
 bool wclap_close(void *wclap) {
 	if (!wclap) {
@@ -96,7 +96,7 @@ bool wclap_close(void *wclap) {
 		abort();
 	}
 	--activeWclapCount;
-	delete (wclap_bridge::Wclap *)wclap;
+	delete (wclap_bridge::WclapModule *)wclap;
 	return true;
 }
 const wclap_version_triple * wclap_version(void *wclap) {
@@ -104,14 +104,15 @@ const wclap_version_triple * wclap_version(void *wclap) {
 		std::cerr << "null WCLAP pointer\n";
 		abort();
 	}
-	return (const wclap_version_triple *)&((wclap_bridge::Wclap *)wclap)->clapVersion;
+	auto *version = ((wclap_bridge::WclapModule *)wclap)->moduleClapVersion();
+	return (const wclap_version_triple *)version;
 }
 const void * wclap_get_factory(void *wclap, const char *factory_id) {
 	if (!wclap) {
 		std::cerr << "null WCLAP pointer\n";
 		abort();
 	}
-	return ((wclap_bridge::Wclap *)wclap)->getFactory(factory_id);
+	return ((wclap_bridge::WclapModule *)wclap)->getFactory(factory_id);
 }
 
 static const wclap_version_triple bridgeVersion = WCLAP_VERSION_INIT;

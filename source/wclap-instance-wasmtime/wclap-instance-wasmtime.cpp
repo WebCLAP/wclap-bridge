@@ -359,6 +359,7 @@ bool wclap_wasmtime::InstanceImpl::Thread::wasiInit() {
 }
 
 uint64_t wclap_wasmtime::InstanceImpl::Thread::wasmMalloc(size_t bytes) {
+	std::lock_guard<std::mutex> lock(mutex);
 	auto stopWithError = [&](const char *message) -> uint64_t {
 		instance.constantErrorMessage = message;
 		return 0;

@@ -15,7 +15,7 @@ using namespace WCLAP_API_NAMESPACE;
 
 using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
 
-struct Wclap {
+struct WclapModule {
 	std::unique_ptr<Instance> instance;
 	MemoryArenaPool arenaPool;
 	
@@ -45,7 +45,7 @@ struct Wclap {
 	clap_version clapVersion = {0, 0, 0};
 	Pointer<const wclap_plugin_entry> entryPtr;
 		
-	Wclap(Instance *instance) : instance(instance), arenaPool(instance) {
+	WclapModule(Instance *instance) : instance(instance), arenaPool(instance) {
 		// TODO: add host functions
 
 		instance->init();

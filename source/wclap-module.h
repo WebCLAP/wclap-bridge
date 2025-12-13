@@ -3,7 +3,7 @@
 #define WCLAP_API_NAMESPACE wclap32
 #define WCLAP_BRIDGE_NAMESPACE wclap_bridge32
 #define WCLAP_BRIDGE_IS64 false
-#include "./_impl/wclap-module-generic.h"
+#include "./_generic/wclap-module.h"
 #undef WCLAP_API_NAMESPACE
 #undef WCLAP_BRIDGE_NAMESPACE
 #undef WCLAP_BRIDGE_IS64
@@ -11,7 +11,7 @@
 #define WCLAP_API_NAMESPACE wclap64
 #define WCLAP_BRIDGE_NAMESPACE wclap_bridge64
 #define WCLAP_BRIDGE_IS64 true
-#include "./_impl/wclap-module-generic.h"
+#include "./_generic/wclap-module.h"
 #undef WCLAP_API_NAMESPACE
 #undef WCLAP_BRIDGE_NAMESPACE
 #undef WCLAP_BRIDGE_IS64

@@ -13,12 +13,15 @@ namespace WCLAP_BRIDGE_NAMESPACE {
 
 using namespace WCLAP_API_NAMESPACE;
 
-using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
+class Plugin;
 
-struct WclapModule {
-	std::unique_ptr<Instance> instance;
-	MemoryArenaPool arenaPool;
-	
+using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
+using MemoryArenaPtr = std::unique_ptr<wclap::MemoryArena<Instance, WCLAP_BRIDGE_IS64>>;
+
+struct WclapModuleBase {
+	std::unique_ptr<Instance> instance; // Destroyed last
+	MemoryArenaPool arenaPool; // Goes next because other destructors might make WASM calls, but we need the Instance for that
+
 	std::atomic<bool> hasError = true;
 	std::string errorMessage = "not initialised";
 	std::mutex errorMutex;
@@ -44,36 +47,35 @@ struct WclapModule {
 	
 	clap_version clapVersion = {0, 0, 0};
 	Pointer<const wclap_plugin_entry> entryPtr;
-		
-	WclapModule(Instance *instance) : instance(instance), arenaPool(instance) {
-		// TODO: add host functions
 
-		instance->init();
-		if (instance->entry32) {
-			entryPtr = {Size(instance->entry32.wasmPointer)};
-		} else {
-			entryPtr = {Size(instance->entry64.wasmPointer)};
-		}
-		if (!entryPtr) {
-			setError("clap_entry is NULL");
-			return;
-		}
-		
-		auto scoped = arenaPool.scoped();
-		auto pathStr = scoped.writeString(instance->path());
-		auto version = instance->get(entryPtr[&wclap_plugin_entry::wclap_version]);
-		clapVersion = {version.major, version.minor, version.revision};
-
-		if (!instance->call(entryPtr[&wclap_plugin_entry::init], pathStr)) {
-			setError("clap_entry::init() returned false");
-			return;
-		}
-		
-		hasError = false;
+	WclapModuleBase(Instance *instance) : instance(instance), arenaPool(instance) {}
+	~WclapModuleBase() {
+LOG_EXPR("~WclapModuleBase()");
 	}
+
+	wclap::IndexLookup<Plugin> pluginList;
 	
-	void * getFactory(const char *factoryId) {
-		return nullptr;
+	wclap_host hostTemplate;
+};
+
+template <typename T>
+struct ClapPluginMethodHelper;
+
+// Returns a plain-C function which calls a given C++ method
+template<auto methodPtr>
+auto clapPluginMethod() {
+	using C = ClapPluginMethodHelper<decltype(methodPtr)>;
+	return C::template callMethod<methodPtr>;
+}
+
+// Partial specialisation used to expand the method signature
+template <class Object, typename Return, typename... Args>
+struct ClapPluginMethodHelper<Return (Object::*)(Args...)> {
+	// Templated static method which forwards to a specific method
+	template<Return (Object::*methodPtr)(Args...)>
+	static Return callMethod(const clap_plugin *plugin, Args... args) {
+		auto *obj = (Object *)plugin->plugin_data;
+		return (obj->*methodPtr)(args...);
 	}
 };
 

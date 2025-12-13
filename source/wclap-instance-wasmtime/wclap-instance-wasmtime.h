@@ -159,14 +159,14 @@ inline double wasmValToArg<double>(const wasmtime_val_raw &v) {
 // Except for these pointer types
 template<class V>
 struct WasmValToArg<wclap32::Pointer<V>> {
-	inline wclap32::Pointer<V> toArg(const wasmtime_val_raw &v) {
-		return {v.i32};
+	static inline wclap32::Pointer<V> toArg(const wasmtime_val_raw &v) {
+		return {uint32_t(v.i32)};
 	}
 };
 template<class V>
 struct WasmValToArg<wclap64::Pointer<V>> {
-	inline wclap64::Pointer<V> toArg(const wasmtime_val_raw &v) {
-		return {v.i64};
+	static inline wclap64::Pointer<V> toArg(const wasmtime_val_raw &v) {
+		return {uint64_t(v.i64)};
 	}
 };
 
@@ -372,33 +372,35 @@ struct InstanceImpl {
 
 	template<class Return, class... Args>
 	Return call(wclap32::Function<Return, Args...> fnPtr, Args... args) {
+		auto &thread = mainThread;
 		if constexpr (std::is_void_v<Return>) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			mainThread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
-			return {};
+			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			return;
 		} else if constexpr (sizeof...(args) > 0) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			mainThread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return wasmValToArg<Return>(wasmVals[0]);
 		} else { // still need one slot for the return value
 			wasmtime_val_raw wasmVals[1];
-			mainThread.call(fnPtr.wasmPointer, &wasmVals, 1);
+			thread.call(fnPtr.wasmPointer, &wasmVals, 1);
 			return wasmValToArg<Return>(wasmVals[0]);
 		}
 	}
 	template<class Return, class... Args>
 	Return call(wclap64::Function<Return, Args...> fnPtr, Args... args) {
+		auto &thread = mainThread;
 		if constexpr (std::is_void_v<Return>) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			mainThread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
-			return {};
+			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			return;
 		} else if constexpr (sizeof...(args) > 0) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			mainThread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return wasmValToArg<Return>(wasmVals[0]);
 		} else { // still need one slot for the return value
 			wasmtime_val_raw wasmVals[1];
-			mainThread.call(fnPtr.wasmPointer, &wasmVals, 1);
+			thread.call(fnPtr.wasmPointer, &wasmVals, 1);
 			return wasmValToArg<Return>(wasmVals[0]);
 		}
 	}
@@ -406,14 +408,18 @@ struct InstanceImpl {
 	template<class Return, class... Args>
 	Return callAt(wclap32::Pointer<wclap32::Function<Return, Args...>> fnPtrPtr, Args... args) {
 		wclap32::Function<Return, Args...> fnPtr;
-		if (!getArray(fnPtrPtr, &fnPtr, 1)) return {};
-		return call<Return, Args...>(fnPtr, args...);
+		if (getArray(fnPtrPtr, &fnPtr, 1)) {
+			return call<Return, Args...>(fnPtr, args...);
+		}
+		if constexpr (!std::is_void_v<Return>) return {};
 	}
 	template<class Return, class... Args>
 	Return callAt(wclap64::Pointer<wclap64::Function<Return, Args...>> fnPtrPtr, Args... args) {
 		wclap64::Function<Return, Args...> fnPtr;
-		if (!getArray(fnPtrPtr, &fnPtr, 1)) return {};
-		return call<Return, Args...>(fnPtr, args...);
+		if (getArray(fnPtrPtr, &fnPtr, 1)) {
+			return call<Return, Args...>(fnPtr, args...);
+		}
+		if constexpr (!std::is_void_v<Return>) return {};
 	}
 };
 

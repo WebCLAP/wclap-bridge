@@ -50,7 +50,6 @@ struct WclapModuleBase {
 
 	WclapModuleBase(Instance *instance) : instance(instance), arenaPool(instance) {}
 	~WclapModuleBase() {
-LOG_EXPR("~WclapModuleBase()");
 	}
 
 	wclap::IndexLookup<Plugin> pluginList;

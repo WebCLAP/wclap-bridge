@@ -51,7 +51,6 @@ LOG_EXPR("pluginInit");
 		return true;
 	}
 	void pluginDestroy() {
-LOG_EXPR("pluginDestroy");
 		module.instance->call(ptr[&wclap_plugin::destroy], ptr);
 		destroyCalled = true;
 		module.pluginList.release(pluginListIndex);
@@ -79,9 +78,16 @@ LOG_EXPR("pluginProcess");
 		for (uint32_t o = 0; o < process->audio_outputs_count; ++o) {
 			auto &audioOutput = process->audio_outputs[o];
 			for (uint32_t c = 0; c < audioOutput.channel_count; ++c) {
-				auto *buffer = audioOutput.data32[c];
-				for (size_t i = 0; i < length; ++i) {
-					buffer[i] = (float(i)/length - 0.5f)*0.1;
+				if (audioOutput.data32) {
+					auto *buffer = audioOutput.data32[c];
+					for (size_t i = 0; i < length; ++i) {
+						buffer[i] = (float(i)/length - 0.5f)*0.1f;
+					}
+				} else if (audioOutput.data64) {
+					auto *buffer = audioOutput.data64[c];
+					for (size_t i = 0; i < length; ++i) {
+						buffer[i] = (float(i)/length - 0.5f)*0.1;
+					}
 				}
 			}
 		}

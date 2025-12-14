@@ -26,4 +26,10 @@ unsafe extern "C" {
         handle: *mut ::std::os::raw::c_void,
         factory_id: *const ::std::os::raw::c_char,
     ) -> *const ::std::os::raw::c_void;
+
+    pub fn wclap_set_strings(
+        pluginIdPrefix: *const ::std::os::raw::c_char,
+        pluginNamePrefix: *const ::std::os::raw::c_char,
+        pluginNameSuffix: *const ::std::os::raw::c_char,
+    );
 }

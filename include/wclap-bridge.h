@@ -38,6 +38,8 @@ const struct wclap_version_triple * wclap_bridge_version();
 // Gets a factory (if supported by both the WCLAP and the bridge)
 const void * wclap_get_factory(void *, const char *factory_id);
 
+void wclap_set_strings(const char *pluginIdPrefix, const char *pluginNamePrefix, const char *pluginNameSuffix);
+
 #ifdef __cplusplus
 }
 #endif

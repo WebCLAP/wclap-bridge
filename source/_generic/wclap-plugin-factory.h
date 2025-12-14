@@ -1,6 +1,9 @@
 // No `#pragma once`, because we deliberately get included multiple times by `../wclap.h`, with different WCLAP_API_NAMESPACE, WCLAP_BRIDGE_NAMESPACE and WCLAP_BRIDGE_IS64 values
 
 #include "./wclap-plugin.h"
+#include "../config.h"
+
+#include <string_view>
 
 namespace WCLAP_BRIDGE_NAMESPACE {
 
@@ -20,13 +23,13 @@ struct PluginFactory {
 	std::vector<std::vector<const char *>> featureArrays;
 	std::vector<clap_plugin_descriptor> descriptors;
 	
-	const char * readString(Pointer<const char> ptr, const char *nullValue=nullptr) {
+	const char * readString(Pointer<const char> ptr, const char *nullValue=nullptr, const char *prefix="", const char *suffix="") {
 		if (!ptr) return nullValue;
-		auto str = module.instance->getString(ptr, 2048);
+		auto str = prefix + module.instance->getString(ptr, 2048) + suffix;
 		strings.emplace_back(std::unique_ptr<std::string>{new std::string(std::move(str))});
 		return strings.back()->data();
 	}
-	
+
 	clap_plugin *createPlugin(const clap_host *host, const char *pluginId) const {
 		const clap_plugin_descriptor *desc = nullptr;
 		for (auto &d : descriptors) {
@@ -39,6 +42,8 @@ struct PluginFactory {
 		
 		auto scoped = module.arenaPool.scoped();
 
+		// In order to match, it must've started with this prefix, so skip it
+		pluginId += wclap_bridge::pluginIdPrefix.size();
 		auto strPtr = scoped.writeString(pluginId);
 		auto hostPtr = scoped.copyAcross(module.hostTemplate);
 		auto pluginPtr = module.instance->call(ptr[&wclap_plugin_factory::create_plugin], ptr, hostPtr, strPtr);
@@ -61,8 +66,8 @@ struct PluginFactory {
 					.minor=wclapDesc.wclap_version.minor,
 					.revision=wclapDesc.wclap_version.revision,
 				},
-				.id=readString(wclapDesc.id, "unknown-clap-id"),
-				.name=readString(wclapDesc.name, "Unknown CLAP plugin"),
+				.id=readString(wclapDesc.id, "unknown-clap-id", wclap_bridge::pluginIdPrefix.c_str()),
+				.name=readString(wclapDesc.name, "Unknown CLAP plugin", wclap_bridge::pluginNamePrefix.c_str(), wclap_bridge::pluginNameSuffix.c_str()),
 				.vendor=readString(wclapDesc.vendor),
 				.url=readString(wclapDesc.url),
 				.manual_url=readString(wclapDesc.manual_url),

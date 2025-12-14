@@ -3,6 +3,7 @@
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 #endif
 
+#include "config.h"
 #include "wclap-bridge.h"
 
 #include "./instance.h"
@@ -113,6 +114,12 @@ const void * wclap_get_factory(void *wclap, const char *factory_id) {
 		abort();
 	}
 	return ((wclap_bridge::WclapModule *)wclap)->getFactory(factory_id);
+}
+
+void wclap_set_strings(const char *idPrefix, const char *namePrefix, const char *nameSuffix) {
+	wclap_bridge::pluginIdPrefix = (idPrefix ? idPrefix : "");
+	wclap_bridge::pluginNamePrefix = (namePrefix ? namePrefix : "");
+	wclap_bridge::pluginNameSuffix = (nameSuffix ? nameSuffix : "");
 }
 
 static const wclap_version_triple bridgeVersion = WCLAP_VERSION_INIT;

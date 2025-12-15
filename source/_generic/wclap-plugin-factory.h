@@ -25,7 +25,7 @@ struct PluginFactory {
 	
 	const char * readString(Pointer<const char> ptr, const char *nullValue=nullptr, const char *prefix="", const char *suffix="") {
 		if (!ptr) return nullValue;
-		auto str = prefix + module.instance->getString(ptr, 2048) + suffix;
+		auto str = prefix + module.mainThread->getString(ptr, 2048) + suffix;
 		strings.emplace_back(std::unique_ptr<std::string>{new std::string(std::move(str))});
 		return strings.back()->data();
 	}
@@ -42,24 +42,24 @@ struct PluginFactory {
 		
 		auto scoped = module.arenaPool.scoped();
 
-		// In order to match, it must've started with this prefix, so skip it
+		// In order to get to this point, it must've started with the WCLAP prefix (if defined), so skip it
 		pluginId += wclap_bridge::pluginIdPrefix.size();
 		auto strPtr = scoped.writeString(pluginId);
 		auto hostPtr = scoped.copyAcross(module.hostTemplate);
-		auto pluginPtr = module.instance->call(ptr[&wclap_plugin_factory::create_plugin], ptr, hostPtr, strPtr);
+		auto pluginPtr = module.mainThread->call(ptr[&wclap_plugin_factory::create_plugin], ptr, hostPtr, strPtr);
 		if (!pluginPtr) return nullptr;
-		auto *plugin = new Plugin(module, hostPtr, pluginPtr, scoped.commit(), desc);
+		auto *plugin = new Plugin(module, host, hostPtr, pluginPtr, scoped.commit(), desc);
 		return &plugin->clapPlugin;
 	}
 
 	PluginFactory(WclapModuleBase &module, Pointer<wclap_plugin_factory> ptr) : module(module), ptr(ptr) {
-		auto &instance = *module.instance;
+		auto &instance = *module.mainThread;
 		// Enumerate all the descriptors up-front
 		auto count = instance.call(ptr[&wclap_plugin_factory::get_plugin_count], ptr);
 		for (uint32_t i = 0; i < count; ++i) {
 			auto descPtr = instance.call(ptr[&wclap_plugin_factory::get_plugin_descriptor], ptr, i);
 			if (!descPtr) continue;
-			auto wclapDesc = module.instance->get(descPtr);
+			auto wclapDesc = module.mainThread->get(descPtr);
 			descriptors.push_back({
 				.clap_version{
 					.major=wclapDesc.wclap_version.major,

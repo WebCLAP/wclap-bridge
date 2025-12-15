@@ -1,5 +1,18 @@
 #pragma once
 
+namespace wclap_bridge32 {
+	template<class Fn>
+	auto registerHostFunction(Instance *instance, void *module, Fn fn) {
+		return instance->registerHost32(module, fn);
+	}
+}
+namespace wclap_bridge64 {
+	template<class Fn>
+	auto registerHostFunction(Instance *instance, void *module, Fn fn) {
+		return instance->registerHost64(module, fn);
+	}
+}
+
 #define WCLAP_API_NAMESPACE wclap32
 #define WCLAP_BRIDGE_NAMESPACE wclap_bridge32
 #define WCLAP_BRIDGE_IS64 false
@@ -25,11 +38,11 @@ struct WclapModule {
 	std::unique_ptr<Wclap32> wclap32;
 	std::unique_ptr<Wclap64> wclap64;
 
-	WclapModule(Instance *instance) {
-		if (instance->is64()) {
-			wclap64 = std::unique_ptr<Wclap64>{new Wclap64(instance)};
+	WclapModule(InstanceGroup *instanceGroup) {
+		if (instanceGroup->is64()) {
+			wclap64 = std::unique_ptr<Wclap64>{new Wclap64(instanceGroup)};
 		} else {
-			wclap32 = std::unique_ptr<Wclap32>{new Wclap32(instance)};
+			wclap32 = std::unique_ptr<Wclap32>{new Wclap32(instanceGroup)};
 		}
 	}
 	

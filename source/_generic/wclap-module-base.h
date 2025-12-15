@@ -14,13 +14,15 @@ namespace WCLAP_BRIDGE_NAMESPACE {
 using namespace WCLAP_API_NAMESPACE;
 
 class Plugin;
+const clap_host * getHostFromPlugin(Plugin *plugin);
 
 using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
 using MemoryArenaPtr = std::unique_ptr<wclap::MemoryArena<Instance, WCLAP_BRIDGE_IS64>>;
 
 struct WclapModuleBase {
-	std::unique_ptr<Instance> instance; // Destroyed last
-	MemoryArenaPool arenaPool; // Goes next because other destructors might make WASM calls, but we need the Instance for that
+	std::unique_ptr<InstanceGroup> instanceGroup; // Destroyed last
+	std::unique_ptr<Instance> mainThread;
+	MemoryArenaPool arenaPool; // Goes next because other destructors might make WASM calls, but we need an Instance (most likely the main thread) for that
 
 	std::atomic<bool> hasError = true;
 	std::string errorMessage = "not initialised";
@@ -33,7 +35,7 @@ struct WclapModuleBase {
 
 	bool getError(char *buffer, size_t bufferLength) {
 		if (!hasError) {
-			auto instanceError = instance->error();
+			auto instanceError = instanceGroup->error();
 			if (!instanceError) return false;
 			setError(*instanceError);
 		}
@@ -48,13 +50,38 @@ struct WclapModuleBase {
 	clap_version clapVersion = {0, 0, 0};
 	Pointer<const wclap_plugin_entry> entryPtr;
 
-	WclapModuleBase(Instance *instance) : instance(instance), arenaPool(instance) {}
+	WclapModuleBase(InstanceGroup *instanceGroup) : instanceGroup(instanceGroup), mainThread(instanceGroup->startInstance()), arenaPool(mainThread.get()) {}
 	~WclapModuleBase() {
 	}
 
 	wclap::IndexLookup<Plugin> pluginList;
+	static const clap_host * getHost(void *context, Pointer<const wclap_host> host) {
+		auto &self = *(WclapModuleBase *)context;
+		auto *plugin = self.pluginList.get(host.wasmPointer);
+		if (!plugin) return nullptr;
+		return getHostFromPlugin(plugin);
+	}
 	
 	wclap_host hostTemplate;
+	static Pointer<const void> hostGetExtension(void *context, Pointer<const wclap_host> host, Pointer<const char> extId) {
+		auto &self = *(WclapModuleBase *)context;
+		// null, no extensions for now
+		return {0};
+	}
+	static void hostRequestRestart(void *context, Pointer<const wclap_host> whost) {
+		auto *host = getHost(context, whost);
+		if (host) host->request_restart(host);
+	}
+	static void hostRequestProcess(void *context, Pointer<const wclap_host> whost) {
+		auto *host = getHost(context, whost);
+		if (host) host->request_process(host);
+	}
+	static void hostRequestCallback(void *context, Pointer<const wclap_host> whost) {
+		auto *host = getHost(context, whost);
+		if (host) host->request_callback(host);
+	}
+
+	wclap_host hostExtAudioPorts;
 };
 
 template <typename T>

@@ -8,19 +8,20 @@ using namespace WCLAP_API_NAMESPACE;
 
 struct Plugin {
 	WclapModuleBase &module;
+	
 	Pointer<const wclap_plugin> ptr;
 	MemoryArenaPtr arena; // this holds the `wclap_host` (and anything else we need) for the lifetime of the plugin
+	std::unique_ptr<Instance> audioThread;
 	uint32_t pluginListIndex;
 	std::atomic<bool> destroyCalled = false;
+	const clap_host *host;
 	
-	Plugin(WclapModuleBase &module, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), ptr(ptr), arena(std::move(arena)) {
-LOG_EXPR(hostPtr.wasmPointer);
+	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), ptr(ptr), arena(std::move(arena)), audioThread(module.instanceGroup->startInstance()) {
 		// Address using its index in the plugin list (where it's retained)
 		pluginListIndex = module.pluginList.retain(this);
-		module.instance->set(hostPtr[&wclap_host::host_data], {pluginListIndex});
+		module.mainThread->set(hostPtr[&wclap_host::host_data], {pluginListIndex});
 
 		clapPlugin.desc = desc;
-LOG_EXPR(clapPlugin.desc);
 	};
 	Plugin(const Plugin& other) = delete;
 	~Plugin() {
@@ -47,30 +48,27 @@ LOG_EXPR(clapPlugin.desc);
 private:
 
 	bool pluginInit() {
-LOG_EXPR("pluginInit");
-		return true;
+		return module.mainThread->call(ptr[&wclap_plugin::init], ptr);
 	}
 	void pluginDestroy() {
-		module.instance->call(ptr[&wclap_plugin::destroy], ptr);
+		module.mainThread->call(ptr[&wclap_plugin::destroy], ptr);
 		destroyCalled = true;
 		module.pluginList.release(pluginListIndex);
 	}
 	bool pluginActivate(double sRate, uint32_t minFrames, uint32_t maxFrames) {
-LOG_EXPR("pluginActivate");
-		return true;
+		return audioThread->call(ptr[&wclap_plugin::activate], ptr, sRate, minFrames, maxFrames);
 	}
 	void pluginDeactivate() {
-LOG_EXPR("pluginDeactivate");
+		audioThread->call(ptr[&wclap_plugin::deactivate], ptr);
 	}
 	bool pluginStartProcessing() {
-LOG_EXPR("pluginStartProcessing");
-		return true;
+		return audioThread->call(ptr[&wclap_plugin::start_processing], ptr);
 	}
 	void pluginStopProcessing() {
-LOG_EXPR("pluginStopProcessing");
+		audioThread->call(ptr[&wclap_plugin::stop_processing], ptr);
 	}
 	void pluginReset() {
-LOG_EXPR("pluginReset");
+		audioThread->call(ptr[&wclap_plugin::reset], ptr);
 	}
 	clap_process_status pluginProcess(const clap_process *process) {
 LOG_EXPR("pluginProcess");
@@ -96,7 +94,7 @@ LOG_EXPR("pluginProcess");
 	}
 
 	void pluginOnMainThread() {
-LOG_EXPR("pluginOnMainThread");
+		module.mainThread->call(ptr[&wclap_plugin::on_main_thread], ptr);
 	}
 
 	const void * pluginGetExtension(const char *extId) {
@@ -105,4 +103,9 @@ LOG_EXPR(extId);
 		return nullptr;
 	}
 };
+
+const clap_host * getHostFromPlugin(Plugin *plugin) {
+	return plugin->host;
+}
+
 }; // namespace

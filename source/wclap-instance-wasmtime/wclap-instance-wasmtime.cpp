@@ -17,7 +17,13 @@ static void epochThreadFunction() {
 std::atomic<size_t> timeLimitEpochs = 0;
 static std::thread globalEpochThread;
 
-bool wclap_wasmtime::InstanceImpl::globalInit(unsigned int timeLimitMs) {
+std::unique_ptr<wclap::Instance<wclap_wasmtime::InstanceImpl>> wclap_wasmtime::InstanceGroup::startInstance() {
+	return std::unique_ptr<wclap::Instance<wclap_wasmtime::InstanceImpl>>{
+		new wclap::Instance<wclap_wasmtime::InstanceImpl>(*this)
+	};
+}
+
+bool wclap_wasmtime::InstanceGroup::globalInit(unsigned int timeLimitMs) {
 	wasm_config_t *config = wasm_config_new();
 	if (!config) {
 		std::cerr << "couldn't create Wasmtime config\n";
@@ -47,7 +53,7 @@ bool wclap_wasmtime::InstanceImpl::globalInit(unsigned int timeLimitMs) {
 	}
 	return true;
 }
-void wclap_wasmtime::InstanceImpl::globalDeinit() {
+void wclap_wasmtime::InstanceGroup::globalDeinit() {
 	if (globalEpochThread.joinable()) {
 		// stop the epoch thread
 		globalEpochRunning.clear();
@@ -60,7 +66,7 @@ void wclap_wasmtime::InstanceImpl::globalDeinit() {
 	}
 }
 
-void wclap_wasmtime::InstanceImpl::setup(const unsigned char *wasmBytes, size_t wasmLength) {
+void wclap_wasmtime::InstanceGroup::setup(const unsigned char *wasmBytes, size_t wasmLength) {
 	wtError = wasmtime_module_new(globalWasmEngine, wasmBytes, wasmLength, &wtModule);
 	if (wtError) return;
 	
@@ -126,9 +132,9 @@ void wclap_wasmtime::InstanceImpl::setup(const unsigned char *wasmBytes, size_t 
 	}
 }
 
-bool wclap_wasmtime::InstanceImpl::Thread::setup() {
+bool wclap_wasmtime::InstanceImpl::setup() {
 	auto stopWithError = [&](const char *message) -> bool {
-		instance.constantErrorMessage = message;
+		group.setError(message);
 		return false;
 	};
 
@@ -170,24 +176,24 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 	}
 	
 	// Link various directories - failure is allowed if `mustLinkDirs` is false
-	if (instance.wclapDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, instance.wclapDir->c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
-			std::cerr << "WASI: failed to link " << *instance.wclapDir << std::endl;
+	if (group.wclapDir) {
+		if (!wasi_config_preopen_dir(wasiConfig, group.wclapDir->c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
+			std::cerr << "WASI: failed to link " << *group.wclapDir << std::endl;
 		}
 	}
-	if (instance.presetDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, instance.presetDir->c_str(), "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			std::cerr << "WASI: failed to link " << *instance.presetDir << std::endl;
+	if (group.presetDir) {
+		if (!wasi_config_preopen_dir(wasiConfig, group.presetDir->c_str(), "/presets/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			std::cerr << "WASI: failed to link " << *group.presetDir << std::endl;
 		}
 	}
-	if (instance.cacheDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, instance.cacheDir->c_str(), "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			std::cerr << "WASI: failed to link " << *instance.cacheDir << std::endl;
+	if (group.cacheDir) {
+		if (!wasi_config_preopen_dir(wasiConfig, group.cacheDir->c_str(), "/cache/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			std::cerr << "WASI: failed to link " << *group.cacheDir << std::endl;
 		}
 	}
-	if (instance.varDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, instance.varDir->c_str(), "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
-			std::cerr << "WASI: failed to link " << *instance.varDir << std::endl;
+	if (group.varDir) {
+		if (!wasi_config_preopen_dir(wasiConfig, group.varDir->c_str(), "/var/", WASMTIME_WASI_DIR_PERMS_READ|WASMTIME_WASI_DIR_PERMS_WRITE, WASMTIME_WASI_FILE_PERMS_READ|WASMTIME_WASI_FILE_PERMS_WRITE)) {
+			std::cerr << "WASI: failed to link " << *group.varDir << std::endl;
 		}
 	}
 
@@ -201,13 +207,13 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 
 	//---------- Shared-memory import ----------//
 
-	if (instance.wtSharedMemory) { // memory import
+	if (group.wtSharedMemory) { // memory import
 		wasmtime_extern_t item;
 		item.kind = WASMTIME_EXTERN_SHAREDMEMORY;
-		item.of.sharedmemory = instance.wtSharedMemory;
+		item.of.sharedmemory = group.wtSharedMemory;
 		
-		auto &module = instance.sharedMemoryImportModule;
-		auto &name = instance.sharedMemoryImportName;
+		auto &module = group.sharedMemoryImportModule;
+		auto &name = group.sharedMemoryImportName;
 		wtError = wasmtime_linker_define(wtLinker, wtContext, module.c_str(), module.size(), name.c_str(), name.size(), &item);
 		if (wtError) return stopWithError("error linking shared-memory import");
 	}
@@ -216,7 +222,7 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 
 	// This doesn't call the WASI _start() or _initialize() methods
 	setWasmDeadline();
-	wtError = wasmtime_linker_instantiate(wtLinker, wtContext, instance.wtModule, &wtInstance, &wtTrap);
+	wtError = wasmtime_linker_instantiate(wtLinker, wtContext, group.wtModule, &wtInstance, &wtTrap);
 	if (wtError) return stopWithError("Failed to create instance (error)");
 	if (wtTrap) return stopWithError("Failed to start instance (trap)");
 
@@ -231,7 +237,7 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 			wtMemory = item.of.memory;
 		} else if (item.kind == WASMTIME_EXTERN_SHAREDMEMORY) {
 			// TODO: it should be the same as the import - not sure how to check this
-			if (!instance.wtSharedMemory) {
+			if (!group.wtSharedMemory) {
 				return stopWithError("exported shared memory, but didn't import it");
 			}
 		} else {
@@ -239,7 +245,7 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 			return stopWithError("exported memory isn't a (Shared)Memory");
 		}
 		wasmtime_extern_delete(&item);
-	} else if (!instance.wtSharedMemory) {
+	} else if (!group.wtSharedMemory) {
 		return stopWithError("must either export memory or import shared memory");
 	}
 
@@ -249,9 +255,9 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 	if (item.kind == WASMTIME_EXTERN_GLOBAL) {
 		wasmtime_val_t v;
 		wasmtime_global_get(wtContext, &item.of.global, &v);
-		if (v.kind == WASM_I32 && !instance.wasm64) {
+		if (v.kind == WASM_I32 && !group.is64()) {
 			wclapEntryAs64 = v.of.i32; // We store it as 64 bits, even though we know it's a 32-bit one
-		} else if (v.kind == WASM_I64 && instance.wasm64) {
+		} else if (v.kind == WASM_I64 && group.is64()) {
 			wclapEntryAs64 = v.of.i64;
 		} else {
 			return stopWithError("clap_entry is not a (correctly-sized) pointer");
@@ -277,7 +283,7 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 			wasmtime_extern_delete(&item);
 			return stopWithError("malloc() function signature mismatch");
 		}
-		if (instance.wasm64) {
+		if (group.is64()) {
 			if (wasm_valtype_kind(params->data[0]) != WASMTIME_I64) {
 				wasmtime_extern_delete(&item);
 				return stopWithError("malloc() function signature mismatch");
@@ -319,9 +325,9 @@ bool wclap_wasmtime::InstanceImpl::Thread::setup() {
 	return true;
 }
 
-bool wclap_wasmtime::InstanceImpl::Thread::wasiInit() {
+bool wclap_wasmtime::InstanceImpl::wasiInit() {
 	auto stopWithError = [&](const char *message) -> bool {
-		instance.constantErrorMessage = message;
+		group.setError(message);
 		return false;
 	};
 
@@ -358,10 +364,10 @@ bool wclap_wasmtime::InstanceImpl::Thread::wasiInit() {
 	return true;
 }
 
-uint64_t wclap_wasmtime::InstanceImpl::Thread::wasmMalloc(size_t bytes) {
+uint64_t wclap_wasmtime::InstanceImpl::wtMalloc(size_t bytes) {
 	std::lock_guard<std::mutex> lock(mutex);
 	auto stopWithError = [&](const char *message) -> uint64_t {
-		instance.constantErrorMessage = message;
+		group.setError(message);
 		return 0;
 	};
 
@@ -369,7 +375,7 @@ uint64_t wclap_wasmtime::InstanceImpl::Thread::wasmMalloc(size_t bytes) {
 	
 	wasmtime_val_t args[1];
 	wasmtime_val_t results[1];
-	if (instance.wasm64) {
+	if (group.is64()) {
 		args[0].kind = WASMTIME_I64;
 		args[0].of.i64 = bytes;
 	} else {
@@ -387,7 +393,7 @@ uint64_t wclap_wasmtime::InstanceImpl::Thread::wasmMalloc(size_t bytes) {
 		logTrap(wtTrap);
 		return stopWithError(trapIsTimeout(wtTrap) ? "malloc() timeout" : "malloc() threw (trapped)");
 	}
-	if (instance.wasm64) {
+	if (group.is64()) {
 		if (results[0].kind != WASMTIME_I64) return 0;
 		return results[0].of.i64;
 	} else {
@@ -396,7 +402,7 @@ uint64_t wclap_wasmtime::InstanceImpl::Thread::wasmMalloc(size_t bytes) {
 	}
 }
 
-void wclap_wasmtime::InstanceImpl::Thread::setWasmDeadline() {
+void wclap_wasmtime::InstanceImpl::setWasmDeadline() {
 	if (timeLimitEpochs) {
 		wasmtime_context_set_epoch_deadline(wtContext, timeLimitEpochs);
 	}

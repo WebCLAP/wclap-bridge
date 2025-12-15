@@ -74,16 +74,16 @@ void * wclap_open_with_dirs(const char *wclapDir, const char *presetDir, const c
 		return nullptr;
 	}
 
-	auto *instance = createInstance((unsigned char *)wasmBytes.data(), wasmBytes.size(), wclapDir, presetDir, cacheDir, varDir);
-	auto error = instance->error();
+	auto *instanceGroup = createInstanceGroup((unsigned char *)wasmBytes.data(), wasmBytes.size(), wclapDir, presetDir, cacheDir, varDir);
+	auto error = instanceGroup->error();
 	if (error) {
 		std::cerr << *error << std::endl;
-		delete instance;
+		delete instanceGroup;
 		return nullptr;
 	}
 	
 	++activeWclapCount;
-	return new wclap_bridge::WclapModule(instance);
+	return new wclap_bridge::WclapModule(instanceGroup);
 }
 void * wclap_open(const char *wclapDir) {
 	return wclap_open_with_dirs(wclapDir, nullptr, nullptr, nullptr);

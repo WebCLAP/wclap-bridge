@@ -39,9 +39,15 @@ This uses the `wclap-cpp` definitions, and provides a Wasmtime-based implementat
 
 From there, it's a manually-implemented CLAP module, where the implementation refers to its internal WCLAP.  There is no automatic translation of return values or structs.
 
+### 32-/64-bit versions
+
+To avoid duplicate code, any 32-/64-bit specific details are in `source/_generic/`, and get included twice (by `source/wclap-module.h`) with different values for `WCLAP_API_NAMESPACE`, `WCLAP_BRIDGE_NAMESPACE` and `WCLAP_BRIDGE_IS64`.  This means we have to be a _bit_ more careful how those files include each other, since they don't have include-guards or `#pragma once`.
+
+This could be organised differently, with either templates, or compiling two sub-libraries files with multiple definitions.  Open an issue (or even a PR? 😉) if you have strong opinions about this.
+
 ### Validity checking
 
-The CLAP module implementation only uses or returns values it understands, so there is an implicit whitelist.  None of the
+The CLAP module implementation only uses or returns values it understands, so there is an implicit whitelist.  No events or values passed across the WCLAP bridge (in either direction) should have un-translated pointers
 
 There may (in future) be additional checks to make sure that parameter/note events refer to IDs which actually exist, and that host functions are being called on appropriate threads.  Ideally hosts should code defensively and handle this kind of error safely anyway, but (since native plugins are inherently more trusted than WCLAPs) it's understandable that they might be less cautious, which is why this is on the wishlist.
 

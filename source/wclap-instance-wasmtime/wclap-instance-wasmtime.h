@@ -170,23 +170,150 @@ struct WasmValToArg<wclap64::Pointer<V>> {
 	}
 };
 
+//---------- Wasmtime type-signature helpers ----------
+
+// generic form - has to be a class so we can do partial specialisation
+template<typename T>
+struct WasmValTypeCode {
+	static inline uint8_t toCode();
+};
+template<typename T>
+inline uint8_t wasmValTypeCode() {
+	return WasmValTypeCode<T>::toCode();
+}
+// but we still specialise the function directly
+template<>
+inline uint8_t wasmValTypeCode<bool>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<int8_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<uint8_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<int16_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<uint16_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<int32_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<uint32_t>() {
+	return WASM_I32;
+}
+template<>
+inline uint8_t wasmValTypeCode<int64_t>() {
+	return WASM_I64;
+}
+template<>
+inline uint8_t wasmValTypeCode<uint64_t>() {
+	return WASM_I64;
+}
+template<>
+inline uint8_t wasmValTypeCode<float>() {
+	return WASM_F32;
+}
+template<>
+inline uint8_t wasmValTypeCode<double>() {
+	return WASM_F64;
+}
+// Except for these pointer types
+template<class V>
+struct WasmValTypeCode<wclap32::Pointer<V>> {
+	static inline uint8_t toCode() {
+		return WASM_I32;
+	}
+};
+template<class V>
+struct WasmValTypeCode<wclap64::Pointer<V>> {
+	static inline uint8_t toCode() {
+		return WASM_I64;
+	}
+};
+
+template<size_t index>
+inline void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {}
+
+template <size_t index, class First, class ...Args>
+inline void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {
+	vec->data[index] = wasm_valtype_new(wasmValTypeCode<First>());
+	setWasmtimeValTypes<index + 1, Args...>(vec);
+}
+
+template<typename Return, typename ...Args>
+inline const wasm_functype_t * getWasmtimeFuncType() {
+	static std::atomic<wasm_functype_t *> type = nullptr;
+	if (type.load()) return type.load();
+
+	wasm_valtype_vec_t params, results;
+	wasm_valtype_vec_new_uninitialized(&params, sizeof...(Args));
+	setWasmtimeValTypes<0, Args...>(&params);
+	if constexpr(std::is_void_v<Return>) {
+		wasm_valtype_vec_new_empty(&results);
+	} else {
+		wasm_valtype_vec_new_uninitialized(&results, 1);
+		results.data[0] = wasm_valtype_new(wasmValTypeCode<Return>());
+	}
+
+	type.store(wasm_functype_new(&params, &results));
+	return type.load();
+}
+
+template <class ...Args, size_t ...Is>
+std::tuple<void *, Args...> argsAsTuple(void *context, wasmtime_val_raw_t *wasmArgs, std::index_sequence<Is...>) {
+    return {context, wasmValToArg<Args>(wasmArgs[Is])...};
+}
+
 //---------- Actual implementations ----------
 
-struct InstanceImpl {
-	void *handle;
-	bool wasm64 = false;
+struct InstanceImpl;
+
+struct InstanceGroup {
 	bool hadInit = false;
+	bool is64() const {
+		return wasm64;
+	}
 
 	static bool globalInit(unsigned int timeLimitMs);
 	static void globalDeinit();
-
+	
 	wasmtime_module_t *wtModule = nullptr;
 	wasmtime_error_t *wtError = nullptr;
 	wasmtime_sharedmemory_t *wtSharedMemory = nullptr;
 	std::string sharedMemoryImportModule, sharedMemoryImportName;
 	const char *constantErrorMessage = nullptr;
 
+	bool setError(const char *message) {
+		auto groupLock = lock();
+		constantErrorMessage = message;
+		return true;
+	}
+	bool setError(wasmtime_error_t *e) {
+		if (!e) return false;
+		if (wtError) {
+			// Keep first error, but log the new one
+			logError(e);
+			wasmtime_error_delete(e);
+			return true;
+		}
+		auto groupLock = lock();
+		wtError = e;
+		return true;
+	}
+	bool hasError() const {
+		return constantErrorMessage || wtError;
+	}
 	std::optional<std::string> error() const {
+		auto groupLock = lock();
 		if (constantErrorMessage) return {constantErrorMessage};
 		
 		if (!wtError) return {};
@@ -198,31 +325,75 @@ struct InstanceImpl {
 		wasm_byte_vec_delete(&message);
 		return {errorMessage};
 	}
-	
+
 	std::optional<std::string> wclapDir, presetDir, cacheDir, varDir;
 	static std::optional<std::string> optStr(const char *str) {
 		if (!str) return {};
 		return {std::string{str}};
 	}
 
+	void setup(const unsigned char *wasmBytes, size_t wasmLength);
+
 	// `handle` is added by `wclap::Instance`, other constructor arguments are passed through
-	InstanceImpl(void *handle, const unsigned char *wasmBytes, size_t wasmLength, const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir) : handle(handle), wclapDir(optStr(wclapDir)), presetDir(optStr(presetDir)), cacheDir(optStr(cacheDir)), varDir(optStr(varDir)) {
+	InstanceGroup(const unsigned char *wasmBytes, size_t wasmLength, const char *wclapDir, const char *presetDir, const char *cacheDir, const char *varDir) : wclapDir(optStr(wclapDir)), presetDir(optStr(presetDir)), cacheDir(optStr(cacheDir)), varDir(optStr(varDir)) {
 		// early returns are easier in normal functions
 		setup(wasmBytes, wasmLength);
-
-		// start one thread
-		mainThread.setup();
 	}
-	InstanceImpl(const InstanceImpl &other) = delete;
-	~InstanceImpl() {
+	~InstanceGroup() {
 		if (wtSharedMemory) wasmtime_sharedmemory_delete(wtSharedMemory);
 		if (wtError) wasmtime_error_delete(wtError);
 		if (wtModule) wasmtime_module_delete(wtModule);
 	}
-	void setup(const unsigned char *wasmBytes, size_t wasmLength);
+
+	std::unique_ptr<wclap::Instance<InstanceImpl>> startInstance();
+
+	std::unique_lock<std::recursive_mutex> lock() const {
+		return std::unique_lock<std::recursive_mutex>{groupMutex};
+	}
+private:
+	mutable std::recursive_mutex groupMutex;
+	bool wasm64 = false;
+};
+
+struct InstanceImpl {
+	void *handle;
+	InstanceGroup &group;
+
+	uint64_t wclapEntryAs64;
+	std::mutex mutex;
+
+	// Delete these (in reverse order) if they're defined
+	wasmtime_store_t *wtStore = nullptr;
+	wasmtime_linker_t *wtLinker = nullptr;
+	wasmtime_error_t *wtError = nullptr;
+	wasm_trap_t *wtTrap = nullptr;
+
+	// Owned by one of the above, so not our business to delete it
+	wasmtime_context_t *wtContext = nullptr;
+	wasmtime_memory_t wtMemory;
+	wasmtime_table_t wtFunctionTable;
+	wasmtime_func_t wtMallocFunc; // direct export
+	wasmtime_instance_t wtInstance;
+
+	InstanceImpl(void *handle, InstanceGroup &group) : handle(handle), group(group) {
+		if (!setup()) return;
+	}
+	InstanceImpl(const InstanceImpl &other) = delete;
+	~InstanceImpl() {
+		if (wtTrap) {
+			logTrap(wtTrap);
+			wasm_trap_delete(wtTrap);
+		}
+		if (wtError) {
+			logError(wtError);
+			wasmtime_error_delete(wtError);
+		}
+		if (wtLinker) wasmtime_linker_delete(wtLinker);
+		if (wtStore) wasmtime_store_delete(wtStore);
+	}
 	
 	bool is64() const {
-		return wasm64;
+		return group.is64();
 	}
 	
 	const char * path() const {
@@ -230,126 +401,96 @@ struct InstanceImpl {
 	}
 		
 	uint32_t init32() {
-		if (!mainThread.wasiInit()) return 0;
-		hadInit = true;
-		return uint32_t(mainThread.wclapEntryAs64);
+		return uint32_t(initInner());
 	}
 	uint64_t init64() {
-		if (!mainThread.wasiInit()) return 0;
-		hadInit = true;
-		return mainThread.wclapEntryAs64;
+		return uint64_t(initInner());
+	}
+	uint64_t initInner() {
+		auto lock = group.lock();
+		if (group.hasError()) return 0;
+		if (group.hadInit) {
+			group.setError("Tried to `.init()` WCLAP twice");
+			return 0;
+		}
+		if (!wasiInit()) {
+			group.setError("`.wasiInit()` returned false");
+			return 0;
+		}
+		group.hadInit = true;
+		return wclapEntryAs64;
 	}
 
-	struct Thread {
-		InstanceImpl &instance;
-		uint64_t wclapEntryAs64;
-		std::mutex mutex;
+	void setWasmDeadline();
+	bool setup(); // creates the thread stuff, always called
+	bool wasiInit(); // calls `_initialize()`, only once per Instance
+	
+	uint64_t wtMalloc(size_t bytes);
 
-		// Delete these (in reverse order) if they're defined
-		wasmtime_store_t *wtStore = nullptr;
-		wasmtime_linker_t *wtLinker = nullptr;
-		wasmtime_error_t *wtError = nullptr;
-		wasm_trap_t *wtTrap = nullptr;
-
-		// Owned by one of the above, so not our business to delete it
-		wasmtime_context_t *wtContext = nullptr;
-		wasmtime_memory_t wtMemory;
-		wasmtime_table_t wtFunctionTable;
-		wasmtime_func_t wtMallocFunc; // direct export
-		wasmtime_instance_t wtInstance;
-
-		void setWasmDeadline();
-
-		Thread(InstanceImpl &instance) : instance(instance) {
-		
+	uint8_t * wasmMemory(uint64_t wasmP, uint64_t size) {
+		if (group.wtSharedMemory) {
+			auto memorySize = wasmtime_sharedmemory_data_size(group.wtSharedMemory);
+			wasmP = std::min<uint64_t>(wasmP, memorySize - size);
+			return wasmtime_sharedmemory_data(group.wtSharedMemory) + wasmP;
+		} else {
+			auto memorySize = wasmtime_memory_data_size(wtContext, &wtMemory);
+			wasmP = std::min<uint64_t>(wasmP, memorySize - size);
+			return wasmtime_memory_data(wtContext, &wtMemory) + wasmP;
 		}
-		Thread(const Thread &) = delete;
-		~Thread() {
-			if (wtTrap) {
-				logTrap(wtTrap);
-				wasm_trap_delete(wtTrap);
-			}
-			if (wtError) {
-				logError(wtError);
-				wasmtime_error_delete(wtError);
-			}
-			if (wtLinker) wasmtime_linker_delete(wtLinker);
-			if (wtStore) wasmtime_store_delete(wtStore);
-		}
-		
-		bool setup(); // creates the thread stuff, always called
-		bool wasiInit(); // calls `_initialize()`, only once per Instance
-		
-		uint64_t wasmMalloc(size_t bytes);
+	}
 
-		uint8_t * wasmMemory(uint64_t wasmP, uint64_t size) {
-			if (instance.wtSharedMemory) {
-				auto memorySize = wasmtime_sharedmemory_data_size(instance.wtSharedMemory);
-				wasmP = std::min<uint64_t>(wasmP, memorySize - size);
-				return wasmtime_sharedmemory_data(instance.wtSharedMemory) + wasmP;
-			} else {
-				auto memorySize = wasmtime_memory_data_size(wtContext, &wtMemory);
-				wasmP = std::min<uint64_t>(wasmP, memorySize - size);
-				return wasmtime_memory_data(wtContext, &wtMemory) + wasmP;
-			}
+	void wtCall(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (wtError || wtTrap || group.hasError()) {
+			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
+			return;
+		}
+	
+		wasmtime_val_t funcVal;
+		if (!wasmtime_table_get(wtContext, &wtFunctionTable, fnP, &funcVal)) {
+			group.setError("function pointer doesn't resolve");
+			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
+			return;
+		}
+		if (funcVal.kind != WASMTIME_FUNCREF) {
+			// Shouldn't ever happen, but who knows
+			group.setError("function pointer doesn't resolve to a function");
+			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
+			return;
 		}
 
-		void call(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-			std::lock_guard<std::mutex> lock(mutex);
-			if (wtError || wtTrap || instance.wtError || instance.constantErrorMessage) {
-				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
-				return;
-			}
-		
-			wasmtime_val_t funcVal;
-			if (!wasmtime_table_get(wtContext, &wtFunctionTable, fnP, &funcVal)) {
-				instance.constantErrorMessage = "function pointer doesn't resolve";
-				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
-				return;
-			}
-			if (funcVal.kind != WASMTIME_FUNCREF) {
-				// Shouldn't ever happen, but who knows
-				instance.constantErrorMessage = "function pointer doesn't resolve to a function";
-				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
-				return;
-			}
-
-			setWasmDeadline();
-			wtError = wasmtime_func_call_unchecked(wtContext, &funcVal.of.funcref, argsAndResults, 1, &wtTrap);
-			if (wtError) {
-				logError(wtError);
-				instance.constantErrorMessage = "WCLAP function call failed";
-				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
-				return;
-			}
-			if (wtTrap) {
-				logTrap(wtTrap);
-				instance.constantErrorMessage = (trapIsTimeout(wtTrap) ? "WCLAP function call timeout" : "WCLAP function call threw (trapped)");
-				if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
-				return;
-			}
+		setWasmDeadline();
+		wtError = wasmtime_func_call_unchecked(wtContext, &funcVal.of.funcref, argsAndResults, 1, &wtTrap);
+		if (wtError) {
+			group.setError("WCLAP function call failed");
+			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
+			return;
 		}
-
-	};
-	Thread mainThread{*this};
+		if (wtTrap) {
+			logTrap(wtTrap);
+			group.setError(trapIsTimeout(wtTrap) ? "WCLAP function call timeout" : "WCLAP function call threw (trapped)");
+			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
+			return;
+		}
+	}
 
 	uint32_t malloc32(uint32_t size) {
-		return uint32_t(mainThread.wasmMalloc(size));
+		return uint32_t(wtMalloc(size));
 	}
 	uint64_t malloc64(uint64_t size) {
-		return uint64_t(mainThread.wasmMalloc(size));
+		return uint64_t(wtMalloc(size));
 	}
 
 	template<class V>
 	bool getArray(wclap32::Pointer<V> ptr, std::remove_cv_t<V> *result, size_t count) {
-		auto *wasmMem = mainThread.wasmMemory(ptr.wasmPointer, sizeof(V)*count);
+		auto *wasmMem = wasmMemory(ptr.wasmPointer, sizeof(V)*count);
 		if (!wasmMem) return false;
 		std::memcpy(result, wasmMem, sizeof(V)*count);
 		return true;
 	}
 	template<class V>
 	bool setArray(wclap32::Pointer<V> ptr, const V *value, size_t count) {
-		auto *wasmMem = mainThread.wasmMemory(ptr.wasmPointer, sizeof(V)*count);
+		auto *wasmMem = wasmMemory(ptr.wasmPointer, sizeof(V)*count);
 		if (!wasmMem) return false;
 		std::memcpy(wasmMem, value, sizeof(V)*count);
 		return true;
@@ -357,14 +498,14 @@ struct InstanceImpl {
 
 	template<class V>
 	bool getArray(wclap64::Pointer<V> ptr, std::remove_cv_t<V> *result, size_t count) {
-		auto *wasmMem = mainThread.wasmMemory(ptr.wasmPointer, sizeof(V)*count);
+		auto *wasmMem = wasmMemory(ptr.wasmPointer, sizeof(V)*count);
 		if (!wasmMem) return false;
 		std::memcpy(result, wasmMem, sizeof(V)*count);
 		return true;
 	}
 	template<class V>
 	bool setArray(wclap64::Pointer<V> ptr, const V *value, size_t count) {
-		auto *wasmMem = mainThread.wasmMemory(ptr.wasmPointer, sizeof(V)*count);
+		auto *wasmMem = wasmMemory(ptr.wasmPointer, sizeof(V)*count);
 		if (!wasmMem) return false;
 		std::memcpy(wasmMem, value, sizeof(V)*count);
 		return true;
@@ -372,35 +513,33 @@ struct InstanceImpl {
 
 	template<class Return, class... Args>
 	Return call(wclap32::Function<Return, Args...> fnPtr, Args... args) {
-		auto &thread = mainThread;
 		if constexpr (std::is_void_v<Return>) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			wtCall(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return;
 		} else if constexpr (sizeof...(args) > 0) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			wtCall(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return wasmValToArg<Return>(wasmVals[0]);
 		} else { // still need one slot for the return value
 			wasmtime_val_raw wasmVals[1];
-			thread.call(fnPtr.wasmPointer, &wasmVals, 1);
+			wtCall(fnPtr.wasmPointer, &wasmVals, 1);
 			return wasmValToArg<Return>(wasmVals[0]);
 		}
 	}
 	template<class Return, class... Args>
 	Return call(wclap64::Function<Return, Args...> fnPtr, Args... args) {
-		auto &thread = mainThread;
 		if constexpr (std::is_void_v<Return>) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			wtCall(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return;
 		} else if constexpr (sizeof...(args) > 0) {
 			wasmtime_val_raw wasmVals[sizeof...(args)] = {argToWasmVal(args)...};
-			thread.call(fnPtr.wasmPointer, wasmVals, sizeof...(args));
+			wtCall(fnPtr.wasmPointer, wasmVals, sizeof...(args));
 			return wasmValToArg<Return>(wasmVals[0]);
 		} else { // still need one slot for the return value
 			wasmtime_val_raw wasmVals[1];
-			thread.call(fnPtr.wasmPointer, &wasmVals, 1);
+			wtCall(fnPtr.wasmPointer, &wasmVals, 1);
 			return wasmValToArg<Return>(wasmVals[0]);
 		}
 	}
@@ -420,6 +559,54 @@ struct InstanceImpl {
 			return call<Return, Args...>(fnPtr, args...);
 		}
 		if constexpr (!std::is_void_v<Return>) return {};
+	}
+	
+	template<class Return, class ...Args>
+	uint64_t registerHostGeneric(void *context, Return (*nativeFn)(void *, Args...)) {
+		struct WrappedFn {
+			void *context;
+			Return (*nativeFn)(void *, Args...);
+			
+			static wasm_trap_t * unchecked(void *env, wasmtime_caller_t *caller, wasmtime_val_raw_t *argsResults, size_t argsResultsLength) {
+				auto &wrapped = *(WrappedFn *)env;
+				auto args = argsAsTuple<Args...>(wrapped.context, argsResults, std::index_sequence_for<Args...>{});
+				if constexpr (std::is_void_v<Return>) {
+					std::apply(wrapped.nativeFn, args);
+				} else {
+					argsResults[0] = argToWasmVal(std::apply(wrapped.nativeFn, args));
+				}
+				return nullptr;
+			}
+			static void destroy(void *env) {
+				auto *wrapped = (WrappedFn *)env;
+				delete wrapped;
+			}
+		};
+		auto *wrapped = new WrappedFn(WrappedFn{context, nativeFn});
+
+		// get the function type
+		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
+		auto *fnType = getWasmtimeFuncType<Return, Args...>();
+		wasmtime_func_new_unchecked(wtContext, fnType, WrappedFn::unchecked, wrapped, WrappedFn::destroy, &fnVal.of.funcref);
+
+		// add it to the table
+		uint64_t fnIndex = 0;
+		wtError = wasmtime_table_grow(wtContext, &wtFunctionTable, 1, &fnVal, &fnIndex);
+		if (wtError) {
+			group.setError(wtError);
+			group.setError("failed to register function");
+			return -1;
+		}
+		return fnIndex;
+	}
+
+	template<class Return, class ...Args>
+	wclap32::Function<Return, Args...> registerHost32(void *context, Return (*fn)(void *, Args...)) {
+		return {uint32_t(registerHostGeneric(context, fn))};
+	}
+	template<class Return, class ...Args>
+	wclap64::Function<Return, Args...> registerHost64(void *context, Return (*fn)(void *, Args...)) {
+		return {uint32_t(registerHostGeneric(context, fn))};
 	}
 };
 

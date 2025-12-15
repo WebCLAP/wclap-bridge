@@ -594,7 +594,7 @@ struct InstanceImpl {
 		wtError = wasmtime_table_grow(wtContext, &wtFunctionTable, 1, &fnVal, &fnIndex);
 		if (wtError) {
 			group.setError(wtError);
-			group.setError("failed to register function");
+			group.setError("failed to add function-table entries for host methods");
 			return -1;
 		}
 		return fnIndex;

@@ -13,12 +13,12 @@ struct WclapModule : public WclapModuleBase {
 	template<class Return, class ...Args>
 	bool registerHost(Instance *instance, Function<Return, Args...> &wasmFn, Return (*fn)(void *, Args...)) {
 		auto prevIndex = wasmFn.wasmPointer;
-		auto index = registerHostFunction(instance, (void *)this, fn);
-		if (index.wasmPointer == -1) {
+		wasmFn = registerHostFunction(instance, (void *)this, fn);
+		if (wasmFn.wasmPointer == -1) {
 			setError("failed to register function");
 			return false;
 		}
-		if (prevIndex != 0 && index.wasmPointer != prevIndex) {
+		if (prevIndex != 0 && wasmFn.wasmPointer != prevIndex) {
 			// This is when we've previously registered it on another thread, and it needs to match
 			setError("function index mismatch");
 			return false;

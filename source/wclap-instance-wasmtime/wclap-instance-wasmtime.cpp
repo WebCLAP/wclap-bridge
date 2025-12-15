@@ -29,6 +29,12 @@ bool wclap_wasmtime::InstanceGroup::globalInit(unsigned int timeLimitMs) {
 		std::cerr << "couldn't create Wasmtime config\n";
 		return false;
 	}
+	auto error = wasmtime_config_cache_config_load(config, nullptr);
+	if (error) {
+		logError(error);
+		wasmtime_error_delete(error);
+		return false;
+	}
 
 	if (timeLimitMs > 0) {
 		// enable epoch_interruption to prevent WCLAPs locking everything up - has a speed cost (10% according to docs)
@@ -67,8 +73,11 @@ void wclap_wasmtime::InstanceGroup::globalDeinit() {
 }
 
 void wclap_wasmtime::InstanceGroup::setup(const unsigned char *wasmBytes, size_t wasmLength) {
-	wtError = wasmtime_module_new(globalWasmEngine, wasmBytes, wasmLength, &wtModule);
-	if (wtError) return;
+	auto *error = wasmtime_module_new(globalWasmEngine, wasmBytes, wasmLength, &wtModule);
+	if (error) {
+		setError(error);
+		return;
+	}
 	
 	auto stopWithError = [&](const char *message) -> void {
 		constantErrorMessage = message;
@@ -122,8 +131,11 @@ void wclap_wasmtime::InstanceGroup::setup(const unsigned char *wasmBytes, size_t
 			}
 			if (wtSharedMemory) return stopWithError("multiple memory imports");
 
-			wtError = wasmtime_sharedmemory_new(globalWasmEngine, asMemory, &wtSharedMemory);
-			if (wtError) return;
+			auto error = wasmtime_sharedmemory_new(globalWasmEngine, asMemory, &wtSharedMemory);
+			if (error) {
+				setError(error);
+				return;
+			}
 			if (!wtSharedMemory) return stopWithError("Shared memory wasn't created");
 			sharedMemoryImportModule = nameToStr(module);
 			sharedMemoryImportName = nameToStr(name);
@@ -148,8 +160,10 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 	wtLinker = wasmtime_linker_new(globalWasmEngine);
 	if (!wtLinker) return stopWithError("error creating linker");
 
-	wtError = wasmtime_linker_define_wasi(wtLinker);
-	if (wtError) return stopWithError("error linking WASI");
+	{
+		auto error = wasmtime_linker_define_wasi(wtLinker);
+		if (error) return stopWithError("error linking WASI");
+	}
 
 	//---------- WASI config ----------//
 
@@ -197,11 +211,13 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 		}
 	}
 
-	wtError = wasmtime_context_set_wasi(wtContext, wasiConfig);
-	if (wtError) {
-		logError(wtError);
-		wasi_config_delete(wasiConfig);
-		return stopWithError("Failed to configure WASI");
+	{
+		auto error = wasmtime_context_set_wasi(wtContext, wasiConfig);
+		if (error) {
+			group.setError(error);
+			wasi_config_delete(wasiConfig);
+			return stopWithError("Failed to configure WASI");
+		}
 	}
 	wasiConfig = nullptr; // owned by the context now
 
@@ -214,17 +230,29 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 		
 		auto &module = group.sharedMemoryImportModule;
 		auto &name = group.sharedMemoryImportName;
-		wtError = wasmtime_linker_define(wtLinker, wtContext, module.c_str(), module.size(), name.c_str(), name.size(), &item);
-		if (wtError) return stopWithError("error linking shared-memory import");
+		auto error = wasmtime_linker_define(wtLinker, wtContext, module.c_str(), module.size(), name.c_str(), name.size(), &item);
+		if (error) {
+			group.setError(error);
+			return stopWithError("error linking shared-memory import");
+		}
 	}
 
 	//---------- Start the instance ----------//
 
-	// This doesn't call the WASI _start() or _initialize() methods
-	setWasmDeadline();
-	wtError = wasmtime_linker_instantiate(wtLinker, wtContext, group.wtModule, &wtInstance, &wtTrap);
-	if (wtError) return stopWithError("Failed to create instance (error)");
-	if (wtTrap) return stopWithError("Failed to start instance (trap)");
+	{
+		// This doesn't call the WASI _start() or _initialize() methods
+		setWasmDeadline();
+		wasm_trap_t *trap = nullptr;
+		auto *error = wasmtime_linker_instantiate(wtLinker, wtContext, group.wtModule, &wtInstance, &trap);
+		if (error) {
+			group.setError(error);
+			return stopWithError("Failed to create instance (error)");
+		}
+		if (trap) {
+			group.setError(trap, "Failed to start instance (timeout)", "Failed to start instance (trap)");
+			return false;
+		}
+	}
 
 	//---------- Find exports ----------//
 
@@ -349,15 +377,16 @@ bool wclap_wasmtime::InstanceImpl::wasiInit() {
 		wasm_functype_delete(type);
 
 		setWasmDeadline();
-		wtError = wasmtime_func_call(wtContext, &item.of.func, nullptr, 0, nullptr, 0, &wtTrap);
-		if (wtError) {
+		wasm_trap_t *trap = nullptr;
+		auto error = wasmtime_func_call(wtContext, &item.of.func, nullptr, 0, nullptr, 0, &trap);
+		if (error) {
+			group.setError(error);
 			wasmtime_extern_delete(&item);
-			logError(wtError);
 			return stopWithError("error calling _initialize()");
-		} else if (wtTrap) {
+		} else if (trap) {
+			group.setError(trap, "_initialize() timeout", "_initialize() threw (trapped)");
 			wasmtime_extern_delete(&item);
-			logTrap(wtTrap);
-			return stopWithError(trapIsTimeout(wtTrap) ? "_initialize() timeout" : "_initialize() threw (trapped)");
+			return false;
 		}
 		wasmtime_extern_delete(&item);
 	}
@@ -366,10 +395,6 @@ bool wclap_wasmtime::InstanceImpl::wasiInit() {
 
 uint64_t wclap_wasmtime::InstanceImpl::wtMalloc(size_t bytes) {
 	std::lock_guard<std::mutex> lock(mutex);
-	auto stopWithError = [&](const char *message) -> uint64_t {
-		group.setError(message);
-		return 0;
-	};
 
 	uint64_t wasmP;
 	
@@ -384,14 +409,18 @@ uint64_t wclap_wasmtime::InstanceImpl::wtMalloc(size_t bytes) {
 	}
 	
 	setWasmDeadline();
-	wtError = wasmtime_func_call(wtContext, &wtMallocFunc, args, 1, results, 1, &wtTrap);
-	if (wtError) {
-		logError(wtError);
-		return stopWithError("calling malloc() failed");
-	}
-	if (wtTrap) {
-		logTrap(wtTrap);
-		return stopWithError(trapIsTimeout(wtTrap) ? "malloc() timeout" : "malloc() threw (trapped)");
+	{
+		wasm_trap_t *trap = nullptr;
+		auto error = wasmtime_func_call(wtContext, &wtMallocFunc, args, 1, results, 1, &trap);
+		if (error) {
+			group.setError(error);
+			group.setError("calling malloc() failed");
+			return 0;
+		}
+		if (trap) {
+			group.setError(trap, "malloc() timeout", "malloc() threw (trapped)");
+			return 0;
+		}
 	}
 	if (group.is64()) {
 		if (results[0].kind != WASMTIME_I64) return 0;

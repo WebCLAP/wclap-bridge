@@ -294,12 +294,16 @@ struct InstanceGroup {
 
 	bool setError(const char *message) {
 		auto groupLock = lock();
+		if (hasError()) {
+			std::cerr << "WCLAP: " << message << std::endl;
+			return true;
+		}
 		constantErrorMessage = message;
 		return true;
 	}
 	bool setError(wasmtime_error_t *e) {
 		if (!e) return false;
-		if (wtError) {
+		if (hasError()) {
 			// Keep first error, but log the new one
 			logError(e);
 			wasmtime_error_delete(e);
@@ -307,6 +311,13 @@ struct InstanceGroup {
 		}
 		auto groupLock = lock();
 		wtError = e;
+		return true;
+	}
+	bool setError(wasm_trap_t *trap, const char *timeoutMessage, const char *otherMessage) {
+		if (!trap) return false;
+		logTrap(trap);
+		setError(trapIsTimeout(trap) ? timeoutMessage : otherMessage);
+		wasm_trap_delete(trap);
 		return true;
 	}
 	bool hasError() const {
@@ -365,8 +376,6 @@ struct InstanceImpl {
 	// Delete these (in reverse order) if they're defined
 	wasmtime_store_t *wtStore = nullptr;
 	wasmtime_linker_t *wtLinker = nullptr;
-	wasmtime_error_t *wtError = nullptr;
-	wasm_trap_t *wtTrap = nullptr;
 
 	// Owned by one of the above, so not our business to delete it
 	wasmtime_context_t *wtContext = nullptr;
@@ -380,14 +389,6 @@ struct InstanceImpl {
 	}
 	InstanceImpl(const InstanceImpl &other) = delete;
 	~InstanceImpl() {
-		if (wtTrap) {
-			logTrap(wtTrap);
-			wasm_trap_delete(wtTrap);
-		}
-		if (wtError) {
-			logError(wtError);
-			wasmtime_error_delete(wtError);
-		}
 		if (wtLinker) wasmtime_linker_delete(wtLinker);
 		if (wtStore) wasmtime_store_delete(wtStore);
 	}
@@ -441,7 +442,7 @@ struct InstanceImpl {
 
 	void wtCall(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
 		std::lock_guard<std::mutex> lock(mutex);
-		if (wtError || wtTrap || group.hasError()) {
+		if (group.hasError()) {
 			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 			return;
 		}
@@ -460,15 +461,16 @@ struct InstanceImpl {
 		}
 
 		setWasmDeadline();
-		wtError = wasmtime_func_call_unchecked(wtContext, &funcVal.of.funcref, argsAndResults, 1, &wtTrap);
-		if (wtError) {
-			group.setError("WCLAP function call failed");
+		wasm_trap_t *trap = nullptr;
+		auto *error = wasmtime_func_call_unchecked(wtContext, &funcVal.of.funcref, argsAndResults, 1, &trap);
+		
+		if (error) {
+			group.setError(error);
 			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 			return;
 		}
-		if (wtTrap) {
-			logTrap(wtTrap);
-			group.setError(trapIsTimeout(wtTrap) ? "WCLAP function call timeout" : "WCLAP function call threw (trapped)");
+		if (trap) {
+			group.setError(trap, "WCLAP function call timeout", "WCLAP function call threw (trapped)");
 			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 			return;
 		}
@@ -591,9 +593,9 @@ struct InstanceImpl {
 
 		// add it to the table
 		uint64_t fnIndex = 0;
-		wtError = wasmtime_table_grow(wtContext, &wtFunctionTable, 1, &fnVal, &fnIndex);
-		if (wtError) {
-			group.setError(wtError);
+		auto *error = wasmtime_table_grow(wtContext, &wtFunctionTable, 1, &fnVal, &fnIndex);
+		if (error) {
+			group.setError(error);
 			group.setError("failed to add function-table entries for host methods");
 			return -1;
 		}

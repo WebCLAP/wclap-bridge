@@ -25,17 +25,9 @@ struct WclapModule : public WclapModuleBase {
 		}
 		return true;
 	}
-	
-	bool addHostFunctions(Instance *instance) {
-		if (!registerHost(instance, hostTemplate.get_extension, hostGetExtension)) return false;
-		if (!registerHost(instance, hostTemplate.request_restart, hostRequestRestart)) return false;
-		if (!registerHost(instance, hostTemplate.request_process, hostRequestProcess)) return false;
-		if (!registerHost(instance, hostTemplate.request_callback, hostRequestCallback)) return false;
-		return true;
-	}
-	
+		
 	WclapModule(InstanceGroup *instanceGroup) : WclapModuleBase(instanceGroup) {
-		if (!addHostFunctions(mainThread.get())) return;
+		if (!addHostFunctions(mainThread.get(), true)) return;
 
 		mainThread->init();
 		if constexpr (WCLAP_BRIDGE_IS64) {
@@ -75,6 +67,94 @@ struct WclapModule : public WclapModuleBase {
 			return &pluginFactory->clapFactory;
 		}
 		return nullptr;
+	}
+
+	bool addHostFunctions(Instance *instance, bool copyAcross) {
+		auto scoped = arenaPool.scoped();
+#define HOST_METHOD(obj, name) \
+		if (!registerHost(instance, obj.name, obj##_##name)) return false;
+		HOST_METHOD(hostTemplate, get_extension);
+		HOST_METHOD(hostTemplate, request_restart);
+		HOST_METHOD(hostTemplate, request_process);
+		HOST_METHOD(hostTemplate, request_callback);
+		
+		HOST_METHOD(hostAudioPorts, is_rescan_flag_supported);
+		HOST_METHOD(hostAudioPorts, rescan);
+		if (copyAcross) hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
+
+		HOST_METHOD(hostParams, rescan);
+		HOST_METHOD(hostParams, clear);
+		HOST_METHOD(hostParams, request_flush);
+		if (copyAcross) hostParamsPtr = scoped.copyAcross(hostParams);
+
+#undef HOST_METHOD
+		if (copyAcross) globalArena = scoped.commit();
+		return true;
+	}
+
+	static Plugin * getPlugin(void *context, Pointer<const wclap_host> host) {
+		auto &self = *(WclapModule *)context;
+		auto dataPtr = self.mainThread->get(host[&wclap_host::host_data]);
+		return self.pluginList.get(dataPtr.wasmPointer);
+	}
+
+	// Host methods
+	static Pointer<const void> hostTemplate_get_extension(void *context, Pointer<const wclap_host> wHost, Pointer<const char> extId) {
+		auto &self = *(WclapModule *)context;
+		auto hostExtStr = self.mainThread->getString(extId, 1024);
+
+		auto *plugin = getPlugin(context, wHost);
+		if (!plugin) return {0};
+		const void *nativeHostExt = plugin->host->get_extension(plugin->host, hostExtStr.c_str());
+		if (!nativeHostExt) return {0};
+
+		if (hostExtStr == CLAP_EXT_AUDIO_PORTS) {
+			return self.hostAudioPortsPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_PARAMS) {
+			return self.hostParamsPtr.cast<const void>();
+		}
+		// null, no extensions for now
+LOG_EXPR(hostExtStr);
+		return {0};
+	}
+	static void hostTemplate_request_restart(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->host->request_restart(plugin->host);
+	}
+	static void hostTemplate_request_process(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->host->request_process(plugin->host);
+	}
+	static void hostTemplate_request_callback(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->host->request_callback(plugin->host);
+	}
+
+	wclap_host_audio_ports hostAudioPorts;
+	Pointer<wclap_host_audio_ports> hostAudioPortsPtr;
+	static bool hostAudioPorts_is_rescan_flag_supported(void *context, Pointer<const wclap_host> wHost, uint32_t flag) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostAudioPorts->is_rescan_flag_supported(plugin->host, flag);
+		return false;
+	}
+	static void hostAudioPorts_rescan(void *context, Pointer<const wclap_host> wHost, uint32_t flags) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostAudioPorts->rescan(plugin->host, flags);
+	}
+
+	wclap_host_params hostParams;
+	Pointer<wclap_host_params> hostParamsPtr;
+	static void hostParams_rescan(void *context, Pointer<const wclap_host> wHost, uint32_t flags) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostParams->rescan(plugin->host, flags);
+	}
+	static void hostParams_clear(void *context, Pointer<const wclap_host> wHost, uint32_t paramId, uint32_t flags) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostParams->clear(plugin->host, paramId, flags);
+	}
+	static void hostParams_request_flush(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostParams->request_flush(plugin->host);
 	}
 };
 

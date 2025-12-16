@@ -8,18 +8,22 @@ using namespace WCLAP_API_NAMESPACE;
 
 struct Plugin {
 	WclapModuleBase &module;
+	Instance *mainThread;
 	
 	Pointer<const wclap_plugin> ptr;
-	MemoryArenaPtr arena; // this holds the `wclap_host` (and anything else we need) for the lifetime of the plugin
+	MemoryArenaPtr arena; // this holds the `wclap_host` (and anything else we need) for the lifetime of the plugin, and is also used by audio-thread methods
 	std::unique_ptr<Instance> audioThread;
 	uint32_t pluginListIndex;
 	std::atomic<bool> destroyCalled = false;
+
 	const clap_host *host;
+	const clap_host_audio_ports *hostAudioPorts = nullptr;
+	const clap_host_params *hostParams = nullptr;
 	
-	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), ptr(ptr), arena(std::move(arena)), audioThread(module.instanceGroup->startInstance()) {
+	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), audioThread(module.instanceGroup->startInstance()), host(host) {
 		// Address using its index in the plugin list (where it's retained)
 		pluginListIndex = module.pluginList.retain(this);
-		module.mainThread->set(hostPtr[&wclap_host::host_data], {pluginListIndex});
+		mainThread->set(hostPtr[&wclap_host::host_data], {pluginListIndex});
 
 		clapPlugin.desc = desc;
 	};
@@ -48,10 +52,15 @@ struct Plugin {
 private:
 
 	bool pluginInit() {
-		return module.mainThread->call(ptr[&wclap_plugin::init], ptr);
+#define GET_HOST_EXT(field, extId) \
+		field = (decltype(field))host->get_extension(host, extId);
+		GET_HOST_EXT(hostAudioPorts, CLAP_EXT_AUDIO_PORTS);
+		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
+#undef GET_HOST_EXT
+		return mainThread->call(ptr[&wclap_plugin::init], ptr);
 	}
 	void pluginDestroy() {
-		module.mainThread->call(ptr[&wclap_plugin::destroy], ptr);
+		mainThread->call(ptr[&wclap_plugin::destroy], ptr);
 		destroyCalled = true;
 		module.pluginList.release(pluginListIndex);
 	}
@@ -71,7 +80,7 @@ private:
 		audioThread->call(ptr[&wclap_plugin::reset], ptr);
 	}
 	clap_process_status pluginProcess(const clap_process *process) {
-LOG_EXPR("pluginProcess");
+//LOG_EXPR("pluginProcess");
 		size_t length = process->frames_count;
 		for (uint32_t o = 0; o < process->audio_outputs_count; ++o) {
 			auto &audioOutput = process->audio_outputs[o];
@@ -94,18 +103,127 @@ LOG_EXPR("pluginProcess");
 	}
 
 	void pluginOnMainThread() {
-		module.mainThread->call(ptr[&wclap_plugin::on_main_thread], ptr);
+		mainThread->call(ptr[&wclap_plugin::on_main_thread], ptr);
 	}
 
-	const void * pluginGetExtension(const char *extId) {
-LOG_EXPR("pluginGetExtension");
-LOG_EXPR(extId);
+	const void * pluginGetExtension(const char *pluginExtId) {
+		auto scoped = module.arenaPool.scoped();
+		auto extIdPtr = scoped.writeString(pluginExtId);
+		auto wclapExt = mainThread->call(ptr[&wclap_plugin::get_extension], ptr, extIdPtr);
+		if (!wclapExt) return nullptr;
+		
+		if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS)) {
+			static const clap_plugin_audio_ports ext{
+				.count=clapPluginMethod<&Plugin::audioPortsCount>(),
+				.get=clapPluginMethod<&Plugin::audioPortsGet>(),
+			};
+			audioPortsExt = wclapExt.cast<const wclap_plugin_audio_ports>();
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAMS)) {
+			static const clap_plugin_params ext{
+				.count=clapPluginMethod<&Plugin::paramsCount>(),
+				.get_info=clapPluginMethod<&Plugin::paramsGetInfo>(),
+				.get_value=clapPluginMethod<&Plugin::paramsGetValue>(),
+				.value_to_text=clapPluginMethod<&Plugin::paramsValueToText>(),
+				.text_to_value=clapPluginMethod<&Plugin::paramsTextToValue>(),
+				.flush=clapPluginMethod<&Plugin::paramsFlush>(),
+			};
+			paramsExt = wclapExt.cast<const wclap_plugin_params>();
+			return &ext;
+		}
+		LOG_EXPR(pluginExtId);
 		return nullptr;
 	}
-};
+	
+	Pointer<const wclap_plugin_audio_ports> audioPortsExt;
+	uint32_t audioPortsCount(bool isInput) {
+		return mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::count], ptr, isInput);
+	}
+	bool audioPortsGet(uint32_t index, bool isInput, clap_audio_port_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.copyAcross(wclap_audio_port_info{});
+		auto result = mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::get], ptr, index, isInput, infoPtr);
+		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
+		
+		const char *portType = nullptr;
+		auto wclapPortType = mainThread->getString(wclapInfo.port_type, 16);
+		if (wclapPortType == CLAP_PORT_MONO) {
+			portType = CLAP_PORT_MONO;
+		} else if (wclapPortType == CLAP_PORT_STEREO) {
+			portType = CLAP_PORT_STEREO;
+		} else if (wclapPortType == CLAP_PORT_SURROUND) {
+			portType = CLAP_PORT_SURROUND;
+		} else if (wclapPortType == CLAP_PORT_AMBISONIC) {
+			portType = CLAP_PORT_AMBISONIC;
+		}
+		
+		*info = clap_audio_port_info{
+			.id=wclapInfo.id,
+			.name="",
+			.flags=wclapInfo.flags,
+			.channel_count=wclapInfo.channel_count,
+			.port_type=portType,
+			.in_place_pair=wclapInfo.in_place_pair
+		};
+		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
+		return result;
+	}
 
-const clap_host * getHostFromPlugin(Plugin *plugin) {
-	return plugin->host;
-}
+	Pointer<const wclap_plugin_params> paramsExt;
+	uint32_t paramsCount() {
+		return mainThread->call(paramsExt[&wclap_plugin_params::count], ptr);
+	}
+	bool paramsGetInfo(uint32_t index, clap_param_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.copyAcross(wclap_param_info{});
+		auto result = mainThread->call(paramsExt[&wclap_plugin_params::get_info], ptr, index, infoPtr);
+		auto wclapInfo = mainThread->get(infoPtr);
+		
+		*info = clap_param_info{
+			.id=wclapInfo.id,
+			.flags=wclapInfo.flags,
+			.cookie=nullptr,
+			.name="",
+			.module="",
+			.min_value=wclapInfo.min_value,
+			.max_value=wclapInfo.max_value,
+			.default_value=wclapInfo.default_value
+		};
+		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
+		std::memcpy(info->module, wclapInfo.module, CLAP_PATH_SIZE);
+		
+		return result;
+	}
+	
+	bool paramsGetValue(clap_id paramId, double *value) {
+		auto scoped = module.arenaPool.scoped();
+		auto valuePtr = scoped.copyAcross(0.0);
+		auto result = mainThread->call(paramsExt[&wclap_plugin_params::get_value], ptr, paramId, valuePtr);
+		*value = mainThread->get(valuePtr);
+		return result;
+	}
+	
+	bool paramsValueToText(clap_id paramId, double value, char *text, uint32_t textCapacity) {
+		auto scoped = module.arenaPool.scoped();
+		auto wclapText = scoped.array<char>(textCapacity);
+		auto result = mainThread->call(paramsExt[&wclap_plugin_params::value_to_text], ptr, paramId, value, wclapText, textCapacity);
+		mainThread->getArray(wclapText, text, textCapacity);
+		return result;
+	}
+
+	bool paramsTextToValue(clap_id paramId, const char *text, double *value) {
+		auto scoped = module.arenaPool.scoped();
+		auto wclapText = scoped.writeString(text);
+		auto valuePtr = scoped.copyAcross(0.0);
+		auto result = mainThread->call(paramsExt[&wclap_plugin_params::text_to_value], ptr, paramId, wclapText, valuePtr);
+		*value = mainThread->get(valuePtr);
+		return result;
+	}
+	
+	void paramsFlush(const clap_input_events *eventsIn, const clap_output_events *eventsOut) {
+		LOG_EXPR("paramsFlush()");
+		return; // not supported for now
+	}
+};
 
 }; // namespace

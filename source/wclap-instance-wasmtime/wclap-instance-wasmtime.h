@@ -241,19 +241,16 @@ struct WasmValTypeCode<wclap64::Pointer<V>> {
 };
 
 template<size_t index>
-inline void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {}
+void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {}
 
 template <size_t index, class First, class ...Args>
-inline void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {
+void setWasmtimeValTypes(wasm_valtype_vec_t *vec) {
 	vec->data[index] = wasm_valtype_new(wasmValTypeCode<First>());
 	setWasmtimeValTypes<index + 1, Args...>(vec);
 }
 
 template<typename Return, typename ...Args>
-inline const wasm_functype_t * getWasmtimeFuncType() {
-	static std::atomic<wasm_functype_t *> type = nullptr;
-	if (type.load()) return type.load();
-
+wasm_functype_t * makeWasmtimeFuncType() {
 	wasm_valtype_vec_t params, results;
 	wasm_valtype_vec_new_uninitialized(&params, sizeof...(Args));
 	setWasmtimeValTypes<0, Args...>(&params);
@@ -264,8 +261,7 @@ inline const wasm_functype_t * getWasmtimeFuncType() {
 		results.data[0] = wasm_valtype_new(wasmValTypeCode<Return>());
 	}
 
-	type.store(wasm_functype_new(&params, &results));
-	return type.load();
+	return wasm_functype_new(&params, &results);
 }
 
 template <class ...Args, size_t ...Is>
@@ -371,7 +367,7 @@ struct InstanceImpl {
 	InstanceGroup &group;
 
 	uint64_t wclapEntryAs64;
-	std::mutex mutex;
+	std::mutex callMutex;
 
 	// Delete these (in reverse order) if they're defined
 	wasmtime_store_t *wtStore = nullptr;
@@ -441,7 +437,7 @@ struct InstanceImpl {
 	}
 
 	void wtCall(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-		std::lock_guard<std::mutex> lock(mutex);
+		std::lock_guard<std::mutex> lock(callMutex);
 		if (group.hasError()) {
 			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 			return;
@@ -588,8 +584,9 @@ struct InstanceImpl {
 
 		// get the function type
 		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
-		auto *fnType = getWasmtimeFuncType<Return, Args...>();
+		auto *fnType = makeWasmtimeFuncType<Return, Args...>();
 		wasmtime_func_new_unchecked(wtContext, fnType, WrappedFn::unchecked, wrapped, WrappedFn::destroy, &fnVal.of.funcref);
+		wasm_functype_delete(fnType);
 
 		// add it to the table
 		uint64_t fnIndex = 0;

@@ -23,6 +23,7 @@ struct WclapModuleBase {
 	std::unique_ptr<InstanceGroup> instanceGroup; // Destroyed last
 	std::unique_ptr<Instance> mainThread;
 	MemoryArenaPool arenaPool; // Goes next because other destructors might make WASM calls, but we need an Instance (most likely the main thread) for that
+	MemoryArenaPtr globalArena; // stores data common across all plugin instances
 
 	std::atomic<bool> hasError = true;
 	std::string errorMessage = "not initialised";
@@ -63,25 +64,6 @@ struct WclapModuleBase {
 	}
 	
 	wclap_host hostTemplate;
-	static Pointer<const void> hostGetExtension(void *context, Pointer<const wclap_host> host, Pointer<const char> extId) {
-		auto &self = *(WclapModuleBase *)context;
-		// null, no extensions for now
-		return {0};
-	}
-	static void hostRequestRestart(void *context, Pointer<const wclap_host> whost) {
-		auto *host = getHost(context, whost);
-		if (host) host->request_restart(host);
-	}
-	static void hostRequestProcess(void *context, Pointer<const wclap_host> whost) {
-		auto *host = getHost(context, whost);
-		if (host) host->request_process(host);
-	}
-	static void hostRequestCallback(void *context, Pointer<const wclap_host> whost) {
-		auto *host = getHost(context, whost);
-		if (host) host->request_callback(host);
-	}
-
-	wclap_host hostExtAudioPorts;
 };
 
 template <typename T>

@@ -394,7 +394,7 @@ bool wclap_wasmtime::InstanceImpl::wasiInit() {
 }
 
 uint64_t wclap_wasmtime::InstanceImpl::wtMalloc(size_t bytes) {
-	std::lock_guard<std::mutex> lock(mutex);
+	std::lock_guard<std::mutex> lock(callMutex);
 
 	uint64_t wasmP;
 	

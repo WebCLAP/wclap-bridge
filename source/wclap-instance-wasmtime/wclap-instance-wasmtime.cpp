@@ -18,9 +18,14 @@ std::atomic<size_t> timeLimitEpochs = 0;
 static std::thread globalEpochThread;
 
 std::unique_ptr<wclap::Instance<wclap_wasmtime::InstanceImpl>> wclap_wasmtime::InstanceGroup::startInstance() {
-	return std::unique_ptr<wclap::Instance<wclap_wasmtime::InstanceImpl>>{
-		new wclap::Instance<wclap_wasmtime::InstanceImpl>(*this)
-	};
+	if (singleThread) return nullptr;
+	
+	auto thread = new wclap::Instance<wclap_wasmtime::InstanceImpl>(*this);
+	if (!wtSharedMemory) { // single-threaded mode
+		singleThread = thread;
+	}
+	
+	return std::unique_ptr<wclap::Instance<wclap_wasmtime::InstanceImpl>>{thread};
 }
 
 bool wclap_wasmtime::InstanceGroup::globalInit(unsigned int timeLimitMs) {

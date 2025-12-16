@@ -352,6 +352,8 @@ struct InstanceGroup {
 		if (wtModule) wasmtime_module_delete(wtModule);
 	}
 
+	wclap::Instance<InstanceImpl> *singleThread = nullptr;
+	// If the WCLAP is single-threaded, this will only succeed once, and return `nullptr` from then on
 	std::unique_ptr<wclap::Instance<InstanceImpl>> startInstance();
 
 	std::unique_lock<std::recursive_mutex> lock() const {

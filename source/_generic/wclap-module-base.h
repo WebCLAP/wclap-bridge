@@ -14,7 +14,6 @@ namespace WCLAP_BRIDGE_NAMESPACE {
 using namespace WCLAP_API_NAMESPACE;
 
 class Plugin;
-const clap_host * getHostFromPlugin(Plugin *plugin);
 
 using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
 using MemoryArenaPtr = std::unique_ptr<wclap::MemoryArena<Instance, WCLAP_BRIDGE_IS64>>;
@@ -56,14 +55,56 @@ struct WclapModuleBase {
 	}
 
 	wclap::IndexLookup<Plugin> pluginList;
-	static const clap_host * getHost(void *context, Pointer<const wclap_host> host) {
-		auto &self = *(WclapModuleBase *)context;
-		auto *plugin = self.pluginList.get(host.wasmPointer);
-		if (!plugin) return nullptr;
-		return getHostFromPlugin(plugin);
-	}
 	
+	// Use the `void *` context pointer of a struct to find the `Plugin`.
+	static Plugin * getPlugin(void *context, Pointer<const wclap_host> host) {
+		auto &self = *(WclapModuleBase *)context;
+		auto dataPtr = self.mainThread->get(host[&wclap_host::host_data]);
+		return self.pluginList.get(dataPtr.wasmPointer);
+	}
+	static Plugin * getPlugin(void *context, Pointer<const wclap_input_events> events) {
+		auto &self = *(WclapModuleBase *)context;
+		auto ctxPtr = self.mainThread->get(events[&wclap_input_events::ctx]);
+		return self.pluginList.get(ctxPtr.wasmPointer);
+	}
+	static Plugin * getPlugin(void *context, Pointer<const wclap_output_events> events) {
+		auto &self = *(WclapModuleBase *)context;
+		auto ctxPtr = self.mainThread->get(events[&wclap_output_events::ctx]);
+		return self.pluginList.get(ctxPtr.wasmPointer);
+	}
+	static Plugin * getPlugin(void *context, Pointer<const wclap_istream> stream) {
+		auto &self = *(WclapModuleBase *)context;
+		auto ctxPtr = self.mainThread->get(stream[&wclap_istream::ctx]);
+		return self.pluginList.get(ctxPtr.wasmPointer);
+	}
+	static Plugin * getPlugin(void *context, Pointer<const wclap_ostream> stream) {
+		auto &self = *(WclapModuleBase *)context;
+		auto ctxPtr = self.mainThread->get(stream[&wclap_ostream::ctx]);
+		return self.pluginList.get(ctxPtr.wasmPointer);
+	}
+
+	void setPlugin(Pointer<const wclap_host> host, uint32_t pluginListIndex) {
+		mainThread->set(host[&wclap_host::host_data], {Size(pluginListIndex)});
+	}
+	void setPlugin(Pointer<const wclap_input_events> events, uint32_t pluginListIndex) {
+		mainThread->set(events[&wclap_input_events::ctx], {Size(pluginListIndex)});
+	}
+	void setPlugin(Pointer<const wclap_output_events> events, uint32_t pluginListIndex) {
+		mainThread->set(events[&wclap_output_events::ctx], {Size(pluginListIndex)});
+	}
+	void setPlugin(Pointer<const wclap_istream> stream, uint32_t pluginListIndex) {
+		mainThread->set(stream[&wclap_istream::ctx], {Size(pluginListIndex)});
+	}
+	void setPlugin(Pointer<const wclap_ostream> stream, uint32_t pluginListIndex) {
+		mainThread->set(stream[&wclap_ostream::ctx], {Size(pluginListIndex)});
+	}
+
+	// These will get filled with registered host functions.  If you put the `pluginList` index into the context pointer (as above) they will forward calls to the appropriate `Plugin`.
 	wclap_host hostTemplate;
+	wclap_input_events inputEventsTemplate;
+	wclap_output_events outputEventsTemplate;
+	wclap_istream istreamTemplate;
+	wclap_ostream ostreamTemplate;
 };
 
 template <typename T>

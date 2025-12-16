@@ -12,7 +12,8 @@ struct Plugin {
 	
 	Pointer<const wclap_plugin> ptr;
 	MemoryArenaPtr arena; // this holds the `wclap_host` (and anything else we need) for the lifetime of the plugin, and is also used by audio-thread methods
-	std::unique_ptr<Instance> audioThread;
+	std::unique_ptr<Instance> maybeAudioThread;
+	Instance *audioThread; // either our dedicated audio thread, or the main (single) thread again
 	uint32_t pluginListIndex;
 	std::atomic<bool> destroyCalled = false;
 
@@ -20,10 +21,10 @@ struct Plugin {
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
 	const clap_host_params *hostParams = nullptr;
 	
-	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), audioThread(module.instanceGroup->startInstance()), host(host) {
+	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {
 		// Address using its index in the plugin list (where it's retained)
 		pluginListIndex = module.pluginList.retain(this);
-		mainThread->set(hostPtr[&wclap_host::host_data], {pluginListIndex});
+		module.setPlugin(hostPtr, pluginListIndex);
 
 		clapPlugin.desc = desc;
 	};
@@ -33,6 +34,7 @@ struct Plugin {
 			// TODO: anything sensible
 		}
 		arena->pool.returnToPool(arena);
+		inputEvents.reserve(1024);
 	}
 
 	clap_plugin clapPlugin{
@@ -49,6 +51,62 @@ struct Plugin {
 		.get_extension=clapPluginMethod<&Plugin::pluginGetExtension>(),
 		.on_main_thread=clapPluginMethod<&Plugin::pluginOnMainThread>()
 	};
+
+	// Host methods
+	std::recursive_mutex hostEventsMutex;
+	std::vector<Pointer<const wclap_event_header>> inputEvents;
+	const clap_output_events *hostOutputEvents = nullptr;
+	uint32_t inputEventsSize() {
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		return uint32_t(inputEvents.size());
+	}
+	Pointer<const wclap_event_header> inputEventsGet(uint32_t index) {
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		if (index < inputEvents.size()) return inputEvents[index];
+		return {0};
+	}
+	template<class Scope>
+	void tryCopyInputEvent(Scope &scope, const clap_event_header *event) {
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		LOG_EXPR(event->space_id);
+		LOG_EXPR(event->type);
+		// TODO: if supported, copy to the scope and add to `inputEvents`
+		return;
+	}
+	bool outputEventsTryPush(Pointer<const wclap_event_header> event) {
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		auto eventHeader = audioThread->get(event);
+		LOG_EXPR(eventHeader.size);
+		LOG_EXPR(eventHeader.space_id);
+		LOG_EXPR(eventHeader.type);
+		// TODO: translate if possible
+		return false;
+	}
+
+	std::recursive_mutex hostStreamsMutex;
+	const clap_istream *hostIstream = nullptr;
+	const clap_ostream *hostOstream = nullptr;
+	int64_t istreamRead(Pointer<void> buffer, uint64_t size) {
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		if (!hostIstream) return -1;
+		
+		if (size > 1024) size = 1024; // 1kB max
+		unsigned char localBuffer[1024];
+		auto result = hostIstream->read(hostIstream, localBuffer, size);
+		if (result > 0 && result <= 1024) {
+			mainThread->setArray(buffer.cast<unsigned char>(), localBuffer, result);
+		}
+		return result;
+	}
+	int64_t ostreamWrite(Pointer<const void> buffer, uint64_t size) {
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		if (!hostOstream) return -1;
+		
+		if (size > 1024) size = 1024; // 1kB max
+		unsigned char localBuffer[1024];
+		mainThread->getArray(buffer.cast<unsigned char>(), localBuffer, size);
+		return hostOstream->write(hostOstream, localBuffer, size);
+	}
 private:
 
 	bool pluginInit() {
@@ -222,7 +280,25 @@ private:
 	
 	void paramsFlush(const clap_input_events *eventsIn, const clap_output_events *eventsOut) {
 		LOG_EXPR("paramsFlush()");
-		return; // not supported for now
+
+		auto scoped = arena->scoped(); // use the audio-thread arena
+		auto inEvents = scoped.copyAcross(module.inputEventsTemplate);
+		auto outEvents = scoped.copyAcross(module.outputEventsTemplate);
+		module.setPlugin(inEvents, pluginListIndex);
+		module.setPlugin(outEvents, pluginListIndex);
+
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		// Copy across (a recognised/translatable subset of) input events
+		inputEvents.resize(0);
+		uint32_t count = eventsIn->size(eventsIn);
+		for (uint32_t i = 0; i < count; ++i) {
+			tryCopyInputEvent(scoped, eventsIn->get(eventsIn, i));
+		}
+		hostOutputEvents = eventsOut;
+
+		mainThread->call(paramsExt[&wclap_plugin_params::flush], ptr, inEvents, outEvents);
+
+		hostOutputEvents = nullptr;
 	}
 };
 

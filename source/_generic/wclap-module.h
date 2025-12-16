@@ -25,7 +25,7 @@ struct WclapModule : public WclapModuleBase {
 		}
 		return true;
 	}
-		
+
 	WclapModule(InstanceGroup *instanceGroup) : WclapModuleBase(instanceGroup) {
 		if (!addHostFunctions(mainThread.get(), true)) return;
 
@@ -77,7 +77,15 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostTemplate, request_restart);
 		HOST_METHOD(hostTemplate, request_process);
 		HOST_METHOD(hostTemplate, request_callback);
-		
+
+		// Other host-owned structures, which probably only exist temporarily
+		HOST_METHOD(inputEventsTemplate, size);
+		HOST_METHOD(inputEventsTemplate, get);
+		HOST_METHOD(outputEventsTemplate, try_push);
+		HOST_METHOD(istreamTemplate, read);
+		HOST_METHOD(ostreamTemplate, write);
+
+		// Extensions - no context pointers, so copied across immediately
 		HOST_METHOD(hostAudioPorts, is_rescan_flag_supported);
 		HOST_METHOD(hostAudioPorts, rescan);
 		if (copyAcross) hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
@@ -90,12 +98,6 @@ struct WclapModule : public WclapModuleBase {
 #undef HOST_METHOD
 		if (copyAcross) globalArena = scoped.commit();
 		return true;
-	}
-
-	static Plugin * getPlugin(void *context, Pointer<const wclap_host> host) {
-		auto &self = *(WclapModule *)context;
-		auto dataPtr = self.mainThread->get(host[&wclap_host::host_data]);
-		return self.pluginList.get(dataPtr.wasmPointer);
 	}
 
 	// Host methods
@@ -128,6 +130,32 @@ LOG_EXPR(hostExtStr);
 	static void hostTemplate_request_callback(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->host->request_callback(plugin->host);
+	}
+
+	static uint32_t inputEventsTemplate_size(void *context, Pointer<const wclap_input_events> obj) {
+		auto *plugin = getPlugin(context, obj);
+		if (plugin) return plugin->inputEventsSize();
+		return 0;
+	}
+	static Pointer<const wclap_event_header> inputEventsTemplate_get(void *context, Pointer<const wclap_input_events> obj, uint32_t index) {
+		auto *plugin = getPlugin(context, obj);
+		if (plugin) return plugin->inputEventsGet(index);
+		return {0};
+	}
+	static bool outputEventsTemplate_try_push(void *context, Pointer<const wclap_output_events> obj, Pointer<const wclap_event_header> event) {
+		auto *plugin = getPlugin(context, obj);
+		if (plugin) return plugin->outputEventsTryPush(event);
+		return false;
+	}
+	static int64_t istreamTemplate_read(void *context, Pointer<const wclap_istream> obj, Pointer<void> buffer, uint64_t size) {
+		auto *plugin = getPlugin(context, obj);
+		if (plugin) return plugin->istreamRead(buffer, size);
+		return -1;
+	}
+	static int64_t ostreamTemplate_write(void *context, Pointer<const wclap_ostream> obj, Pointer<const void> buffer, uint64_t size) {
+		auto *plugin = getPlugin(context, obj);
+		if (plugin) return plugin->ostreamWrite(buffer, size);
+		return -1;
 	}
 
 	wclap_host_audio_ports hostAudioPorts;

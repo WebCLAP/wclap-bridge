@@ -4,25 +4,30 @@ This provides a C-API library which loads a WCLAP and provides a native CLAP int
 
 It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://docs.wasmtime.dev/c-api/index.html).  Alternative runtimes (for different speed/binary-size tradeoffs) and `wasm64` support are on the wishlist.
 
+It *should* be cross-platform, but actually only OSX is supported by the CMake, because `wasmtime-fetched.cmake` needs to know how to fetch/link the OS-specific builds of Wasmtime.  If you're on Windows or Linux, help would be appreciated!
+
 ## How to use the bridge
 
-It's only 7 functions - see [`include/wclap-bridge.h`](include/wclap-bridge.h) for details.
+The API is only 10 functions - see [`wclap-bridge.h`](include/wclap-bridge.h) for details.
 
-* `wclap_global_init(validityCheckLevel)`
+* `wclap_global_init(timeoutMs)`
 * `wclap_global_deinit()`
 * `wclap_open()`: opens a WCLAP (including calling its `clap_entry->init()`), returning an opaque pointer which is non-`NULL` on success
 * `wclap_open_with_dirs()`: opens a WCLAP, providing optional preset/cache/var directories for WASI
-* `wclap_close()`: closes a WCLAP (including calling its `clap_entry->deinit()`) which was _successfully_ opened using `wclap_open()`
 * `wclap_get_error()`: returns a `bool`, and optionally fills a `char *` buffer with the (latest) API failure for a WCLAP module
 * `wclap_get_factory()`: returns a CLAP-compatible factory, if supported by the WCLAP and the bridge
+* `wclap_close()`: closes a WCLAP (including calling its `clap_entry->deinit()`) which was opened using `wclap_open()`
+* `wclap_version()`: returns the `x.y.z` version reported by the WCLAP
+* `wclap_bridge_version()`: returns the maximum CLAP version which the bridge supports
+* `wclap_set_strings()`: sets optional prefixes for plugin IDs and names (to avoid confusion/collision with the native ones)
 
 The factories returned from `wclap_get_factory()` are equivalent to a native CLAP's `clap_entry.get_factory()`.
 
 ## Errors
 
-The strings returned by `wclap_error()` are only valid until the next API call (including `wclap_error()`), so make a copy if you want to store it.
+The strings returned by `wclap_get_error()` are valid until the WCLAP is closed with `wclap_close()`.
 
-Errors reported by `wclap_error()` are recoverable, but the WCLAP instance won't work properly.  For now, catastrophic errors call `abort()`.
+Errors reported by `wclap_get_error()` are recoverable (in that you can `wclap_close()`, with no memory corruptions or leaks), but the WCLAP instance won't work properly.  For now, catastrophic errors call `abort()`.
 
 ## WCLAP virtual filesystem structure
 
@@ -39,6 +44,8 @@ This uses the `wclap-cpp` definitions, and provides a Wasmtime-based implementat
 
 From there, it's a manually-implemented CLAP module, where the implementation refers to its internal WCLAP.  There is no automatic translation of return values or structs.
 
+Each plugin owns its own memory arena and `Instance` (basically a thread context) in the WCLAP, so that it's guaranteed to be available for realtime calls.
+
 ### 32-/64-bit versions
 
 To avoid duplicate code, any 32-/64-bit specific details are in `source/_generic/`, and get included twice (by `source/wclap-module.h`) with different values for `WCLAP_API_NAMESPACE`, `WCLAP_BRIDGE_NAMESPACE` and `WCLAP_BRIDGE_IS64`.  This means we have to be a _bit_ more careful how those files include each other, since they don't have include-guards or `#pragma once`.
@@ -47,7 +54,7 @@ This could be organised differently, with either templates, or compiling two sub
 
 ### Validity checking
 
-The CLAP module implementation only uses or returns values it understands, so there is an implicit whitelist.  No events or values passed across the WCLAP bridge (in either direction) should have un-translated pointers
+The CLAP module implementation only uses or returns values it understands, so there is an implicit whitelist.  No events or values passed across the WCLAP bridge (in either direction) should have un-translated pointers.
 
 There may (in future) be additional checks to make sure that parameter/note events refer to IDs which actually exist, and that host functions are being called on appropriate threads.  Ideally hosts should code defensively and handle this kind of error safely anyway, but (since native plugins are inherently more trusted than WCLAPs) it's understandable that they might be less cautious, which is why this is on the wishlist.
 
@@ -58,3 +65,15 @@ WASM instances themselves are single-threaded, and threading is (currently) only
 Each incoming CLAP API call (from this bridge's host) is assumed to be either on the main thread or the audio thread.  There are two pre-allocated `Instance`s for these two threads.
 
 If a WCLAP doesn't implement threads (i.e. it has no imported shared memory) then only one `Instance` is allocated, and it is locked and used for all incoming API calls.
+
+## Limitations
+
+### Extensions
+
+Currently, only the audio-ports/latency/params/state extensions are supported.  All extensions (including drafts) are on the wishlist, including using the (draft) webview extension for GUIs.
+
+### Threads
+
+If the WCLAP doesn't support threads (i.e. it exports memory instead of importing it), then the main thread is used for everything, so the audio thread _may_ block.
+
+There should probably be an API for checking this, so the host can adapt as appropriate.

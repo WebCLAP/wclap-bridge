@@ -17,6 +17,7 @@ class Plugin;
 
 using MemoryArenaPool = wclap::MemoryArenaPool<Instance, WCLAP_BRIDGE_IS64>;
 using MemoryArenaPtr = std::unique_ptr<wclap::MemoryArena<Instance, WCLAP_BRIDGE_IS64>>;
+using MemoryArenaScope = typename wclap::MemoryArena<Instance, WCLAP_BRIDGE_IS64>::Scoped;
 
 struct WclapModuleBase {
 	std::unique_ptr<InstanceGroup> instanceGroup; // Destroyed last

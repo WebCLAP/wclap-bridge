@@ -65,21 +65,117 @@ struct Plugin {
 		if (index < inputEvents.size()) return inputEvents[index];
 		return {0};
 	}
-	template<class Scope>
-	void tryCopyInputEvent(Scope &scope, const clap_event_header *event) {
-		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
-		LOG_EXPR(event->space_id);
-		LOG_EXPR(event->type);
-		// TODO: if supported, copy to the scope and add to `inputEvents`
-		return;
+	void tryCopyInputEvent(MemoryArenaScope &scope, const clap_event_header *event) {
+		if (event->space_id != CLAP_CORE_EVENT_SPACE_ID) return;
+		if (event->type <= 4 || (event->type >= 7 && event->type <= 10) || event->type == 12) {
+			// clap_event_note, clap_event_note_expression, clap_event_param_gesture, clap_event_transport, clap_event_midi or clap_event_midi2
+			auto bytes = scope.reserve(event->size, 8).cast<unsigned char>();
+			audioThread->setArray(bytes, (unsigned char *)event, event->size);
+			inputEvents.push_back(bytes.cast<const wclap_event_header>());
+		} else if (event->type == 5 || event->type == 6) {
+			// Treat `wclap_event_param_mod` as `wclap_event_param_value`, since they're identical aside from the `value`/`amount` field name
+			// only the value/amount field names differ (for clarity)
+			// so we use the same code for both
+			auto valueEvent = *(clap_event_param_value *)event;
+			wclap_event_param_value wValueEvent{
+				.header=*(wclap_event_header *)event,
+				.param_id=valueEvent.param_id,
+				.cookie={Size(size_t(valueEvent.cookie))}, // for wasm64, this entire event could be a bitwise copy, but that's unnerving
+				.note_id=valueEvent.note_id,
+				.port_index=valueEvent.port_index,
+				.channel=valueEvent.channel,
+				.key=valueEvent.key,
+				.value=valueEvent.value
+			};
+			Pointer<wclap_event_param_value> wValueEventPtr = scope.copyAcross(wValueEvent);
+			inputEvents.push_back(wValueEventPtr.cast<const wclap_event_header>());
+		} else if (event->type == 11) {
+			auto *sysex = (clap_event_midi_sysex *)event;
+			auto size = sysex->size;
+			auto wBuffer = scope.array<uint8_t>(size);
+			audioThread->setArray(wBuffer, sysex->buffer, size);
+			wclap_event_midi_sysex wSysex{
+				.header=*(wclap_event_header *)event,
+				.port_index=sysex->port_index,
+				.buffer=wBuffer,
+				.size=size
+			};
+			Pointer<wclap_event_midi_sysex> wSysexPtr = scope.copyAcross(wSysex);
+			inputEvents.push_back(wSysexPtr.cast<const wclap_event_header>());
+		}
 	}
 	bool outputEventsTryPush(Pointer<const wclap_event_header> event) {
 		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		if (!hostOutputEvents) return false;
 		auto eventHeader = audioThread->get(event);
-		LOG_EXPR(eventHeader.size);
-		LOG_EXPR(eventHeader.space_id);
-		LOG_EXPR(eventHeader.type);
-		// TODO: translate if possible
+		if (eventHeader.space_id != CLAP_CORE_EVENT_SPACE_ID) return false;
+
+		if (eventHeader.type < 4) {
+			clap_event_note nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 4) {
+			clap_event_note_expression nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 5 || eventHeader.type == 6) {
+			// Again, treat `wclap_event_param_mod` as `wclap_event_param_value`
+			auto wEvent = audioThread->get(event.cast<const wclap_event_param_value>());
+
+			void *cookie = nullptr;
+			// Store cookie, assuming host pointer size is larger enough (which is almost certainly true)
+			if constexpr (sizeof(cookie) >= sizeof(wEvent.cookie)) {
+				cookie = (void *)size_t(wEvent.cookie.wasmPointer);
+			}
+
+			clap_event_param_value nativeEvent{
+				.header=*(clap_event_header *)&wEvent.header,
+				.param_id=wEvent.param_id,
+				.cookie=cookie,
+				.note_id=wEvent.note_id,
+				.port_index=wEvent.port_index,
+				.channel=wEvent.channel,
+				.key=wEvent.key,
+				.value=wEvent.value
+			};
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 7 || eventHeader.type == 8) {
+			clap_event_param_gesture nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 9) {
+			clap_event_transport nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 10) {
+			clap_event_midi nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 11) {
+			auto wEvent = audioThread->get(event.cast<const wclap_event_midi_sysex>());
+			if (wEvent.size > 1024) return false; // too big, and we don't want to allocate here
+			uint8_t buffer[1024];
+			audioThread->getArray(wEvent.buffer, buffer, wEvent.size);
+			clap_event_midi_sysex nativeEvent{
+				.header=*(clap_event_header *)&wEvent.header,
+				.port_index=wEvent.port_index,
+				.buffer=buffer,
+				.size=wEvent.size
+			};
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		} else if (eventHeader.type == 12) {
+			clap_event_midi2 nativeEvent;
+			audioThread->getArray(event.cast<unsigned char>(), (unsigned char *)&nativeEvent, sizeof(nativeEvent));
+			nativeEvent.header.size = sizeof(nativeEvent);
+			return hostOutputEvents->try_push(hostOutputEvents, &nativeEvent.header);
+		}
 		return false;
 	}
 
@@ -138,26 +234,114 @@ private:
 		audioThread->call(ptr[&wclap_plugin::reset], ptr);
 	}
 	clap_process_status pluginProcess(const clap_process *process) {
-//LOG_EXPR("pluginProcess");
-		size_t length = process->frames_count;
-		for (uint32_t o = 0; o < process->audio_outputs_count; ++o) {
-			auto &audioOutput = process->audio_outputs[o];
-			for (uint32_t c = 0; c < audioOutput.channel_count; ++c) {
-				if (audioOutput.data32) {
-					auto *buffer = audioOutput.data32[c];
-					for (size_t i = 0; i < length; ++i) {
-						buffer[i] = (float(i)/length - 0.5f)*0.1f;
-					}
-				} else if (audioOutput.data64) {
-					auto *buffer = audioOutput.data64[c];
-					for (size_t i = 0; i < length; ++i) {
-						buffer[i] = (float(i)/length - 0.5f)*0.1;
-					}
+		auto scoped = arena->scoped(); // use the audio-thread arena
+
+		auto inEvents = scoped.copyAcross(module.inputEventsTemplate);
+		auto outEvents = scoped.copyAcross(module.outputEventsTemplate);
+		module.setPlugin(inEvents, pluginListIndex);
+		module.setPlugin(outEvents, pluginListIndex);
+
+		// Input/output events
+		std::unique_lock<std::recursive_mutex> lock{hostEventsMutex};
+		inputEvents.resize(0);
+		// Copy across (a recognised/translatable subset of) input events
+		auto *eventsIn = process->in_events;
+		uint32_t count = eventsIn->size(eventsIn);
+		for (uint32_t i = 0; i < count; ++i) {
+			tryCopyInputEvent(scoped, eventsIn->get(eventsIn, i));
+		}
+		hostOutputEvents = process->out_events;
+
+		// The process structure
+		wclap_process wProcess{
+			.steady_time=process->steady_time,
+			.frames_count=process->frames_count,
+			.transport={0},
+			.audio_inputs={0},
+			.audio_outputs={0},
+			.audio_inputs_count=process->audio_inputs_count,
+			.audio_outputs_count=process->audio_outputs_count,
+			.in_events=inEvents,
+			.out_events=outEvents
+		};
+		if (process->transport) {
+			// The transport event contains no pointers, so translates directly.
+			auto wTransport = *(wclap_event_transport *)process->transport;
+			wProcess.transport = scoped.copyAcross(wTransport);
+		}
+
+		auto translateBuffer = [&](const clap_audio_buffer &buffer, Pointer<const wclap_audio_buffer> wBufferPtr){
+			wclap_audio_buffer wBuffer{
+				.data32={0},
+				.data64={0},
+				.channel_count=buffer.channel_count,
+				.latency=buffer.latency,
+				.constant_mask=buffer.constant_mask
+			};
+			// Copy audio data across
+			if (buffer.data32) {
+				wBuffer.data32 = scoped.array<Pointer<float>>(wBuffer.channel_count);
+				for (uint32_t c = 0; c < wBuffer.channel_count; ++c) {
+					auto array = scoped.array<float>(wProcess.frames_count);
+					audioThread->setArray(array, buffer.data32[c], wProcess.frames_count);
+					audioThread->set(wBuffer.data32, array, c);
+				}
+			}
+			if (buffer.data64) {
+				wBuffer.data64 = scoped.array<Pointer<double>>(wBuffer.channel_count);
+				for (uint32_t c = 0; c < wBuffer.channel_count; ++c) {
+					auto array = scoped.array<double>(wProcess.frames_count);
+					audioThread->setArray(array, buffer.data64[c], wProcess.frames_count);
+					audioThread->set(wBuffer.data64, array, c);
+				}
+			}
+			audioThread->set(wBufferPtr.cast<wclap_audio_buffer>(), wBuffer);
+		};
+		// Audio inputs
+		wProcess.audio_inputs = scoped.array<const wclap_audio_buffer>(wProcess.audio_inputs_count);
+		for (uint32_t portIndex = 0; portIndex < wProcess.audio_inputs_count; ++portIndex) {
+			translateBuffer(process->audio_inputs[portIndex], wProcess.audio_inputs + portIndex);
+		}
+		wProcess.audio_outputs = scoped.array<wclap_audio_buffer>(wProcess.audio_outputs_count);
+		for (uint32_t portIndex = 0; portIndex < wProcess.audio_outputs_count; ++portIndex) {
+			translateBuffer(process->audio_outputs[portIndex], wProcess.audio_outputs + portIndex);
+		}
+
+		// Ready - copy the process structure across and call
+		auto processPtr = scoped.copyAcross(wProcess);
+		auto resultCode = mainThread->call(ptr[&wclap_plugin::process], ptr, processPtr);
+
+		// Events cleanup
+		hostOutputEvents = nullptr;
+		// Copy back output buffers
+		for (uint32_t portIndex = 0; portIndex < wProcess.audio_outputs_count; ++portIndex) {
+			auto &buffer = process->audio_outputs[portIndex];
+			auto wBuffer = audioThread->get(wProcess.audio_outputs, portIndex);
+			if (buffer.data32) {
+				for (uint32_t c = 0; c < buffer.channel_count; ++c) {
+					Pointer<float> channelPtr = audioThread->get(wBuffer.data32, c);
+					audioThread->getArray(channelPtr, buffer.data32[c], wProcess.frames_count);
+					checkBuffers(buffer.data32[c], wProcess.frames_count);
+				}
+			}
+			if (buffer.data64) {
+				for (uint32_t c = 0; c < buffer.channel_count; ++c) {
+					Pointer<double> channelPtr = audioThread->get(wBuffer.data64, c);
+					audioThread->getArray(channelPtr, buffer.data64[c], wProcess.frames_count);
+					checkBuffers(buffer.data64[c], wProcess.frames_count);
 				}
 			}
 		}
 		
-		return CLAP_PROCESS_CONTINUE;
+		return resultCode;
+	}
+	template<class S>
+	void checkBuffers(S *buffer, size_t length) {
+		static constexpr S limit = 100;
+		for (size_t i = 0; i < length; ++i) {
+			auto a = std::abs(buffer[i]);
+			if (!(a < limit)) buffer[i] = 0;
+		}
 	}
 
 	void pluginOnMainThread() {
@@ -237,10 +421,16 @@ private:
 		auto result = mainThread->call(paramsExt[&wclap_plugin_params::get_info], ptr, index, infoPtr);
 		auto wclapInfo = mainThread->get(infoPtr);
 		
+		void *cookie = nullptr;
+		// Store cookie, assuming host pointer size is larger enough (which is almost certainly true)
+		if constexpr (sizeof(cookie) >= sizeof(wclapInfo.cookie)) {
+			cookie = (void *)size_t(wclapInfo.cookie.wasmPointer);
+		}
+		
 		*info = clap_param_info{
 			.id=wclapInfo.id,
 			.flags=wclapInfo.flags,
-			.cookie=nullptr,
+			.cookie=cookie,
 			.name="",
 			.module="",
 			.min_value=wclapInfo.min_value,
@@ -279,8 +469,6 @@ private:
 	}
 	
 	void paramsFlush(const clap_input_events *eventsIn, const clap_output_events *eventsOut) {
-		LOG_EXPR("paramsFlush()");
-
 		auto scoped = arena->scoped(); // use the audio-thread arena
 		auto inEvents = scoped.copyAcross(module.inputEventsTemplate);
 		auto outEvents = scoped.copyAcross(module.outputEventsTemplate);

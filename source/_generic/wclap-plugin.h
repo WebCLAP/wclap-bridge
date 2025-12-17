@@ -1,6 +1,7 @@
 // No `#pragma once`, because we deliberately get included multiple times by `../wclap.h`, with different WCLAP_API_NAMESPACE, WCLAP_BRIDGE_NAMESPACE and WCLAP_BRIDGE_IS64 values
 
 #include <atomic>
+//#include "webview-gui/clap-webview-gui.h"
 
 namespace WCLAP_BRIDGE_NAMESPACE {
 
@@ -19,8 +20,10 @@ struct Plugin {
 
 	const clap_host *host;
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
+	const clap_host_latency *hostLatency = nullptr;
 	const clap_host_params *hostParams = nullptr;
-	
+	const clap_host_state *hostState = nullptr;
+		
 	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {
 		// Address using its index in the plugin list (where it's retained)
 		pluginListIndex = module.pluginList.retain(this);
@@ -209,7 +212,9 @@ private:
 #define GET_HOST_EXT(field, extId) \
 		field = (decltype(field))host->get_extension(host, extId);
 		GET_HOST_EXT(hostAudioPorts, CLAP_EXT_AUDIO_PORTS);
+		GET_HOST_EXT(hostLatency, CLAP_EXT_LATENCY);
 		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
+		GET_HOST_EXT(hostState, CLAP_EXT_STATE);
 #undef GET_HOST_EXT
 		return mainThread->call(ptr[&wclap_plugin::init], ptr);
 	}
@@ -361,6 +366,12 @@ private:
 			};
 			audioPortsExt = wclapExt.cast<const wclap_plugin_audio_ports>();
 			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_LATENCY)) {
+			static const clap_plugin_latency ext{
+				.get=clapPluginMethod<&Plugin::latencyGet>(),
+			};
+			latencyExt = wclapExt.cast<const wclap_plugin_latency>();
+			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAMS)) {
 			static const clap_plugin_params ext{
 				.count=clapPluginMethod<&Plugin::paramsCount>(),
@@ -371,6 +382,13 @@ private:
 				.flush=clapPluginMethod<&Plugin::paramsFlush>(),
 			};
 			paramsExt = wclapExt.cast<const wclap_plugin_params>();
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_STATE)) {
+			static const clap_plugin_state ext{
+				.save=clapPluginMethod<&Plugin::stateSave>(),
+				.load=clapPluginMethod<&Plugin::stateLoad>(),
+			};
+			stateExt = wclapExt.cast<const wclap_plugin_state>();
 			return &ext;
 		}
 		LOG_EXPR(pluginExtId);
@@ -409,6 +427,11 @@ private:
 		};
 		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
 		return result;
+	}
+
+	Pointer<const wclap_plugin_latency> latencyExt;
+	uint32_t latencyGet() {
+		return mainThread->call(latencyExt[&wclap_plugin_latency::get], ptr);
 	}
 
 	Pointer<const wclap_plugin_params> paramsExt;
@@ -487,6 +510,30 @@ private:
 		mainThread->call(paramsExt[&wclap_plugin_params::flush], ptr, inEvents, outEvents);
 
 		hostOutputEvents = nullptr;
+	}
+
+	Pointer<const wclap_plugin_state> stateExt;
+	bool stateSave(const clap_ostream_t *stream) {
+		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
+		auto streamPtr = scoped.copyAcross(module.ostreamTemplate);
+		module.setPlugin(streamPtr, pluginListIndex);
+
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		hostOstream = stream;
+		auto result = mainThread->call(stateExt[&wclap_plugin_state::save], ptr, streamPtr);
+		hostOstream = nullptr;
+		return result;
+	}
+	bool stateLoad(const clap_istream_t *stream) {
+		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
+		auto streamPtr = scoped.copyAcross(module.istreamTemplate);
+		module.setPlugin(streamPtr, pluginListIndex);
+
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		hostIstream = stream;
+		auto result = mainThread->call(stateExt[&wclap_plugin_state::load], ptr, streamPtr);
+		hostIstream = nullptr;
+		return result;
 	}
 };
 

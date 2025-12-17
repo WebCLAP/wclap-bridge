@@ -90,10 +90,16 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostAudioPorts, rescan);
 		if (copyAcross) hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
 
+		HOST_METHOD(hostLatency, changed);
+		if (copyAcross) hostLatencyPtr = scoped.copyAcross(hostLatency);
+
 		HOST_METHOD(hostParams, rescan);
 		HOST_METHOD(hostParams, clear);
 		HOST_METHOD(hostParams, request_flush);
 		if (copyAcross) hostParamsPtr = scoped.copyAcross(hostParams);
+
+		HOST_METHOD(hostState, mark_dirty);
+		if (copyAcross) hostStatePtr = scoped.copyAcross(hostState);
 
 #undef HOST_METHOD
 		if (copyAcross) globalArena = scoped.commit();
@@ -112,8 +118,12 @@ struct WclapModule : public WclapModuleBase {
 
 		if (hostExtStr == CLAP_EXT_AUDIO_PORTS) {
 			return self.hostAudioPortsPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_LATENCY) {
+			return self.hostLatencyPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_PARAMS) {
 			return self.hostParamsPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_STATE) {
+			return self.hostStatePtr.cast<const void>();
 		}
 		// null, no extensions for now
 LOG_EXPR(hostExtStr);
@@ -170,6 +180,13 @@ LOG_EXPR(hostExtStr);
 		if (plugin) return plugin->hostAudioPorts->rescan(plugin->host, flags);
 	}
 
+	wclap_host_latency hostLatency;
+	Pointer<wclap_host_latency> hostLatencyPtr;
+	static void hostLatency_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostLatency->changed(plugin->host);
+	}
+
 	wclap_host_params hostParams;
 	Pointer<wclap_host_params> hostParamsPtr;
 	static void hostParams_rescan(void *context, Pointer<const wclap_host> wHost, uint32_t flags) {
@@ -183,6 +200,13 @@ LOG_EXPR(hostExtStr);
 	static void hostParams_request_flush(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostParams->request_flush(plugin->host);
+	}
+
+	wclap_host_state hostState;
+	Pointer<wclap_host_state> hostStatePtr;
+	static void hostState_mark_dirty(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostState->mark_dirty(plugin->host);
 	}
 };
 

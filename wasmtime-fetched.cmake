@@ -8,12 +8,12 @@ message(STATUS "checking/downloading Wasmtime C SDK")
 if(APPLE)
 	# Fetch both AMD64 and ARM64
 	FetchContent_Declare(wasmtime-c-api-amd64
-		URL https://github.com/bytecodealliance/wasmtime/releases/download/v30.0.1/wasmtime-v30.0.1-x86_64-macos-c-api.tar.xz
-		URL_HASH SHA256=c7083258caf236c6042c7c12ac104e34d8c2f707b220ada1abdabca71c6f9a4b
+		URL https://github.com/bytecodealliance/wasmtime/releases/download/v39.0.1/wasmtime-v39.0.1-x86_64-macos-c-api.tar.xz
+		URL_HASH SHA256=0ff4f203106fe2b9b7b940a670282c41b01450b44c2157693a5bfb4848391a09
 	)
 	FetchContent_Declare(wasmtime-c-api-arm64
-		URL https://github.com/bytecodealliance/wasmtime/releases/download/v30.0.1/wasmtime-v30.0.1-aarch64-macos-c-api.tar.xz
-		URL_HASH SHA256=d0ac00220fab585693189a46ddf84ac8ff2eeb810b3d4d09b498acb5b9268e5d
+		URL https://github.com/bytecodealliance/wasmtime/releases/download/v39.0.1/wasmtime-v39.0.1-aarch64-macos-c-api.tar.xz
+		URL_HASH SHA256=afd838069897a4a5246f178c5db95f68d0aa288cd71499970c74ebc8bced970f
 	)
 	FetchContent_MakeAvailable(wasmtime-c-api-amd64 wasmtime-c-api-arm64)
 	

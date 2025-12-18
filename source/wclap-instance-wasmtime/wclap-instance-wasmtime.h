@@ -391,7 +391,7 @@ struct InstanceImpl {
 	InstanceGroup &group;
 
 	uint64_t wclapEntryAs64;
-	std::mutex callMutex;
+	std::recursive_mutex callMutex; // has to be recursive in case a WCLAP function calls out to a host which then calls a WCLAP function etc.
 
 	// Delete these (in reverse order) if they're defined
 	wasmtime_store_t *wtStore = nullptr;
@@ -454,6 +454,7 @@ struct InstanceImpl {
 			wasmP = std::min<uint64_t>(wasmP, memorySize - size);
 			return wasmtime_sharedmemory_data(group.wtSharedMemory) + wasmP;
 		} else {
+			std::lock_guard<std::recursive_mutex> lock(callMutex);
 			auto memorySize = wasmtime_memory_data_size(wtContext, &wtMemory);
 			wasmP = std::min<uint64_t>(wasmP, memorySize - size);
 			return wasmtime_memory_data(wtContext, &wtMemory) + wasmP;
@@ -461,7 +462,7 @@ struct InstanceImpl {
 	}
 
 	void wtCall(uint64_t fnP, wasmtime_val_raw *argsAndResults, size_t argN) {
-		std::lock_guard<std::mutex> lock(callMutex);
+		std::lock_guard<std::recursive_mutex> lock(callMutex);
 		if (group.hasError()) {
 			if (argN > 0) argsAndResults[0].i64 = 0; // returns 0
 			return;

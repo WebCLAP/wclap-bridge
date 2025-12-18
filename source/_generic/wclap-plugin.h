@@ -2,7 +2,10 @@
 
 #include <atomic>
 #include <string_view>
+#include <fstream>
+
 #include "webview-gui/clap-webview-gui.h"
+#include "webview-gui/helpers.h"
 
 namespace WCLAP_BRIDGE_NAMESPACE {
 
@@ -713,12 +716,28 @@ private:
 		wasFileUri = false;
 		return result;
 	}
-	bool webviewGetResource(const char *path, char *mime, uint32_t mimeCapacity, const clap_ostream_t *stream) {
+	bool webviewGetResource(const char *path, char *mime, uint32_t mimeCapacity, const clap_ostream *ostream) {
 		if (wasFileUri) {
-			LOG_EXPR(path);
 			auto mapped = module.instanceGroup->mapPath(path);
-			LOG_EXPR(!!mapped);
-			if (mapped) LOG_EXPR(*mapped);
+			if (!mapped) return false;
+			
+			auto mimeGuess = webview_gui::helpers::guessMediaType(path);
+			std::strncpy(mime, mimeGuess.c_str(), mimeCapacity);
+			
+			std::ifstream stream{*mapped, std::ios::binary|std::ios::ate};
+			std::vector<char> buffer;
+			buffer.resize(stream.tellg()); // we opened at the end, so this is the file size
+			stream.seekg(0);
+			// Read entire file into memory at once
+			if (stream.read(buffer.data(), buffer.size())) {
+				size_t index = 0;
+				while (index < buffer.size()) {
+					auto result = ostream->write(ostream, (const void *)(buffer.data() + index), uint64_t(buffer.size() - index));
+					if (result <= 0) return false;
+					index += result;
+				}
+				return true;
+			}
 			return false;
 		}
 
@@ -729,14 +748,17 @@ private:
 		auto mimePtr = scoped.array<char>(mimeCapacity);
 		
 		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
-		hostOstream = stream;
+		hostOstream = ostream;
 		auto result = mainThread->call(webviewExt[&wclap_plugin_webview::get_resource], ptr, pathPtr, mimePtr, mimeCapacity, streamPtr);
 		mainThread->getArray(mimePtr, mime, mimeCapacity);
 		hostOstream = nullptr;
 		return result;
 	}
 	bool webviewReceive(const void *buffer, uint32_t size) {
-		return false;
+		auto scoped = module.arenaPool.scoped();
+		auto bufferPtr = scoped.array<unsigned char>(size);
+		mainThread->setArray(bufferPtr, (const unsigned char *)buffer, size);
+		return mainThread->call(webviewExt[&wclap_plugin_webview::receive], ptr, bufferPtr.cast<const void>(), size);
 	}
 };
 

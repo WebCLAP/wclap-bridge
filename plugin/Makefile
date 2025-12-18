@@ -17,4 +17,4 @@ open-reaper:
 	/Applications/REAPER.app/Contents/MacOS/REAPER REAPER/basics/basics.RPP
 
 nodemon:
-	nodemon --watch wclap-bridge --watch source -e h,hpp,cpp --exec "make bridge-plugin || exit 1"
+	nodemon --watch ../source --watch source -e h,hpp,cpp --exec "make bridge-plugin || exit 1"

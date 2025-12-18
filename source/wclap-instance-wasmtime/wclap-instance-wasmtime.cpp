@@ -194,9 +194,9 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 		wasi_config_set_env(wasiConfig, envNames.size(), envNames.data(), envValues.data());
 	}
 	
-	// Link various directories - failure is allowed if `mustLinkDirs` is false
+	// Link various directories
 	if (group.wclapDir) {
-		if (!wasi_config_preopen_dir(wasiConfig, group.wclapDir->c_str(), "/plugin/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
+		if (!wasi_config_preopen_dir(wasiConfig, group.wclapDir->c_str(), "/plugin.wclap/", WASMTIME_WASI_DIR_PERMS_READ, WASMTIME_WASI_FILE_PERMS_READ)) {
 			std::cerr << "WASI: failed to link " << *group.wclapDir << std::endl;
 		}
 	}

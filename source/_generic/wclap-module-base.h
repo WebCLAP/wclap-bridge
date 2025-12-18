@@ -52,8 +52,7 @@ struct WclapModuleBase {
 	Pointer<const wclap_plugin_entry> entryPtr;
 
 	WclapModuleBase(InstanceGroup *instanceGroup) : instanceGroup(instanceGroup), mainThread(instanceGroup->startInstance()), arenaPool(mainThread.get()) {}
-	~WclapModuleBase() {
-	}
+	~WclapModuleBase() {}
 
 	wclap::IndexLookup<Plugin> pluginList;
 	

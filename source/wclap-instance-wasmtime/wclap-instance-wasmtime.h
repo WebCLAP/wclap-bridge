@@ -12,6 +12,9 @@
 #include <iostream>
 #include <shared_mutex>
 #include <type_traits>
+#include <string>
+#include <cstring>
+#include <filesystem>
 
 namespace wclap_wasmtime {
 
@@ -350,6 +353,25 @@ struct InstanceGroup {
 		if (wtSharedMemory) wasmtime_sharedmemory_delete(wtSharedMemory);
 		if (wtError) wasmtime_error_delete(wtError);
 		if (wtModule) wasmtime_module_delete(wtModule);
+	}
+	
+	std::optional<std::string> mapPath(const std::string &virtualPath) {
+		std::filesystem::path path = virtualPath;
+		path = std::filesystem::absolute(path.make_preferred()); // remove all `/../` etc.
+		auto testPrefix = [&](std::optional<std::string> &dir, const char *prefix) -> bool {
+			auto length = std::strlen(prefix);
+			if (dir && virtualPath.substr(0, length) == prefix) {
+				path = std::filesystem::path(path.string().substr(length));
+				path = std::filesystem::path(*dir) / path;
+				return true;
+			}
+			return false;
+		};
+		if (testPrefix(wclapDir, "/plugin.wclap/")) return path.string();
+		if (testPrefix(presetDir, "/presets/")) return path.string();
+		if (testPrefix(cacheDir, "/cache/")) return path.string();
+		if (testPrefix(varDir, "/var/")) return path.string();
+		return {};
 	}
 
 	wclap::Instance<InstanceImpl> *singleThread = nullptr;

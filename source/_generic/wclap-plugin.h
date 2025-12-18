@@ -1,7 +1,8 @@
 // No `#pragma once`, because we deliberately get included multiple times by `../wclap.h`, with different WCLAP_API_NAMESPACE, WCLAP_BRIDGE_NAMESPACE and WCLAP_BRIDGE_IS64 values
 
 #include <atomic>
-//#include "webview-gui/clap-webview-gui.h"
+#include <string_view>
+#include "webview-gui/clap-webview-gui.h"
 
 namespace WCLAP_BRIDGE_NAMESPACE {
 
@@ -10,6 +11,7 @@ using namespace WCLAP_API_NAMESPACE;
 struct Plugin {
 	WclapModuleBase &module;
 	Instance *mainThread;
+	webview_gui::ClapWebviewGui webviewGui;
 	
 	Pointer<const wclap_plugin> ptr;
 	MemoryArenaPtr arena; // this holds the `wclap_host` (and anything else we need) for the lifetime of the plugin, and is also used by audio-thread methods
@@ -20,9 +22,11 @@ struct Plugin {
 
 	const clap_host *host;
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
+	const clap_host_gui *hostGui = nullptr;
 	const clap_host_latency *hostLatency = nullptr;
 	const clap_host_params *hostParams = nullptr;
 	const clap_host_state *hostState = nullptr;
+	const clap_host_webview *hostWebview = nullptr;
 		
 	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {
 		// Address using its index in the plugin list (where it's retained)
@@ -206,16 +210,31 @@ struct Plugin {
 		mainThread->getArray(buffer.cast<unsigned char>(), localBuffer, size);
 		return hostOstream->write(hostOstream, localBuffer, size);
 	}
+	std::mutex webviewMessageMutex;
+	std::vector<unsigned char> webviewMessageBuffer;
+	bool webviewSend(Pointer<const void> buffer, uint64_t size) {
+		std::unique_lock<std::mutex> lock{webviewMessageMutex};
+		webviewMessageBuffer.resize(size); // main thread, it's fine
+		mainThread->getArray(buffer.cast<unsigned char>(), webviewMessageBuffer.data(), size);
+		return hostWebview->send(host, webviewMessageBuffer.data(), size);
+	}
 private:
 
 	bool pluginInit() {
 #define GET_HOST_EXT(field, extId) \
 		field = (decltype(field))host->get_extension(host, extId);
 		GET_HOST_EXT(hostAudioPorts, CLAP_EXT_AUDIO_PORTS);
+		GET_HOST_EXT(hostGui, CLAP_EXT_GUI);
 		GET_HOST_EXT(hostLatency, CLAP_EXT_LATENCY);
 		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
 		GET_HOST_EXT(hostState, CLAP_EXT_STATE);
 #undef GET_HOST_EXT
+
+		// Webview -> GUI helper
+		webviewGui.init(&clapPlugin, host);
+		// Don't query the actual host - the helper does that, and provides this proxy which routes messages appropriately
+		hostWebview = (const clap_host_webview *)webviewGui.extHostWebview;
+
 		return mainThread->call(ptr[&wclap_plugin::init], ptr);
 	}
 	void pluginDestroy() {
@@ -365,13 +384,34 @@ private:
 				.get=clapPluginMethod<&Plugin::audioPortsGet>(),
 			};
 			audioPortsExt = wclapExt.cast<const wclap_plugin_audio_ports>();
-			return &ext;
+			return audioPortsExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_GUI)) {
+			static const clap_plugin_gui ext{
+				.is_api_supported=clapPluginMethod<&Plugin::guiIsApiSupported>(),
+				.get_preferred_api=clapPluginMethod<&Plugin::guiGetPreferredApi>(),
+				.create=clapPluginMethod<&Plugin::guiCreate>(),
+				.destroy=clapPluginMethod<&Plugin::guiDestroy>(),
+				.set_scale=clapPluginMethod<&Plugin::guiSetScale>(),
+				.get_size=clapPluginMethod<&Plugin::guiGetSize>(),
+				.can_resize=clapPluginMethod<&Plugin::guiCanResize>(),
+				.get_resize_hints=clapPluginMethod<&Plugin::guiGetResizeHints>(),
+				.adjust_size=clapPluginMethod<&Plugin::guiAdjustSize>(),
+				.set_size=clapPluginMethod<&Plugin::guiSetSize>(),
+				.set_parent=clapPluginMethod<&Plugin::guiSetParent>(),
+				.set_transient=clapPluginMethod<&Plugin::guiSetTransient>(),
+				.suggest_title=clapPluginMethod<&Plugin::guiSuggestTitle>(),
+				.show=clapPluginMethod<&Plugin::guiShow>(),
+				.hide=clapPluginMethod<&Plugin::guiHide>(),
+			};
+			guiExt = wclapExt.cast<const wclap_plugin_gui>();
+			if (!webviewExt) webviewExt = wclapExt.cast<const wclap_plugin_webview>();
+			return guiExt ? &ext : nullptr; // depends on the WCLAP's webview extension, not the GUI one
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_LATENCY)) {
 			static const clap_plugin_latency ext{
 				.get=clapPluginMethod<&Plugin::latencyGet>(),
 			};
 			latencyExt = wclapExt.cast<const wclap_plugin_latency>();
-			return &ext;
+			return latencyExt ? &ext : nullptr;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAMS)) {
 			static const clap_plugin_params ext{
 				.count=clapPluginMethod<&Plugin::paramsCount>(),
@@ -382,14 +422,22 @@ private:
 				.flush=clapPluginMethod<&Plugin::paramsFlush>(),
 			};
 			paramsExt = wclapExt.cast<const wclap_plugin_params>();
-			return &ext;
+			return paramsExt ? &ext : nullptr;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_STATE)) {
 			static const clap_plugin_state ext{
 				.save=clapPluginMethod<&Plugin::stateSave>(),
 				.load=clapPluginMethod<&Plugin::stateLoad>(),
 			};
 			stateExt = wclapExt.cast<const wclap_plugin_state>();
-			return &ext;
+			return stateExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_WEBVIEW)) {
+			static const clap_plugin_webview ext{
+				.get_uri=clapPluginMethod<&Plugin::webviewGetUri>(),
+				.get_resource=clapPluginMethod<&Plugin::webviewGetResource>(),
+				.receive=clapPluginMethod<&Plugin::webviewReceive>()
+			};
+			webviewExt = wclapExt.cast<const wclap_plugin_webview>();
+			return webviewExt ? &ext : nullptr;
 		}
 		LOG_EXPR(pluginExtId);
 		return nullptr;
@@ -427,6 +475,110 @@ private:
 		};
 		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
 		return result;
+	}
+	
+	Pointer<const wclap_plugin_gui> guiExt;
+	bool guiIsApiSupported(const char *api, bool isFloating) {
+		return webviewGui.isApiSupported(api, isFloating);
+	}
+	bool guiGetPreferredApi(const char **api, bool *isFloating) {
+		return webviewGui.getPreferredApi(api, isFloating);
+	}
+	bool guiCreate(const char *api, bool isFloating) {
+		if (!webviewGui.create(api, isFloating)) return false;
+		if (guiExt) {
+			// Create a webview GUI in the WCLAP, but continue whether it succeeds or not
+			auto scoped = module.arenaPool.scoped();
+			auto str = scoped.writeString(CLAP_WINDOW_API_WEBVIEW);
+			mainThread->call(guiExt[&wclap_plugin_gui::create], ptr, str, isFloating);
+		}
+		return true;
+	}
+	void guiDestroy() {
+		if (guiExt) {
+			mainThread->call(guiExt[&wclap_plugin_gui::destroy], ptr);
+		}
+		webviewGui.destroy();
+	}
+	bool guiSetScale(double scale) {
+		return webviewGui.setScale(scale);
+	}
+	bool guiGetSize(uint32_t *w, uint32_t *h) {
+		if (guiExt) {
+			auto scoped = module.arenaPool.scoped();
+			auto wPtr = scoped.copyAcross(uint32_t(0));
+			auto hPtr = scoped.copyAcross(uint32_t(0));
+			if (mainThread->call(guiExt[&wclap_plugin_gui::get_size], ptr, wPtr, hPtr)) {
+				*w = mainThread->get(wPtr);
+				*h = mainThread->get(hPtr);
+				webviewGui.setSize(*w, *h);
+				return true;
+			}
+		}
+		return webviewGui.getSize(w, h);
+	}
+	bool guiCanResize() {
+		if (guiExt) {
+			return mainThread->call(guiExt[&wclap_plugin_gui::can_resize], ptr);
+		}
+		return webviewGui.canResize();
+	}
+	bool guiGetResizeHints(clap_gui_resize_hints *hints) {
+		if (guiExt) {
+			auto scoped = module.arenaPool.scoped();
+			auto hintsPtr = scoped.copyAcross(wclap_gui_resize_hints{});
+			if (mainThread->call(guiExt[&wclap_plugin_gui::get_resize_hints], ptr, hintsPtr)) {
+				auto wHints = mainThread->get(hintsPtr);
+				*hints = *(clap_gui_resize_hints *)&wHints; // struct translates directly
+				return true;
+			}
+		}
+		return webviewGui.getResizeHints(hints);
+	}
+	bool guiAdjustSize(uint32_t *w, uint32_t *h) {
+		if (guiExt) {
+			auto scoped = module.arenaPool.scoped();
+			auto wPtr = scoped.copyAcross(*w);
+			auto hPtr = scoped.copyAcross(*h);
+			if (mainThread->call(guiExt[&wclap_plugin_gui::adjust_size], ptr, wPtr, hPtr)) {
+				*w = mainThread->get(wPtr);
+				*h = mainThread->get(hPtr);
+				return true;
+			}
+		}
+		return webviewGui.adjustSize(w, h);
+	}
+	bool guiSetSize(uint32_t w, uint32_t h) {
+		if (guiExt) {
+			mainThread->call(guiExt[&wclap_plugin_gui::set_size], ptr, w, h);
+		}
+		return webviewGui.setSize(w, h);
+	}
+	bool guiSetParent(const clap_window *window) {
+		return webviewGui.setParent(window);
+	}
+	bool guiSetTransient(const clap_window *window) {
+		return webviewGui.setTransient(window);
+	}
+	void guiSuggestTitle(const char *title) {
+		if (guiExt) {
+			auto scoped = module.arenaPool.scoped();
+			auto titlePtr = scoped.writeString(title);
+			mainThread->call(guiExt[&wclap_plugin_gui::suggest_title], ptr, titlePtr);
+		}
+		webviewGui.suggestTitle(title);
+	}
+	bool guiShow() {
+		if (guiExt) {
+			mainThread->call(guiExt[&wclap_plugin_gui::show], ptr);
+		}
+		return webviewGui.show();
+	}
+	bool guiHide() {
+		if (guiExt) {
+			mainThread->call(guiExt[&wclap_plugin_gui::hide], ptr);
+		}
+		return webviewGui.hide();
 	}
 
 	Pointer<const wclap_plugin_latency> latencyExt;
@@ -534,6 +686,57 @@ private:
 		auto result = mainThread->call(stateExt[&wclap_plugin_state::load], ptr, streamPtr);
 		hostIstream = nullptr;
 		return result;
+	}
+
+	std::atomic<bool> wasFileUri = false;
+	Pointer<const wclap_plugin_webview> webviewExt;
+	int32_t webviewGetUri(char *uri, uint32_t uriCapacity) {
+		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
+		auto uriPtr = scoped.array<char>(uriCapacity);
+		auto result = mainThread->call(webviewExt[&wclap_plugin_webview::get_uri], ptr, uriPtr, uriCapacity);
+		if (result <= 0 || result > uriCapacity) return result;
+		if (uri) mainThread->getArray(uriPtr, uri, uriCapacity);
+		if (uri[result] == 0) {
+			// Complain, but also try to fix it
+			std::cerr << "WCLAP clap_plugin_webview.get_uri() length didn't include NULL terminator. Extending by 1 char." << std::endl;
+			++result;
+		}
+		if (std::string_view(uri, 5) == "file:") {
+			wasFileUri = true;
+			// Strip all but one leading `/`
+			auto *path = uri + 5, *pathEnd = uri + (result - 1);
+			while (path[0] == '/' && path[1] == '/') ++path;
+			std::string pathStr{path, pathEnd};
+			std::strncpy(uri, pathStr.c_str(), uriCapacity);
+			return pathStr.size() + 1;
+		}
+		wasFileUri = false;
+		return result;
+	}
+	bool webviewGetResource(const char *path, char *mime, uint32_t mimeCapacity, const clap_ostream_t *stream) {
+		if (wasFileUri) {
+			LOG_EXPR(path);
+			auto mapped = module.instanceGroup->mapPath(path);
+			LOG_EXPR(!!mapped);
+			if (mapped) LOG_EXPR(*mapped);
+			return false;
+		}
+
+		auto scoped = module.arenaPool.scoped();
+		auto streamPtr = scoped.copyAcross(module.ostreamTemplate);
+		module.setPlugin(streamPtr, pluginListIndex);
+		auto pathPtr = scoped.writeString(path);
+		auto mimePtr = scoped.array<char>(mimeCapacity);
+		
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		hostOstream = stream;
+		auto result = mainThread->call(webviewExt[&wclap_plugin_webview::get_resource], ptr, pathPtr, mimePtr, mimeCapacity, streamPtr);
+		mainThread->getArray(mimePtr, mime, mimeCapacity);
+		hostOstream = nullptr;
+		return result;
+	}
+	bool webviewReceive(const void *buffer, uint32_t size) {
+		return false;
 	}
 };
 

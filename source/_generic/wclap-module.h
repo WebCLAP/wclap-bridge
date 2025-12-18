@@ -101,6 +101,9 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostState, mark_dirty);
 		if (copyAcross) hostStatePtr = scoped.copyAcross(hostState);
 
+		HOST_METHOD(hostWebview, send);
+		if (copyAcross) hostWebviewPtr = scoped.copyAcross(hostWebview);
+
 #undef HOST_METHOD
 		if (copyAcross) globalArena = scoped.commit();
 		return true;
@@ -113,6 +116,12 @@ struct WclapModule : public WclapModuleBase {
 
 		auto *plugin = getPlugin(context, wHost);
 		if (!plugin) return {0};
+		
+		if (hostExtStr == CLAP_EXT_WEBVIEW) {
+			// Special-cased because we provide it to the plugin even if the host doesn't
+			return self.hostWebviewPtr.cast<const void>();
+		}
+		
 		const void *nativeHostExt = plugin->host->get_extension(plugin->host, hostExtStr.c_str());
 		if (!nativeHostExt) return {0};
 
@@ -207,6 +216,14 @@ LOG_EXPR(hostExtStr);
 	static void hostState_mark_dirty(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostState->mark_dirty(plugin->host);
+	}
+
+	wclap_host_webview hostWebview;
+	Pointer<wclap_host_webview> hostWebviewPtr;
+	static bool hostWebview_send(void *context, Pointer<const wclap_host> wHost, Pointer<const void> buffer, uint32_t size) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->webviewSend(buffer, size);
+		return false;
 	}
 };
 

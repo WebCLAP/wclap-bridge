@@ -12,7 +12,7 @@ endif()
 add_library(wclap-bridge STATIC)
 target_sources(wclap-bridge PRIVATE
 	source/wclap-bridge.cpp
-	source/wclap-instance-wasmtime/wclap-instance-wasmtime.cpp
+	source/wclap-instance-wasmi/wclap-instance-wasmi.cpp
 )
 target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(wclap-bridge PUBLIC ${CMAKE_CURRENT_LIST_DIR}/modules/clap/include)
@@ -21,7 +21,16 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/modules/wclap-cpp)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/modules/webview-gui)
 target_link_libraries(wclap-bridge PRIVATE wclap-cpp webview-gui)
 
-include(wasmtime-fetched.cmake)
+#include(wasmtime-fetched.cmake)
+#target_include_directories(wclap-bridge PRIVATE wasmtime)
+#target_link_libraries(wclap-bridge PRIVATE wasmtime)
 
-target_include_directories(wclap-bridge PRIVATE wasmtime)
-target_link_libraries(wclap-bridge PRIVATE wasmtime)
+include(FetchContent)
+FetchContent_Declare(
+	wasmi
+	GIT_REPOSITORY https://github.com/wasmi-labs/wasmi.git
+	GIT_TAG v1.0.4
+	SOURCE_SUBDIR crates/c_api
+)
+FetchContent_MakeAvailable(wasmi)
+target_link_libraries(wclap-bridge PRIVATE wasmi)

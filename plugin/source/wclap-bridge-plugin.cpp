@@ -4,21 +4,26 @@
 
 #include <iostream>
 #include <atomic>
+#include <mutex>
 #include <string>
 
 #ifndef LOG_EXPR
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 #endif
 
-std::atomic_flag initialised = ATOMIC_FLAG_INIT;
+std::mutex initMutex;
+std::atomic<int> initCounter = 0;
 std::atomic<void *> wclapHandle = nullptr;
 
 CLAP_EXPORT bool clap_init(const char *modulePath) {
-	if (initialised.test_and_set()) {
+	std::lock_guard<std::mutex> lock{initMutex};
+	if (initCounter++) {
+		LOG_EXPR(wclapHandle.load());
 		return wclapHandle.load() != nullptr;
 	}
 	
-	wclap_global_init(250); // allow 250ms for any given function call
+	auto globalInit = wclap_global_init(250); // allow 250ms for any given function call
+	if (!globalInit) return false;
 	wclap_set_strings("wclap:", "[WCLAP] ", "");
 	
 	std::string clapPath = modulePath;
@@ -59,19 +64,18 @@ CLAP_EXPORT bool clap_init(const char *modulePath) {
 }
 
 CLAP_EXPORT void clap_deinit() {
-	if (!initialised.test()) return;
+	std::lock_guard<std::mutex> lock{initMutex};
+	if (--initCounter) return;
 
 	if (wclapHandle.load()) {
 		wclap_close(wclapHandle.load());
 		wclapHandle.store(nullptr);
 		wclap_global_deinit();
 	}
-	
-	initialised.clear();
 }
 
 CLAP_EXPORT const void * clap_get_factory(const char* factoryId) {
-	if (!initialised.test() || wclapHandle.load() == nullptr) return nullptr;
+	if (initCounter <= 0 || wclapHandle.load() == nullptr) return nullptr;
 	
 	return wclap_get_factory(wclapHandle.load(), factoryId);
 }

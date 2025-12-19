@@ -37,14 +37,15 @@ struct Plugin {
 		module.setPlugin(hostPtr, pluginListIndex);
 
 		clapPlugin.desc = desc;
+		inputEvents.reserve(1024);
 	};
 	Plugin(const Plugin& other) = delete;
 	~Plugin() {
 		if (!destroyCalled) { // This means the WclapModule is closing suddenly, without shutting down the plugins
 			// TODO: anything sensible
+			abort();
 		}
 		arena->pool.returnToPool(arena);
-		inputEvents.reserve(1024);
 	}
 
 	clap_plugin clapPlugin{

@@ -1,9 +1,11 @@
 # WCLAP Bridge Plugin
 
-This builds a CLAP plugin which loads a WCLAP using the bridge library.
+This builds a CLAP plugin which scans/loads WCLAPs using the bridge library.
 
-## Where does it look?
+Where available, it provides plugin GUIs using the CLAP webview extension.
 
-It looks for a WCLAP to open based on its own path, by replacing `.clap`/`.vst3`, and `CLAP`/`VST3` directories with `.wclap` and `WCLAP`.  You can therefore choose a WCLAP to bridge by renaming/symlinking as appropriate.
+## TODO
 
-For example: on MacOS, if this plugin is in `~/Library/Audio/Plug-Ins/CLAP/my-plugin.clap`, it will attempt to open `~/Library/Audio/Plug-Ins/WCLAP/my-plugin.wclap`.
+* Search paths for non-MacOS systems
+* `WCLAP_PATH` environment variable
+* Cache the scanned results, and lazily load WCLAPs when we want a plugin from them (instead of loading them all eagerly)

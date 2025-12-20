@@ -6,6 +6,12 @@ It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://doc
 
 It *should* be cross-platform, but actually only OSX is supported by the CMake, because `wasmtime-fetched.cmake` needs to know how to fetch/link the OS-specific builds of Wasmtime.  If you're on Windows or Linux, help would be appreciated!
 
+### Bridge plugin
+
+An example CLAP plugin which scans for WCLAPs, and proxies them to native hosts is in `plugin/`.
+
+To keep things separate, it prefixes plugin IDs with `wclap:` and names with `[WCLAP]`.  For example, a WCLAP which provides "Example Plugin" as `com.example.plugin` will be advertised as "[WCLAP] Example Plugin" / `wclap:com.example.plugin`.
+
 ## How to use the bridge
 
 The API is only 10 functions - see [`wclap-bridge.h`](include/wclap-bridge.h) for details.

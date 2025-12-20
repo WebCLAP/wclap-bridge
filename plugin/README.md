@@ -1,8 +1,6 @@
 # WCLAP Bridge Plugin
 
-This builds a CLAP plugin which scans/loads WCLAPs using the bridge library.
-
-Where available, it provides plugin GUIs using the CLAP webview extension.
+This builds a CLAP plugin which scans/loads WCLAPs using the bridge library.  Where available, it provides plugin GUIs using the CLAP webview extension.
 
 ## TODO
 

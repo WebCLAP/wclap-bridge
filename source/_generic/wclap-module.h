@@ -93,6 +93,10 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostLatency, changed);
 		if (copyAcross) hostLatencyPtr = scoped.copyAcross(hostLatency);
 
+		HOST_METHOD(hostNotePorts, supported_dialects);
+		HOST_METHOD(hostNotePorts, rescan);
+		if (copyAcross) hostNotePortsPtr = scoped.copyAcross(hostNotePorts);
+
 		HOST_METHOD(hostParams, rescan);
 		HOST_METHOD(hostParams, clear);
 		HOST_METHOD(hostParams, request_flush);
@@ -194,6 +198,18 @@ LOG_EXPR(hostExtStr);
 	static void hostLatency_changed(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostLatency->changed(plugin->host);
+	}
+
+	wclap_host_note_ports hostNotePorts;
+	Pointer<wclap_host_note_ports> hostNotePortsPtr;
+	static uint32_t hostNotePorts_supported_dialects(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostNotePorts->supported_dialects(plugin->host);
+		return false;
+	}
+	static void hostNotePorts_rescan(void *context, Pointer<const wclap_host> wHost, uint32_t flags) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostNotePorts->rescan(plugin->host, flags);
 	}
 
 	wclap_host_params hostParams;

@@ -27,6 +27,7 @@ struct Plugin {
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
 	const clap_host_gui *hostGui = nullptr;
 	const clap_host_latency *hostLatency = nullptr;
+	const clap_host_note_ports *hostNotePorts = nullptr;
 	const clap_host_params *hostParams = nullptr;
 	const clap_host_state *hostState = nullptr;
 	const clap_host_webview *hostWebview = nullptr;
@@ -230,6 +231,7 @@ private:
 		GET_HOST_EXT(hostAudioPorts, CLAP_EXT_AUDIO_PORTS);
 		GET_HOST_EXT(hostGui, CLAP_EXT_GUI);
 		GET_HOST_EXT(hostLatency, CLAP_EXT_LATENCY);
+		GET_HOST_EXT(hostNotePorts, CLAP_EXT_NOTE_PORTS);
 		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
 		GET_HOST_EXT(hostState, CLAP_EXT_STATE);
 #undef GET_HOST_EXT
@@ -416,6 +418,13 @@ private:
 			};
 			latencyExt = wclapExt.cast<const wclap_plugin_latency>();
 			return latencyExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_NOTE_PORTS)) {
+			static const clap_plugin_note_ports ext{
+				.count=clapPluginMethod<&Plugin::notePortsCount>(),
+				.get=clapPluginMethod<&Plugin::notePortsGet>(),
+			};
+			notePortsExt = wclapExt.cast<const wclap_plugin_note_ports>();
+			return notePortsExt ? &ext : nullptr;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAMS)) {
 			static const clap_plugin_params ext{
 				.count=clapPluginMethod<&Plugin::paramsCount>(),
@@ -588,6 +597,26 @@ private:
 	Pointer<const wclap_plugin_latency> latencyExt;
 	uint32_t latencyGet() {
 		return mainThread->call(latencyExt[&wclap_plugin_latency::get], ptr);
+	}
+	
+	Pointer<const wclap_plugin_note_ports> notePortsExt;
+	uint32_t notePortsCount(bool isInput) {
+		return mainThread->call(notePortsExt[&wclap_plugin_note_ports::count], ptr, isInput);
+	}
+	bool notePortsGet(uint32_t index, bool isInput, clap_note_port_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.copyAcross(wclap_note_port_info{});
+		auto result = mainThread->call(notePortsExt[&wclap_plugin_note_ports::get], ptr, index, isInput, infoPtr);
+		wclap_note_port_info wclapInfo = mainThread->get(infoPtr);
+		
+		*info = clap_note_port_info{
+			.id=wclapInfo.id,
+			.supported_dialects=wclapInfo.supported_dialects,
+			.preferred_dialect=wclapInfo.preferred_dialect,
+			.name="",
+		};
+		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
+		return result;
 	}
 
 	Pointer<const wclap_plugin_params> paramsExt;

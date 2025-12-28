@@ -150,6 +150,7 @@ void wclap_wasmtime::InstanceGroup::setup(const unsigned char *wasmBytes, size_t
 }
 
 bool wclap_wasmtime::InstanceImpl::setup() {
+	if (group.hasError()) return false;
 	auto stopWithError = [&](const char *message) -> bool {
 		group.setError(message);
 		return false;
@@ -337,6 +338,7 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 
 	// Look for the first function table
 	size_t exportIndex = 0;
+	bool foundTable = false;
 	while (wasmtime_instance_export_nth(wtContext, &wtInstance, exportIndex, &name, &nameSize, &item)) {
 		if (item.kind == WASMTIME_EXTERN_TABLE) {
 			wasm_tabletype_t *type = wasmtime_table_type(wtContext, &item.of.table);
@@ -349,12 +351,14 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 					return stopWithError("exported function table can't grow enough for CLAP host functions");
 				}
 				wtFunctionTable = item.of.table;
+				foundTable = true;
 				break;
 			}
 		}
 		wasmtime_extern_delete(&item);
 		++exportIndex;
 	}
+	if (!foundTable) return stopWithError("couldn't find function table in WCLAP");
 	return true;
 }
 

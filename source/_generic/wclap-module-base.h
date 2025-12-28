@@ -25,7 +25,7 @@ struct WclapModuleBase {
 	MemoryArenaPool arenaPool; // Goes next because other destructors might make WASM calls, but we need an Instance (most likely the main thread) for that
 	MemoryArenaPtr globalArena; // stores data common across all plugin instances
 
-	std::atomic<bool> hasError = true;
+	std::atomic<bool> hasError = false;
 	std::string errorMessage = "not initialised";
 	std::mutex errorMutex;
 	void setError(const std::string &error) {
@@ -51,7 +51,12 @@ struct WclapModuleBase {
 	clap_version clapVersion = {0, 0, 0};
 	Pointer<const wclap_plugin_entry> entryPtr;
 
-	WclapModuleBase(InstanceGroup *instanceGroup) : instanceGroup(instanceGroup), mainThread(instanceGroup->startInstance()), arenaPool(mainThread.get()) {}
+	WclapModuleBase(InstanceGroup *instanceGroup) : instanceGroup(instanceGroup), mainThread(instanceGroup->startInstance()), arenaPool(mainThread.get()) {
+		if (!hasError) {
+			auto error = instanceGroup->error();
+			if (error) setError(*error);
+		}
+	}
 	~WclapModuleBase() {}
 
 	wclap::IndexLookup<Plugin> pluginList;

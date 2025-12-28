@@ -58,6 +58,7 @@ void scanWclapDirectory(const std::string &pathStr) {
 		auto wclapPath = entry.path().string();
 		auto wclapEnd = wclapPath.substr(wclapPath.size() - 6);
 		if (wclapEnd == ".wclap") {
+			std::cout << "Found: " << wclapPath << std::endl;
 			auto *handle = wclap_open(wclapPath.c_str());
 			char errorMessage[256] = "";
 			if (wclap_get_error(handle, errorMessage, 256)) {

@@ -27,7 +27,8 @@ struct WclapModule : public WclapModuleBase {
 	}
 
 	WclapModule(InstanceGroup *instanceGroup) : WclapModuleBase(instanceGroup) {
-		if (!addHostFunctions(mainThread.get(), true)) return;
+		if (hasError) return; // base class failed
+		if (!addHostFunctions(mainThread.get())) return;
 
 		mainThread->init();
 		if constexpr (WCLAP_BRIDGE_IS64) {
@@ -39,6 +40,8 @@ struct WclapModule : public WclapModuleBase {
 			setError("clap_entry is NULL");
 			return;
 		}
+		
+		bindGlobalArena();
 		
 		auto scoped = arenaPool.scoped();
 		auto pathStr = scoped.writeString(mainThread->path());
@@ -69,8 +72,7 @@ struct WclapModule : public WclapModuleBase {
 		return nullptr;
 	}
 
-	bool addHostFunctions(Instance *instance, bool copyAcross) {
-		auto scoped = arenaPool.scoped();
+	bool addHostFunctions(Instance *instance) {
 #define HOST_METHOD(obj, name) \
 		if (!registerHost(instance, obj.name, obj##_##name)) return false;
 		HOST_METHOD(hostTemplate, get_extension);
@@ -85,34 +87,41 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(istreamTemplate, read);
 		HOST_METHOD(ostreamTemplate, write);
 
-		// Extensions - no context pointers, so copied across immediately
+		// Extensions - no context pointers, so these will get copied across below
 		HOST_METHOD(hostAudioPorts, is_rescan_flag_supported);
 		HOST_METHOD(hostAudioPorts, rescan);
-		if (copyAcross) hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
 
 		HOST_METHOD(hostLatency, changed);
-		if (copyAcross) hostLatencyPtr = scoped.copyAcross(hostLatency);
 
 		HOST_METHOD(hostNotePorts, supported_dialects);
 		HOST_METHOD(hostNotePorts, rescan);
-		if (copyAcross) hostNotePortsPtr = scoped.copyAcross(hostNotePorts);
 
 		HOST_METHOD(hostParams, rescan);
 		HOST_METHOD(hostParams, clear);
 		HOST_METHOD(hostParams, request_flush);
-		if (copyAcross) hostParamsPtr = scoped.copyAcross(hostParams);
 
 		HOST_METHOD(hostState, mark_dirty);
-		if (copyAcross) hostStatePtr = scoped.copyAcross(hostState);
 
 		HOST_METHOD(hostWebview, send);
-		if (copyAcross) hostWebviewPtr = scoped.copyAcross(hostWebview);
 
 #undef HOST_METHOD
-		if (copyAcross) globalArena = scoped.commit();
 		return true;
 	}
-
+	bool bindGlobalArena() {
+		auto scoped = arenaPool.scoped();
+		
+		// The global arena holds all the extensions, for the lifetime of the module
+		hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
+		hostLatencyPtr = scoped.copyAcross(hostLatency);
+		hostNotePortsPtr = scoped.copyAcross(hostNotePorts);
+		hostParamsPtr = scoped.copyAcross(hostParams);
+		hostStatePtr = scoped.copyAcross(hostState);
+		hostWebviewPtr = scoped.copyAcross(hostWebview);
+		
+		globalArena = scoped.commit();
+		return true;
+	}
+	
 	// Host methods
 	static Pointer<const void> hostTemplate_get_extension(void *context, Pointer<const wclap_host> wHost, Pointer<const char> extId) {
 		auto &self = *(WclapModule *)context;

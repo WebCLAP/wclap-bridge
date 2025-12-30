@@ -2,6 +2,8 @@
 
 #include "clap/all.h"
 
+#include "semver/semver.hpp"
+
 #include <iostream>
 #include <atomic>
 #include <mutex>
@@ -58,7 +60,6 @@ void scanWclapDirectory(const std::string &pathStr) {
 		auto wclapPath = entry.path().string();
 		auto wclapEnd = wclapPath.substr(wclapPath.size() - 6);
 		if (wclapEnd == ".wclap") {
-			std::cout << "Found: " << wclapPath << std::endl;
 			auto *handle = wclap_open(wclapPath.c_str());
 			char errorMessage[256] = "";
 			if (wclap_get_error(handle, errorMessage, 256)) {
@@ -99,6 +100,24 @@ void scanWclapPlugins() {
 		for (size_t i = 0; i < count; ++i) {
 			auto *desc = wclap.pluginFactory->get_plugin_descriptor(wclap.pluginFactory, i);
 			if (desc) {
+				bool duplicate = false;
+				for (auto &existing : pluginList) {
+					if (!std::strcmp(desc->id, existing.desc->id)) {
+						duplicate = true;
+						bool newer = false;
+						if (!existing.desc->version) {
+							newer = true;
+						} else if (desc->version) {
+							auto ver = semver::version::parse(desc->version);
+							auto existingVer = semver::version::parse(existing.desc->version);
+							newer = ver > existingVer;
+						}
+						if (newer) existing = {desc, wclapIndex};
+						break;
+					}
+				}
+				if (duplicate) return;
+				
 				pluginList.push_back({desc, wclapIndex});
 			}
 		}

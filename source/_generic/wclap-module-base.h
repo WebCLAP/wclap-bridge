@@ -57,6 +57,7 @@ struct WclapModuleBase {
 			if (error) setError(*error);
 		}
 	}
+	WclapModuleBase(const WclapModuleBase &other) = delete;
 	~WclapModuleBase() {}
 
 	wclap::IndexLookup<Plugin> pluginList;

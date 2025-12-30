@@ -64,7 +64,7 @@ struct WclapModule : public WclapModuleBase {
 				auto scoped = arenaPool.scoped();
 				auto wclapStr = scoped.writeString(CLAP_PLUGIN_FACTORY_ID);
 				auto factoryPtr = mainThread->call(entryPtr[&wclap_plugin_entry::get_factory], wclapStr);
-				pluginFactory.emplace(PluginFactory{*this, factoryPtr.cast<wclap_plugin_factory>()});
+				pluginFactory.emplace(*this, factoryPtr.cast<wclap_plugin_factory>());
 			}
 			if (!pluginFactory->ptr) return nullptr;
 			return &pluginFactory->clapFactory;

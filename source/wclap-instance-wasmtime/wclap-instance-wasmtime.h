@@ -15,6 +15,9 @@
 #include <string>
 #include <cstring>
 #include <filesystem>
+#include <thread>
+#include <vector>
+#include <memory>
 
 namespace wclap_wasmtime {
 
@@ -378,6 +381,30 @@ struct InstanceGroup {
 	// If the WCLAP is single-threaded, this will only succeed once, and return `nullptr` from then on
 	std::unique_ptr<wclap::Instance<InstanceImpl>> startInstance();
 
+	// TODO: can we move this to a generic module?
+	struct Thread {
+		uint32_t index;
+		uint64_t threadArg;
+		
+		std::thread thread;
+		std::unique_ptr<wclap::Instance<InstanceImpl>> instance;
+		
+		~Thread() {
+			// This should block for at most the WASM function-call timeout period
+			if (thread.joinable()) {
+				stopThread(this);
+				thread.join();
+			}
+		}
+	};
+	std::vector<std::unique_ptr<Thread>> threads;
+	static void runThread(InstanceGroup *group, size_t index);
+	static void stopThread(Thread *thread);
+	
+	int32_t wasiThreadSpawn(uint64_t threadArg);
+
+	static wasm_trap_t * wtWasiThreadSpawn(void *context, wasmtime_caller *, wasmtime_val_raw *values, size_t argCount);
+
 	std::unique_lock<std::recursive_mutex> lock() const {
 		return std::unique_lock<std::recursive_mutex>{groupMutex};
 	}
@@ -441,6 +468,8 @@ struct InstanceImpl {
 		group.hadInit = true;
 		return wclapEntryAs64;
 	}
+	
+	void runThread(uint32_t threadId, uint64_t threadArg);
 
 	void setWasmDeadline();
 	bool setup(); // creates the thread stuff, always called
@@ -632,6 +661,9 @@ struct InstanceImpl {
 	wclap64::Function<Return, Args...> registerHost64(void *context, Return (*fn)(void *, Args...)) {
 		return {uint32_t(registerHostGeneric(context, fn))};
 	}
+
+	static wasmtime_error_t * continueChecker(wasmtime_context_t *context, void *data, uint64_t *epochsDelta, wasmtime_update_deadline_kind_t *updateKind);
 };
 
 }; // namespace
+

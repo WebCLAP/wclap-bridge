@@ -1,4 +1,4 @@
-all: translate-structs cmake
+all: cmake bridge-plugin
 
 clean:
 	rm -rf out
@@ -9,3 +9,6 @@ cmake:
 	# CMAKE_BUILD_TYPE is needed for single-config generators (e.g. Makefiles)
 	cmake -B out/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=../static
 	cmake --build out/build --config Release
+
+bridge-plugin:
+	cd plugin && make

@@ -24,6 +24,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(clap-wrapper)
 
+################# Other deps
+
+FetchContent_Declare(
+    cpp-semver
+    GIT_REPOSITORY https://github.com/z4kn4fein/cpp-semver.git
+    GIT_TAG v0.4.0)
+FetchContent_MakeAvailable(cpp-semver)
+
 ################# Bridge plugin
 
 # Plugin identifier / target prefix
@@ -35,6 +43,7 @@ add_library(${PLUGIN}_static STATIC)
 target_link_libraries(${PLUGIN}_static PUBLIC
 	clap
 	wclap-bridge
+	semver
 )
 target_sources(${PLUGIN}_static PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/source/wclap-bridge-plugin.cpp

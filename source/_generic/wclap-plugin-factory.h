@@ -31,6 +31,7 @@ struct PluginFactory {
 	}
 
 	clap_plugin *createPlugin(const clap_host *host, const char *pluginId) const {
+LOG_EXPR(pluginId);
 		const clap_plugin_descriptor *desc = nullptr;
 		for (auto &d : descriptors) {
 			if (!std::strcmp(d.id, pluginId)) {
@@ -88,6 +89,7 @@ struct PluginFactory {
 			desc.features = featureArray.data();
 		}
 	}
+	PluginFactory(const PluginFactory &other) = delete;
 	
 	static uint32_t get_plugin_count(const clap_plugin_factory *factory) {
 		auto &self = *(const PluginFactory *)factory;

@@ -381,65 +381,14 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 	return true;
 }
 
-void wclap_wasmtime::InstanceGroup::runThread(InstanceGroup *group, size_t index) {
-	Thread *thread;
-	{
-		auto locked = group->lock();
-		thread = group->threads[index].get();
-	}
-	
-	LOG_EXPR("WCLAP thread starting");
-	LOG_EXPR(thread->instance.get());
-	
-	thread->instance->runThread(thread->index, thread->threadArg);
-
-	// Remove ourselves from the thread list
-	LOG_EXPR("WCLAP thread finished");
-	auto locked = group->lock();
-	thread->thread.detach(); // this is the thread running this function, so calling `.join()` from here would break, but we're about to finish anyway
-	group->threads[index] = nullptr;
-}
-
-void wclap_wasmtime::InstanceGroup::stopThread(Thread *thread) {
-	thread->instance->requestStop();
-}
-
-int32_t wclap_wasmtime::InstanceGroup::wasiThreadSpawn(uint64_t threadArg) {
-	auto locked = lock();
-	if (threads.empty()) threads.emplace_back();
-
-	auto instance = startInstance();
-	if (!instance) {
-		setError("failed to start instance for new WCLAP thread");
-		return -1;
-	}
-
-	// Use empty thread or start new one
-	size_t index = threads.size();
-	for (size_t i = 1; i < threads.size(); ++i) {
-		if (!threads[i]) {
-			index = i;
-			break;
-		}
-	}
-	if (index == threads.size()) threads.emplace_back();
-	threads[index] = std::unique_ptr<Thread>{new Thread{
-		.index=uint32_t(index),
-		.threadArg=threadArg,
-		.thread=std::thread{runThread, this, index},
-		.instance=std::move(instance)
-	}};
-
-	return index;
-}
-
 wasm_trap_t * wclap_wasmtime::InstanceGroup::wtWasiThreadSpawn(void *context, wasmtime_caller *, wasmtime_val_raw *values, size_t argCount) {
 	auto &group = *(InstanceGroup *)context;
-	if (group.is64()) {
-		values[0].i32 = group.wasiThreadSpawn(uint64_t(values[0].i64));
-	} else {
-		values[0].i32 = group.wasiThreadSpawn(uint32_t(values[0].i32));
+	if (!group.wasiThreadSpawn) {
+		values[0].i32 = -1; // failure
+		return nullptr;
 	}
+	uint64_t threadArg = group.is64() ? uint64_t(values[0].i64) : uint32_t(values[0].i32);
+	values[0].i32 = group.wasiThreadSpawn(group.wasiThreadSpawnContext, threadArg);
 	return nullptr;
 }
 
@@ -488,6 +437,10 @@ void wclap_wasmtime::InstanceImpl::runThread(uint32_t threadId, uint64_t threadA
 		group.setError(message);
 	};
 
+	if (!group.hadInit) {
+		return stopWithError("Instance Group not initialised before .runThread()");
+	}
+
 	wasmtime_extern_t item;
 	if (!wasmtime_instance_export_get(wtContext, &wtInstance, "wasi_thread_start", 17, &item)) {
 		return stopWithError("wasi_thread_start not found");
@@ -497,20 +450,20 @@ void wclap_wasmtime::InstanceImpl::runThread(uint32_t threadId, uint64_t threadA
 		return stopWithError("wasi_thread_start isn't a function");
 	}
 
-	wasmtime_val_t wasmVals[2];
-	wasmVals[0] = {.kind=WASMTIME_I32, .of={.i32=int32_t(threadId)}};
+	wasmtime_val_raw_t wasmVals[2];
+	wasmVals[0] = {.i32=int32_t(threadId)};
 	if (group.is64()) {
-		wasmVals[1] = {.kind=WASMTIME_I64, .of={.i64=int64_t(threadArg)}};
+		wasmVals[1] = {.i64=int64_t(threadArg)};
 	} else {
-		wasmVals[1] = {.kind=WASMTIME_I32, .of={.i32=int32_t(uint32_t(threadArg))}};
+		wasmVals[1] = {.i32=int32_t(uint32_t(threadArg))};
 	}
 
 	setWasmDeadline();
-	// Threads are allowed to continue unless explicitly stopped
+	// Threads are allowed to continue unless explicitly stopped, but we use the deadline for checking in
 	wasmtime_store_epoch_deadline_callback(wtStore, continueChecker, handle, nullptr);
 
 	wasm_trap_t *trap = nullptr;
-	auto error = wasmtime_func_call(wtContext, &item.of.func, wasmVals, 2, nullptr, 0, &trap);
+	auto error = wasmtime_func_call_unchecked(wtContext, &item.of.func, wasmVals, 2, &trap);
 	if (error) {
 		group.setError(error);
 		wasmtime_extern_delete(&item);

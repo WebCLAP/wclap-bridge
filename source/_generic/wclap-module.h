@@ -13,7 +13,7 @@ struct WclapModule : public WclapModuleBase {
 	template<class Return, class ...Args>
 	bool registerHost(Instance *instance, Function<Return, Args...> &wasmFn, Return (*fn)(void *, Args...)) {
 		auto prevIndex = wasmFn.wasmPointer;
-		wasmFn = registerHostFunction(instance, (void *)this, fn);
+		wasmFn = registerHostFunction(instance, (void *)this, fn); // defined in the non-generic `../wclap-module.h` so that it produces the correct-sized pointer
 		if (wasmFn.wasmPointer == -1) {
 			setError("failed to register function");
 			return false;
@@ -29,6 +29,9 @@ struct WclapModule : public WclapModuleBase {
 	WclapModule(InstanceGroup *instanceGroup) : WclapModuleBase(instanceGroup) {
 		if (hasError) return; // base class failed
 		if (!addHostFunctions(mainThread.get())) return;
+		
+		instanceGroup->wasiThreadSpawnContext = this;
+		instanceGroup->wasiThreadSpawn = staticWasiThreadSpawn;
 
 		mainThread->init();
 		if constexpr (WCLAP_BRIDGE_IS64) {
@@ -54,6 +57,12 @@ struct WclapModule : public WclapModuleBase {
 		}
 		
 		hasError = false;
+	}
+	~WclapModule() {
+		// Prevent any new threads from spawning after this point
+		auto lock = this->threadLock();
+		instanceGroup->wasiThreadSpawn = nullptr;
+		instanceGroup->wasiThreadSpawnContext = nullptr;
 	}
 
 	std::optional<PluginFactory> pluginFactory;
@@ -120,6 +129,45 @@ struct WclapModule : public WclapModuleBase {
 		
 		globalArena = scoped.commit();
 		return true;
+	}
+
+	static int32_t staticWasiThreadSpawn(void *context, uint64_t threadArg) {
+		auto *module = (WclapModule *)context;
+		return module->wasiThreadSpawn(threadArg);
+	}
+	int32_t wasiThreadSpawn(uint64_t threadArg) {
+		if (hasError) return -1;
+
+		auto locked = threadLock();
+
+		auto instance = instanceGroup->startInstance();
+		if (!instance) {
+			setError("failed to start instance for new WCLAP thread");
+			return -1;
+		}
+
+		if (!addHostFunctions(instance.get())) {
+			setError("failed to register host functions for new WCLAP thread");
+			return -1;
+		}
+
+		// Use empty thread or start new one
+		size_t index = threads.size();
+		for (size_t i = 1; i < threads.size(); ++i) {
+			if (!threads[i]) {
+				index = i;
+				break;
+			}
+		}
+		if (index == threads.size()) threads.emplace_back();
+		threads[index] = std::unique_ptr<Thread>{new Thread{
+			.index=uint32_t(index),
+			.threadArg=threadArg,
+			.thread=std::thread{runThread, this, index},
+			.instance=std::move(instance)
+		}};
+
+		return index;
 	}
 	
 	// Host methods

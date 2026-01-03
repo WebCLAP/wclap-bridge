@@ -9,6 +9,8 @@
 
 #include "../instance.h"
 
+#include <thread>
+
 namespace WCLAP_BRIDGE_NAMESPACE {
 
 using namespace WCLAP_API_NAMESPACE;
@@ -56,9 +58,25 @@ struct WclapModuleBase {
 			auto error = instanceGroup->error();
 			if (error) setError(*error);
 		}
+		threads.emplace_back(); // first entry is empty, because we address threads by index, and 0 is a reserved thread ID
 	}
 	WclapModuleBase(const WclapModuleBase &other) = delete;
-	~WclapModuleBase() {}
+	~WclapModuleBase() {
+		auto checkThreadsStopped = [&]() -> bool {
+			bool allStopped = true;
+			
+			auto lock = threadLock();
+			for (auto &thread : threads) {
+				if (!thread) continue;
+				thread->instance->requestStop();
+				allStopped = false;
+			}
+			return allStopped;
+		};
+		while (!checkThreadsStopped()) {
+			std::this_thread::yield();
+		}
+	}
 
 	wclap::IndexLookup<Plugin> pluginList;
 	
@@ -111,6 +129,45 @@ struct WclapModuleBase {
 	wclap_output_events outputEventsTemplate;
 	wclap_istream istreamTemplate;
 	wclap_ostream ostreamTemplate;
+
+	struct Thread {
+		uint32_t index;
+		uint64_t threadArg;
+		
+		std::thread thread;
+		std::unique_ptr<Instance> instance;
+		
+		~Thread() {
+			// This should block for at most the WASM function-call timeout period
+			if (thread.joinable()) {
+				instance->requestStop();
+				thread.join();
+			}
+		}
+	};
+	std::mutex threadMutex;
+	std::lock_guard<std::mutex> threadLock() {
+		return std::lock_guard<std::mutex>{threadMutex};
+	}
+	std::vector<std::unique_ptr<Thread>> threads;
+	static void runThread(WclapModuleBase *module, size_t index) {
+		Thread *thread;
+		{
+			auto lock = module->threadLock();
+			thread = module->threads[index].get();
+		}
+		
+		LOG_EXPR("WCLAP thread starting");
+		
+		thread->instance->runThread(thread->index, thread->threadArg);
+
+		// Remove ourselves from the thread list
+		LOG_EXPR("WCLAP thread finished");
+		auto lock = module->threadLock();
+		thread->thread.detach(); // this is the thread running this function, so calling `.join()` from here would break, but we're about to finish anyway
+		// The thread vector doesn't get destroyed until all the threads have stopped, so this is safe
+		module->threads[index] = nullptr;
+	}
 };
 
 template <typename T>

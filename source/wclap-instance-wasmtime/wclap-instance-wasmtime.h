@@ -15,7 +15,6 @@
 #include <string>
 #include <cstring>
 #include <filesystem>
-#include <thread>
 #include <vector>
 #include <memory>
 
@@ -380,28 +379,9 @@ struct InstanceGroup {
 	wclap::Instance<InstanceImpl> *singleThread = nullptr;
 	// If the WCLAP is single-threaded, this will only succeed once, and return `nullptr` from then on
 	std::unique_ptr<wclap::Instance<InstanceImpl>> startInstance();
-
-	// TODO: can we move this to a generic module?
-	struct Thread {
-		uint32_t index;
-		uint64_t threadArg;
-		
-		std::thread thread;
-		std::unique_ptr<wclap::Instance<InstanceImpl>> instance;
-		
-		~Thread() {
-			// This should block for at most the WASM function-call timeout period
-			if (thread.joinable()) {
-				stopThread(this);
-				thread.join();
-			}
-		}
-	};
-	std::vector<std::unique_ptr<Thread>> threads;
-	static void runThread(InstanceGroup *group, size_t index);
-	static void stopThread(Thread *thread);
 	
-	int32_t wasiThreadSpawn(uint64_t threadArg);
+	void * wasiThreadSpawnContext = nullptr;
+	int32_t (*wasiThreadSpawn)(void *context, uint64_t threadArg) = nullptr;
 
 	static wasm_trap_t * wtWasiThreadSpawn(void *context, wasmtime_caller *, wasmtime_val_raw *values, size_t argCount);
 
@@ -439,6 +419,7 @@ struct InstanceImpl {
 		if (wtLinker) wasmtime_linker_delete(wtLinker);
 		if (wtStore) wasmtime_store_delete(wtStore);
 	}
+	bool setup(); // creates the thread stuff - always called, basically part of the constructor
 	
 	bool is64() const {
 		return group.is64();
@@ -472,8 +453,7 @@ struct InstanceImpl {
 	void runThread(uint32_t threadId, uint64_t threadArg);
 
 	void setWasmDeadline();
-	bool setup(); // creates the thread stuff, always called
-	bool wasiInit(); // calls `_initialize()`, only once per Instance
+	bool wasiInit(); // calls `_initialize()`, only once per InstanceGroup
 	
 	uint64_t wtMalloc(size_t bytes);
 
@@ -615,6 +595,8 @@ struct InstanceImpl {
 	
 	template<class Return, class ...Args>
 	uint64_t registerHostGeneric(void *context, Return (*nativeFn)(void *, Args...)) {
+		if (group.hasError()) return -1;
+
 		struct WrappedFn {
 			void *context;
 			Return (*nativeFn)(void *, Args...);
@@ -639,8 +621,12 @@ struct InstanceImpl {
 		// get the function type
 		wasmtime_val_t fnVal{WASMTIME_FUNCREF};
 		auto *fnType = makeWasmtimeFuncType<Return, Args...>();
+		if (!fnType) {
+			group.setError("failed to create WASM function type");
+			return -1;
+		}
 		wasmtime_func_new_unchecked(wtContext, fnType, WrappedFn::unchecked, wrapped, WrappedFn::destroy, &fnVal.of.funcref);
-		wasm_functype_delete(fnType);
+		wasm_functype_delete(fnType); // the type gets cloned, so delete our copy
 
 		// add it to the table
 		uint64_t fnIndex = 0;

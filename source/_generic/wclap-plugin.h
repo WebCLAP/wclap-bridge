@@ -750,24 +750,46 @@ private:
 		if (wasFileUri) {
 			auto mapped = module.instanceGroup->mapPath(path);
 			if (!mapped) return false;
+			for (size_t i = 0; i < mapped->size(); ++i) {
+				auto c = (*mapped)[i];
+				if (c == '?' || c == '#') { // trim query/hash
+					mapped->resize(i);
+					break;
+				}
+			}
 			
 			auto mimeGuess = webview_gui::helpers::guessMediaType(path);
 			std::strncpy(mime, mimeGuess.c_str(), mimeCapacity);
 			
 			std::ifstream stream{*mapped, std::ios::binary|std::ios::ate};
+			if (!stream) {
+				std::cerr << "WCLAP: couldn't open file: " << *mapped << std::endl;
+				return false;
+			}
+			
 			std::vector<char> buffer;
-			buffer.resize(stream.tellg()); // we opened at the end, so this is the file size
+			auto bufferSize = stream.tellg();
+			if (bufferSize > 100*1024*1024) {
+				std::cerr << "WCLAP: refused to serve webview UI resource of > 100MB: " << bufferSize << std::endl;
+				return false; // This is a webview UI, 100MB max file-size is more than generous
+			}
+			buffer.resize(bufferSize); // we opened at the end, so this is the file size
 			stream.seekg(0);
 			// Read entire file into memory at once
 			if (stream.read(buffer.data(), buffer.size())) {
+				std::cout << "WCLAP: read " << buffer.size() << " bytes for file: " << *mapped << std::endl;
 				size_t index = 0;
 				while (index < buffer.size()) {
 					auto result = ostream->write(ostream, (const void *)(buffer.data() + index), uint64_t(buffer.size() - index));
-					if (result <= 0) return false;
+					if (result <= 0) {
+						std::cerr << "WCLAP: failed to write to stream: " << result << std::endl;
+						return false;
+					}
 					index += result;
 				}
 				return true;
 			}
+			std::cerr << "WCLAP: couldn't read file: " << *mapped << std::endl;
 			return false;
 		}
 

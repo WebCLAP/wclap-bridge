@@ -143,6 +143,8 @@ CLAP_EXPORT void clap_deinit() {
 	if (--initCounter) return;
 
 	wclapList.clear();
+	invalidations.clear();
+	pluginList.clear();
 	wclap_global_deinit();
 }
 

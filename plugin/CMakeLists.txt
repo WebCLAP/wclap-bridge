@@ -38,6 +38,13 @@ FetchContent_Declare(
     GIT_TAG v0.4.0)
 FetchContent_MakeAvailable(cpp-semver)
 
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW ON)
+FetchContent_MakeAvailable(nlohmann_json)
+
 ################# Bridge plugin
 
 # Plugin identifier / target prefix
@@ -50,6 +57,7 @@ target_link_libraries(${PLUGIN}_static PUBLIC
 	clap
 	wclap-bridge
 	semver
+	nlohmann_json::nlohmann_json
 )
 target_sources(${PLUGIN}_static PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/source/wclap-bridge-plugin.cpp

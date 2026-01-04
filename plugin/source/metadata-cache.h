@@ -1,12 +1,12 @@
 #pragma once
 
 #include "clap/plugin.h"
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 #include <map>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <ctime>
 
 // Simple metadata cache for WCLAP plugin descriptors
@@ -108,23 +108,11 @@ inline std::string getCacheFilePath() {
     std::string dir = getCacheDir();
     if (dir.empty()) return "";
 #ifdef _WIN32
-    return dir + "\\plugin-cache.txt";
+    return dir + "\\plugin-cache.json";
 #else
-    return dir + "/plugin-cache.txt";
+    return dir + "/plugin-cache.json";
 #endif
 }
-
-// Simple text-based serialization (avoiding JSON dependency)
-// Format:
-//   WCLAP_CACHE_V1
-//   PATH:<path>
-//   MTIME:<mtime>
-//   PLUGIN_COUNT:<n>
-//   ID:<id>
-//   NAME:<name>
-//   ...
-//   END_PLUGIN
-//   END_WCLAP
 
 class MetadataCache {
 public:
@@ -137,50 +125,41 @@ public:
         std::ifstream file(path);
         if (!file.is_open()) return false;
 
-        std::string line;
-        if (!std::getline(file, line) || line != "WCLAP_CACHE_V1") {
+        try {
+            nlohmann::json j;
+            file >> j;
+
+            if (j.value("version", 0) != 2) {
+                return false;  // Unknown version
+            }
+
+            entries.clear();
+            for (const auto& [wclapPath, wclapJson] : j["wclaps"].items()) {
+                CachedWclap wclap;
+                wclap.path = wclapPath;
+                wclap.mtime = wclapJson.value("mtime", std::time_t{0});
+
+                for (const auto& descJson : wclapJson["plugins"]) {
+                    CachedDescriptor desc;
+                    desc.id = descJson.value("id", "");
+                    desc.name = descJson.value("name", "");
+                    desc.vendor = descJson.value("vendor", "");
+                    desc.url = descJson.value("url", "");
+                    desc.manual_url = descJson.value("manual_url", "");
+                    desc.support_url = descJson.value("support_url", "");
+                    desc.version = descJson.value("version", "");
+                    desc.description = descJson.value("description", "");
+                    desc.features = descJson.value("features", std::vector<std::string>{});
+                    wclap.descriptors.push_back(std::move(desc));
+                }
+
+                entries[wclapPath] = std::move(wclap);
+            }
+
+            return true;
+        } catch (const nlohmann::json::exception&) {
             return false;
         }
-
-        entries.clear();
-        CachedWclap* currentWclap = nullptr;
-        CachedDescriptor* currentDesc = nullptr;
-
-        while (std::getline(file, line)) {
-            size_t colonPos = line.find(':');
-            if (colonPos == std::string::npos) continue;
-
-            std::string key = line.substr(0, colonPos);
-            std::string value = line.substr(colonPos + 1);
-
-            if (key == "PATH") {
-                entries[value] = CachedWclap{};
-                currentWclap = &entries[value];
-                currentWclap->path = value;
-                currentDesc = nullptr;
-            } else if (key == "MTIME" && currentWclap) {
-                currentWclap->mtime = std::stoll(value);
-            } else if (key == "BEGIN_PLUGIN" && currentWclap) {
-                currentWclap->descriptors.emplace_back();
-                currentDesc = &currentWclap->descriptors.back();
-            } else if (key == "END_PLUGIN") {
-                currentDesc = nullptr;
-            } else if (key == "END_WCLAP") {
-                currentWclap = nullptr;
-            } else if (currentDesc) {
-                if (key == "ID") currentDesc->id = value;
-                else if (key == "NAME") currentDesc->name = value;
-                else if (key == "VENDOR") currentDesc->vendor = value;
-                else if (key == "URL") currentDesc->url = value;
-                else if (key == "MANUAL_URL") currentDesc->manual_url = value;
-                else if (key == "SUPPORT_URL") currentDesc->support_url = value;
-                else if (key == "VERSION") currentDesc->version = value;
-                else if (key == "DESCRIPTION") currentDesc->description = value;
-                else if (key == "FEATURE") currentDesc->features.push_back(value);
-            }
-        }
-
-        return true;
     }
 
     bool save() {
@@ -194,30 +173,33 @@ public:
         std::ofstream file(path);
         if (!file.is_open()) return false;
 
-        file << "WCLAP_CACHE_V1\n";
+        nlohmann::json j;
+        j["version"] = 2;
+        j["wclaps"] = nlohmann::json::object();
 
         for (const auto& [wclapPath, wclap] : entries) {
-            file << "PATH:" << wclap.path << "\n";
-            file << "MTIME:" << wclap.mtime << "\n";
+            nlohmann::json wclapJson;
+            wclapJson["mtime"] = wclap.mtime;
+            wclapJson["plugins"] = nlohmann::json::array();
 
             for (const auto& desc : wclap.descriptors) {
-                file << "BEGIN_PLUGIN:\n";
-                file << "ID:" << desc.id << "\n";
-                file << "NAME:" << desc.name << "\n";
-                file << "VENDOR:" << desc.vendor << "\n";
-                file << "URL:" << desc.url << "\n";
-                file << "MANUAL_URL:" << desc.manual_url << "\n";
-                file << "SUPPORT_URL:" << desc.support_url << "\n";
-                file << "VERSION:" << desc.version << "\n";
-                file << "DESCRIPTION:" << desc.description << "\n";
-                for (const auto& f : desc.features) {
-                    file << "FEATURE:" << f << "\n";
-                }
-                file << "END_PLUGIN\n";
+                nlohmann::json descJson;
+                descJson["id"] = desc.id;
+                descJson["name"] = desc.name;
+                descJson["vendor"] = desc.vendor;
+                descJson["url"] = desc.url;
+                descJson["manual_url"] = desc.manual_url;
+                descJson["support_url"] = desc.support_url;
+                descJson["version"] = desc.version;
+                descJson["description"] = desc.description;
+                descJson["features"] = desc.features;
+                wclapJson["plugins"].push_back(descJson);
             }
-            file << "END_WCLAP\n";
+
+            j["wclaps"][wclapPath] = wclapJson;
         }
 
+        file << j.dump(2);  // Pretty print with 2-space indent
         return true;
     }
 
@@ -226,25 +208,28 @@ public:
         auto it = entries.find(wclapPath);
         if (it == entries.end()) return false;
 
-        // Check if module.wasm mtime matches
-        std::string wasmPath = wclapPath + "/module.wasm";
-        if (!std::filesystem::exists(wasmPath)) return false;
-
-        auto fileTime = std::filesystem::last_write_time(wasmPath);
-        auto sctp = std::chrono::time_point_cast<std::chrono::seconds>(
-            fileTime - std::filesystem::file_time_type::clock::now() +
-            std::chrono::system_clock::now());
-        std::time_t mtime = std::chrono::system_clock::to_time_t(sctp);
+        std::time_t mtime = getWclapMtime(wclapPath);
+        if (mtime == 0) return false;
 
         return it->second.mtime == mtime;
     }
 
-    // Get mtime for a wclap's module.wasm
+    // Get mtime for a wclap (either bundle/module.wasm or single .wclap file)
     static std::time_t getWclapMtime(const std::string& wclapPath) {
-        std::string wasmPath = wclapPath + "/module.wasm";
-        if (!std::filesystem::exists(wasmPath)) return 0;
+        std::string targetPath;
 
-        auto fileTime = std::filesystem::last_write_time(wasmPath);
+        // Check if it's a bundle with module.wasm inside
+        std::string bundlePath = wclapPath + "/module.wasm";
+        if (std::filesystem::exists(bundlePath)) {
+            targetPath = bundlePath;
+        } else if (std::filesystem::exists(wclapPath) && std::filesystem::is_regular_file(wclapPath)) {
+            // Single file .wclap
+            targetPath = wclapPath;
+        } else {
+            return 0;
+        }
+
+        auto fileTime = std::filesystem::last_write_time(targetPath);
         auto sctp = std::chrono::time_point_cast<std::chrono::seconds>(
             fileTime - std::filesystem::file_time_type::clock::now() +
             std::chrono::system_clock::now());

@@ -30,6 +30,11 @@ struct Plugin {
 	const clap_host_note_ports *hostNotePorts = nullptr;
 	const clap_host_params *hostParams = nullptr;
 	const clap_host_state *hostState = nullptr;
+	const clap_host_tail *hostTail = nullptr;
+	const clap_host_timer_support *hostTimerSupport = nullptr;
+	const clap_host_track_info *hostTrackInfo = nullptr;
+	const clap_host_preset_load *hostPresetLoad = nullptr;
+	const clap_host_voice_info *hostVoiceInfo = nullptr;
 	const clap_host_webview *hostWebview = nullptr;
 		
 	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {
@@ -234,6 +239,11 @@ private:
 		GET_HOST_EXT(hostNotePorts, CLAP_EXT_NOTE_PORTS);
 		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
 		GET_HOST_EXT(hostState, CLAP_EXT_STATE);
+		GET_HOST_EXT(hostTail, CLAP_EXT_TAIL);
+		GET_HOST_EXT(hostTimerSupport, CLAP_EXT_TIMER_SUPPORT);
+		GET_HOST_EXT(hostTrackInfo, CLAP_EXT_TRACK_INFO);
+		GET_HOST_EXT(hostPresetLoad, CLAP_EXT_PRESET_LOAD);
+		GET_HOST_EXT(hostVoiceInfo, CLAP_EXT_VOICE_INFO);
 #undef GET_HOST_EXT
 
 		// Webview -> GUI helper
@@ -443,6 +453,43 @@ private:
 			};
 			stateExt = wclapExt.cast<const wclap_plugin_state>();
 			return stateExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TAIL)) {
+			static const clap_plugin_tail ext{
+				.get=clapPluginMethod<&Plugin::tailGet>(),
+			};
+			tailExt = wclapExt.cast<const wclap_plugin_tail>();
+			return tailExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_RENDER)) {
+			static const clap_plugin_render ext{
+				.has_hard_realtime_requirement=clapPluginMethod<&Plugin::renderHasHardRealtimeRequirement>(),
+				.set=clapPluginMethod<&Plugin::renderSet>(),
+			};
+			renderExt = wclapExt.cast<const wclap_plugin_render>();
+			return renderExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_VOICE_INFO)) {
+			static const clap_plugin_voice_info ext{
+				.get=clapPluginMethod<&Plugin::voiceInfoGet>(),
+			};
+			voiceInfoExt = wclapExt.cast<const wclap_plugin_voice_info>();
+			return voiceInfoExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TIMER_SUPPORT)) {
+			static const clap_plugin_timer_support ext{
+				.on_timer=clapPluginMethod<&Plugin::timerSupportOnTimer>(),
+			};
+			timerSupportExt = wclapExt.cast<const wclap_plugin_timer_support>();
+			return timerSupportExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TRACK_INFO)) {
+			static const clap_plugin_track_info ext{
+				.changed=clapPluginMethod<&Plugin::trackInfoChanged>(),
+			};
+			trackInfoExt = wclapExt.cast<const wclap_plugin_track_info>();
+			return trackInfoExt ? &ext : nullptr;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PRESET_LOAD)) {
+			static const clap_plugin_preset_load ext{
+				.from_location=clapPluginMethod<&Plugin::presetLoadFromLocation>(),
+			};
+			presetLoadExt = wclapExt.cast<const wclap_plugin_preset_load>();
+			return presetLoadExt ? &ext : nullptr;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_WEBVIEW)) {
 			static const clap_plugin_webview ext{
 				.get_uri=clapPluginMethod<&Plugin::webviewGetUri>(),
@@ -719,6 +766,51 @@ private:
 		auto result = mainThread->call(stateExt[&wclap_plugin_state::load], ptr, streamPtr);
 		hostIstream = nullptr;
 		return result;
+	}
+
+	Pointer<const wclap_plugin_tail> tailExt;
+	uint32_t tailGet() {
+		return mainThread->call(tailExt[&wclap_plugin_tail::get], ptr);
+	}
+
+	Pointer<const wclap_plugin_render> renderExt;
+	bool renderHasHardRealtimeRequirement() {
+		return mainThread->call(renderExt[&wclap_plugin_render::has_hard_realtime_requirement], ptr);
+	}
+	bool renderSet(clap_plugin_render_mode mode) {
+		return mainThread->call(renderExt[&wclap_plugin_render::set], ptr, mode);
+	}
+
+	Pointer<const wclap_plugin_voice_info> voiceInfoExt;
+	bool voiceInfoGet(clap_voice_info_t *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.copyAcross(wclap_voice_info{});
+		auto result = mainThread->call(voiceInfoExt[&wclap_plugin_voice_info::get], ptr, infoPtr);
+		auto wclapInfo = mainThread->get(infoPtr);
+		*info = clap_voice_info_t{
+			.voice_count=wclapInfo.voice_count,
+			.voice_capacity=wclapInfo.voice_capacity,
+			.flags=wclapInfo.flags
+		};
+		return result;
+	}
+
+	Pointer<const wclap_plugin_timer_support> timerSupportExt;
+	void timerSupportOnTimer(clap_id timerId) {
+		mainThread->call(timerSupportExt[&wclap_plugin_timer_support::on_timer], ptr, timerId);
+	}
+
+	Pointer<const wclap_plugin_track_info> trackInfoExt;
+	void trackInfoChanged() {
+		mainThread->call(trackInfoExt[&wclap_plugin_track_info::changed], ptr);
+	}
+
+	Pointer<const wclap_plugin_preset_load> presetLoadExt;
+	bool presetLoadFromLocation(uint32_t locationKind, const char *location, const char *loadKey) {
+		auto scoped = module.arenaPool.scoped();
+		auto locationPtr = scoped.writeString(location ? location : "");
+		auto loadKeyPtr = scoped.writeString(loadKey ? loadKey : "");
+		return mainThread->call(presetLoadExt[&wclap_plugin_preset_load::from_location], ptr, locationKind, locationPtr, loadKeyPtr);
 	}
 
 	std::atomic<bool> wasFileUri = false;

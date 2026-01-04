@@ -111,6 +111,18 @@ struct WclapModule : public WclapModuleBase {
 
 		HOST_METHOD(hostState, mark_dirty);
 
+		HOST_METHOD(hostTail, changed);
+
+		HOST_METHOD(hostTimerSupport, register_timer);
+		HOST_METHOD(hostTimerSupport, unregister_timer);
+
+		HOST_METHOD(hostTrackInfo, get);
+
+		HOST_METHOD(hostPresetLoad, on_error);
+		HOST_METHOD(hostPresetLoad, loaded);
+
+		HOST_METHOD(hostVoiceInfo, changed);
+
 		HOST_METHOD(hostWebview, send);
 
 #undef HOST_METHOD
@@ -125,6 +137,11 @@ struct WclapModule : public WclapModuleBase {
 		hostNotePortsPtr = scoped.copyAcross(hostNotePorts);
 		hostParamsPtr = scoped.copyAcross(hostParams);
 		hostStatePtr = scoped.copyAcross(hostState);
+		hostTailPtr = scoped.copyAcross(hostTail);
+		hostTimerSupportPtr = scoped.copyAcross(hostTimerSupport);
+		hostTrackInfoPtr = scoped.copyAcross(hostTrackInfo);
+		hostPresetLoadPtr = scoped.copyAcross(hostPresetLoad);
+		hostVoiceInfoPtr = scoped.copyAcross(hostVoiceInfo);
 		hostWebviewPtr = scoped.copyAcross(hostWebview);
 		
 		globalArena = scoped.commit();
@@ -190,10 +207,22 @@ struct WclapModule : public WclapModuleBase {
 			return self.hostAudioPortsPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_LATENCY) {
 			return self.hostLatencyPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_NOTE_PORTS) {
+			return self.hostNotePortsPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_PARAMS) {
 			return self.hostParamsPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_STATE) {
 			return self.hostStatePtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TAIL) {
+			return self.hostTailPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TIMER_SUPPORT) {
+			return self.hostTimerSupportPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TRACK_INFO) {
+			return self.hostTrackInfoPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_PRESET_LOAD) {
+			return self.hostPresetLoadPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_VOICE_INFO) {
+			return self.hostVoiceInfoPtr.cast<const void>();
 		}
 		// null, no extensions for now
 LOG_EXPR(hostExtStr);
@@ -289,6 +318,87 @@ LOG_EXPR(hostExtStr);
 	static void hostState_mark_dirty(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostState->mark_dirty(plugin->host);
+	}
+
+	wclap_host_tail hostTail;
+	Pointer<wclap_host_tail> hostTailPtr;
+	static void hostTail_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin && plugin->hostTail) return plugin->hostTail->changed(plugin->host);
+	}
+
+	wclap_host_voice_info hostVoiceInfo;
+	Pointer<wclap_host_voice_info> hostVoiceInfoPtr;
+	static void hostVoiceInfo_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin && plugin->hostVoiceInfo) return plugin->hostVoiceInfo->changed(plugin->host);
+	}
+
+	wclap_host_timer_support hostTimerSupport;
+	Pointer<wclap_host_timer_support> hostTimerSupportPtr;
+	static bool hostTimerSupport_register_timer(void *context, Pointer<const wclap_host> wHost, uint32_t periodMs, Pointer<wclap_id> timerIdPtr) {
+		auto &self = *(WclapModule *)context;
+		auto *plugin = getPlugin(context, wHost);
+		if (!plugin || !plugin->hostTimerSupport) return false;
+		clap_id timerId = 0;
+		bool result = plugin->hostTimerSupport->register_timer(plugin->host, periodMs, &timerId);
+		if (result) {
+			self.mainThread->set(timerIdPtr, timerId);
+		}
+		return result;
+	}
+	static bool hostTimerSupport_unregister_timer(void *context, Pointer<const wclap_host> wHost, wclap_id timerId) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin && plugin->hostTimerSupport) return plugin->hostTimerSupport->unregister_timer(plugin->host, timerId);
+		return false;
+	}
+
+	wclap_host_track_info hostTrackInfo;
+	Pointer<wclap_host_track_info> hostTrackInfoPtr;
+	static bool hostTrackInfo_get(void *context, Pointer<const wclap_host> wHost, Pointer<wclap_track_info> infoPtr) {
+		auto &self = *(WclapModule *)context;
+		auto *plugin = getPlugin(context, wHost);
+		if (!plugin || !plugin->hostTrackInfo) return false;
+		clap_track_info_t info{};
+		bool result = plugin->hostTrackInfo->get(plugin->host, &info);
+		if (result) {
+			// Translate port type string
+			Pointer<const char> portTypePtr{0};
+			if (info.audio_port_type) {
+				auto scoped = self.arenaPool.scoped();
+				portTypePtr = scoped.writeString(info.audio_port_type);
+			}
+			wclap_track_info wclapInfo{
+				.flags=info.flags,
+				.name="",
+				.color={info.color.alpha, info.color.red, info.color.green, info.color.blue},
+				.audio_channel_count=info.audio_channel_count,
+				.audio_port_type=portTypePtr
+			};
+			std::memcpy(wclapInfo.name, info.name, CLAP_NAME_SIZE);
+			self.mainThread->set(infoPtr, wclapInfo);
+		}
+		return result;
+	}
+
+	wclap_host_preset_load hostPresetLoad;
+	Pointer<wclap_host_preset_load> hostPresetLoadPtr;
+	static void hostPresetLoad_on_error(void *context, Pointer<const wclap_host> wHost, uint32_t locationKind, Pointer<const char> locationPtr, Pointer<const char> loadKeyPtr, int32_t osError, Pointer<const char> msgPtr) {
+		auto &self = *(WclapModule *)context;
+		auto *plugin = getPlugin(context, wHost);
+		if (!plugin || !plugin->hostPresetLoad) return;
+		auto location = self.mainThread->getString(locationPtr, CLAP_PATH_SIZE);
+		auto loadKey = self.mainThread->getString(loadKeyPtr, CLAP_PATH_SIZE);
+		auto msg = self.mainThread->getString(msgPtr, 1024);
+		plugin->hostPresetLoad->on_error(plugin->host, locationKind, location.c_str(), loadKey.c_str(), osError, msg.c_str());
+	}
+	static void hostPresetLoad_loaded(void *context, Pointer<const wclap_host> wHost, uint32_t locationKind, Pointer<const char> locationPtr, Pointer<const char> loadKeyPtr) {
+		auto &self = *(WclapModule *)context;
+		auto *plugin = getPlugin(context, wHost);
+		if (!plugin || !plugin->hostPresetLoad) return;
+		auto location = self.mainThread->getString(locationPtr, CLAP_PATH_SIZE);
+		auto loadKey = self.mainThread->getString(loadKeyPtr, CLAP_PATH_SIZE);
+		plugin->hostPresetLoad->loaded(plugin->host, locationKind, location.c_str(), loadKey.c_str());
 	}
 
 	wclap_host_webview hostWebview;

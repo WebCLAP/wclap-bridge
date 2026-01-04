@@ -79,7 +79,25 @@ If a WCLAP doesn't implement threads (i.e. it has no imported shared memory) the
 
 ### Extensions
 
-Currently, only the audio-ports/latency/params/state extensions are supported.  All extensions (including drafts) are on the wishlist, including using the (draft) webview extension for GUIs.
+The following CLAP extensions are currently supported:
+
+| Extension | Plugin → Host | Host → Plugin |
+|-----------|---------------|---------------|
+| `audio-ports` | `count()`, `get()` | `is_rescan_flag_supported()`, `rescan()` |
+| `gui` | Full implementation (15 methods) | — |
+| `latency` | `get()` | `changed()` |
+| `note-ports` | `count()`, `get()` | `supported_dialects()`, `rescan()` |
+| `params` | `count()`, `get_info()`, `get_value()`, `value_to_text()`, `text_to_value()`, `flush()` | `rescan()`, `clear()`, `request_flush()` |
+| `preset-load` | `from_location()` | `on_error()`, `loaded()` |
+| `render` | `has_hard_realtime_requirement()`, `set()` | — |
+| `state` | `save()`, `load()` | `mark_dirty()` |
+| `tail` | `get()` | `changed()` |
+| `timer-support` | `on_timer()` | `register_timer()`, `unregister_timer()` |
+| `track-info` | `changed()` | `get()` |
+| `voice-info` | `get()` | `changed()` |
+| `webview` | `get_uri()`, `get_resource()`, `receive()` | `send()` |
+
+Additional extensions (including drafts like `thread-pool`, `context-menu`, `surround`, `ambisonic`) are on the wishlist.
 
 ### Threads
 

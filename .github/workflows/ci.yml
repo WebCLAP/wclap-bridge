@@ -113,6 +113,7 @@ jobs:
           curl -L -o clap-validator.tar.gz \
             https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-macos-universal.tar.gz
           tar xzf clap-validator.tar.gz
+          mv binaries/clap-validator .
           chmod +x clap-validator
 
       - name: Download clap-validator (Linux)

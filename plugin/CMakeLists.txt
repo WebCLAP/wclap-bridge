@@ -5,6 +5,11 @@ project(wclap-bridge-plugin VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Windows: Use static CRT to match clap-wrapper defaults
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 if (APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")

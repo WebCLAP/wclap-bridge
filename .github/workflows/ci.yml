@@ -105,3 +105,41 @@ jobs:
           dir build\
           echo "=== Plugin ==="
           dir plugin\build\
+
+      # Validate plugin with clap-validator
+      - name: Download clap-validator (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -L -o clap-validator.tar.gz \
+            https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-macos-universal.tar.gz
+          tar xzf clap-validator.tar.gz
+          chmod +x clap-validator
+
+      - name: Download clap-validator (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -L -o clap-validator.tar.gz \
+            https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-ubuntu-18.04.tar.gz
+          tar xzf clap-validator.tar.gz
+          chmod +x clap-validator
+
+      - name: Download clap-validator (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip" -OutFile clap-validator.zip
+          Expand-Archive -Path clap-validator.zip -DestinationPath .
+
+      - name: Validate CLAP plugin (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          CLAP_PLUGIN=$(find plugin/build -name "*.clap" -type f -o -name "*.clap" -type d | head -1)
+          echo "Validating: $CLAP_PLUGIN"
+          ./clap-validator validate "$CLAP_PLUGIN" --only-failed || true
+
+      - name: Validate CLAP plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $CLAP_PLUGIN = Get-ChildItem -Path plugin\build -Recurse -Filter "*.clap" | Select-Object -First 1
+          echo "Validating: $($CLAP_PLUGIN.FullName)"
+          .\clap-validator.exe validate $CLAP_PLUGIN.FullName --only-failed
+        continue-on-error: true

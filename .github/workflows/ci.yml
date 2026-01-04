@@ -21,13 +21,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Cache Wasmtime SDK
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: ${{ runner.os }}-wasmtime-deps-${{ hashFiles('wasmtime-fetched.cmake') }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('wasmtime-fetched.cmake', 'CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-wasmtime-deps-
+            ${{ runner.os }}-deps-
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -39,18 +39,31 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           # Linux workaround: webview-gui missing <cstring> include
-          CMAKE_EXTRA=""
           if [ "$RUNNER_OS" = "Linux" ]; then
-            CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-include\ cstring"
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON \
+              -DCMAKE_CXX_FLAGS="-include cstring"
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
           fi
-          cmake -B build -DCMAKE_BUILD_TYPE=Release $CMAKE_EXTRA
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --config Release --parallel
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd build
+          ctest --output-on-failure
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd build
+          ctest --output-on-failure -C Release
 
       - name: Build bridge plugin (Unix)
         if: runner.os != 'Windows'

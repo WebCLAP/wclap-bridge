@@ -26,3 +26,26 @@ include(wasmtime-fetched.cmake)
 
 target_include_directories(wclap-bridge PRIVATE wasmtime)
 target_link_libraries(wclap-bridge PRIVATE wasmtime)
+
+# Testing
+option(WCLAP_BRIDGE_BUILD_TESTS "Build unit tests" OFF)
+if(WCLAP_BRIDGE_BUILD_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.4.0
+    )
+    FetchContent_MakeAvailable(Catch2)
+
+    add_executable(wclap_bridge_tests
+        tests/bridge_test.cpp
+    )
+    target_link_libraries(wclap_bridge_tests PRIVATE
+        wclap-bridge
+        Catch2::Catch2WithMain
+    )
+
+    enable_testing()
+    add_test(NAME wclap_bridge_tests COMMAND wclap_bridge_tests)
+endif()

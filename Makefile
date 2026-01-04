@@ -47,7 +47,7 @@ ifeq ($(PLATFORM),windows)
     CMAKE_GEN := -G "Ninja"
 endif
 
-.PHONY: all release debug clean install install-vst3 submodules library plugin
+.PHONY: all release debug clean install install-vst3 submodules library plugin test
 
 all: release
 
@@ -73,6 +73,13 @@ release:
 
 debug:
 	$(MAKE) plugin BUILD_TYPE=Debug
+
+# Build and run tests
+test: submodules
+	@echo "==> Building and running tests..."
+	cmake -B $(BUILD_DIR) $(CMAKE_FLAGS) -DWCLAP_BRIDGE_BUILD_TESTS=ON $(CMAKE_GEN)
+	cmake --build $(BUILD_DIR) --config $(BUILD_TYPE) --parallel
+	cd $(BUILD_DIR) && ctest --output-on-failure
 
 # Install CLAP plugin to standard location
 install: release
@@ -156,6 +163,7 @@ help:
 	@echo "  make              Build release for current platform"
 	@echo "  make release      Build optimized release"
 	@echo "  make debug        Build with debug symbols"
+	@echo "  make test         Build and run unit tests"
 	@echo "  make install      Install CLAP to standard folder"
 	@echo "  make install-vst3 Install VST3 to standard folder"
 	@echo "  make install-all  Install both CLAP and VST3"

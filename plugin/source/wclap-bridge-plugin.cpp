@@ -22,14 +22,50 @@ void scanWclapDirectory(const std::string &pathStr);
 void scanWclapDirectories() {
 	std::string wclapPath = "/Library/Audio/Plug-Ins/WCLAP/";
 	scanWclapDirectory(wclapPath);
-	
+
 	const char *home = getenv("HOME");
 	if (home) {
 		scanWclapDirectory(home + wclapPath);
 	}
 }
+#elif defined(_WIN32)
+#	include <stdlib.h>
+#	include <shlobj.h>
+void scanWclapDirectories() {
+	// System-wide: %COMMONPROGRAMFILES%\WCLAP
+	char commonPath[MAX_PATH];
+	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROGRAM_FILES_COMMON, NULL, 0, commonPath))) {
+		std::string systemPath = std::string(commonPath) + "\\WCLAP\\";
+		scanWclapDirectory(systemPath);
+	}
+
+	// User-specific: %LOCALAPPDATA%\Programs\Common\WCLAP
+	char localAppData[MAX_PATH];
+	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+		std::string userPath = std::string(localAppData) + "\\Programs\\Common\\WCLAP\\";
+		scanWclapDirectory(userPath);
+	}
+}
+#elif defined(__linux__)
+#	include <stdlib.h>
+#	include <pwd.h>
+#	include <unistd.h>
+void scanWclapDirectories() {
+	// System-wide
+	scanWclapDirectory("/usr/lib/wclap/");
+
+	// User-specific: ~/.wclap
+	const char *home = getenv("HOME");
+	if (!home) {
+		struct passwd *pw = getpwuid(getuid());
+		if (pw) home = pw->pw_dir;
+	}
+	if (home) {
+		scanWclapDirectory(std::string(home) + "/.wclap/");
+	}
+}
 #else
-#	error "Only MacOS implemented - please add this OS to wclap-bridge-plugin.cpp"
+#	error "Unsupported platform - please add this OS to wclap-bridge-plugin.cpp"
 #endif
 
 std::mutex initMutex;

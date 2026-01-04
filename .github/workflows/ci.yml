@@ -40,10 +40,11 @@ jobs:
         run: |
           # Linux workarounds:
           # - webview-gui missing <cstring> include
+          # - wclap-instance-wasmtime.h missing <mutex> include
           # - wclap-cpp -Wchanges-meaning error (struct member named same as type)
           if [ "$RUNNER_OS" = "Linux" ]; then
             cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON \
-              -DCMAKE_CXX_FLAGS="-include cstring -Wno-error=changes-meaning"
+              -DCMAKE_CXX_FLAGS="-include cstring -include mutex -Wno-error=changes-meaning"
           else
             cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
           fi

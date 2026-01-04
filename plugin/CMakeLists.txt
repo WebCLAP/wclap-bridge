@@ -2,7 +2,16 @@ cmake_minimum_required(VERSION 3.28)
 
 project(wclap-bridge-plugin VERSION 1.0.0)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Linux: All static libs linked into shared plugin need -fPIC
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Windows: Use static CRT to match clap-wrapper defaults
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 if (APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)

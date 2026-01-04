@@ -3,13 +3,16 @@ cmake_minimum_required(VERSION 3.28)
 project(wclap-bridge LANGUAGES C CXX)
 
 if (PROJECT_IS_TOP_LEVEL)
-	set(CMAKE_CXX_STANDARD 17)
+	set(CMAKE_CXX_STANDARD 20)
+	set(CMAKE_CXX_STANDARD_REQUIRED ON)
 	if (NOT GENERATOR_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
 		message(WARNING "Using single-config generator, but CMAKE_BUILD_TYPE isn't set")
 	endif()
 endif()
 
 add_library(wclap-bridge STATIC)
+# Required on Linux: static library is linked into shared plugin
+set_property(TARGET wclap-bridge PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_sources(wclap-bridge PRIVATE
 	source/wclap-bridge.cpp
 	source/wclap-instance-wasmtime/wclap-instance-wasmtime.cpp
@@ -25,3 +28,26 @@ include(wasmtime-fetched.cmake)
 
 target_include_directories(wclap-bridge PRIVATE wasmtime)
 target_link_libraries(wclap-bridge PRIVATE wasmtime)
+
+# Testing
+option(WCLAP_BRIDGE_BUILD_TESTS "Build unit tests" OFF)
+if(WCLAP_BRIDGE_BUILD_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.4.0
+    )
+    FetchContent_MakeAvailable(Catch2)
+
+    add_executable(wclap_bridge_tests
+        tests/bridge_test.cpp
+    )
+    target_link_libraries(wclap_bridge_tests PRIVATE
+        wclap-bridge
+        Catch2::Catch2WithMain
+    )
+
+    enable_testing()
+    add_test(NAME wclap_bridge_tests COMMAND wclap_bridge_tests)
+endif()

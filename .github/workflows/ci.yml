@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('wasmtime-fetched.cmake', 'CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libwebkit2gtk-4.1-dev
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          # Linux workarounds:
+          # - webview-gui missing <cstring> include
+          # - wclap-instance-wasmtime.h missing <mutex> include
+          # - wclap-cpp -Wchanges-meaning error (struct member named same as type)
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON \
+              -DCMAKE_CXX_FLAGS="-include cstring -include mutex -Wno-error=changes-meaning"
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
+          fi
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd build
+          ctest --output-on-failure
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Copy wasmtime.dll to test executable directory
+          Copy-Item build\_deps\wasmtime-c-api-src\lib\wasmtime.dll build\Release\ -ErrorAction SilentlyContinue
+          cd build
+          ctest --output-on-failure -C Release
+
+      - name: Build bridge plugin (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd plugin
+          # Linux workarounds for webview-gui and wclap-cpp
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cmake -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_CXX_FLAGS="-include cstring -include mutex -Wno-error=changes-meaning"
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release
+          fi
+          cmake --build build --config Release --parallel
+
+      - name: Build bridge plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd plugin
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: List outputs (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "=== Library ==="
+          ls -la build/
+          echo "=== Plugin ==="
+          ls -la plugin/build/
+
+      - name: List outputs (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Library ==="
+          dir build\
+          echo "=== Plugin ==="
+          dir plugin\build\
+
+      # Validate plugin with clap-validator
+      - name: Download clap-validator (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -L -o clap-validator.tar.gz \
+            https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-macos-universal.tar.gz
+          tar xzf clap-validator.tar.gz
+          mv binaries/clap-validator .
+          chmod +x clap-validator
+
+      - name: Download clap-validator (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -L -o clap-validator.tar.gz \
+            https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-ubuntu-18.04.tar.gz
+          tar xzf clap-validator.tar.gz
+          chmod +x clap-validator
+
+      - name: Download clap-validator (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip" -OutFile clap-validator.zip
+          Expand-Archive -Path clap-validator.zip -DestinationPath .
+
+      - name: Validate CLAP plugin (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          CLAP_PLUGIN=$(find plugin/build -name "*.clap" -type f -o -name "*.clap" -type d | head -1)
+          echo "Validating: $CLAP_PLUGIN"
+          ./clap-validator validate "$CLAP_PLUGIN" --only-failed || true
+
+      - name: Validate CLAP plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $CLAP_PLUGIN = Get-ChildItem -Path plugin\build -Recurse -Filter "*.clap" | Select-Object -First 1
+          echo "Validating: $($CLAP_PLUGIN.FullName)"
+          .\clap-validator.exe validate $CLAP_PLUGIN.FullName --only-failed
+        continue-on-error: true

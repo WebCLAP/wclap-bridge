@@ -38,10 +38,12 @@ jobs:
       - name: Configure (Unix)
         if: runner.os != 'Windows'
         run: |
-          # Linux workaround: webview-gui missing <cstring> include
+          # Linux workarounds:
+          # - webview-gui missing <cstring> include
+          # - wclap-cpp -Wchanges-meaning error (struct member named same as type)
           if [ "$RUNNER_OS" = "Linux" ]; then
             cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON \
-              -DCMAKE_CXX_FLAGS="-include cstring"
+              -DCMAKE_CXX_FLAGS="-include cstring -Wno-error=changes-meaning"
           else
             cmake -B build -DCMAKE_BUILD_TYPE=Release -DWCLAP_BRIDGE_BUILD_TESTS=ON
           fi
@@ -62,6 +64,8 @@ jobs:
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: |
+          # Copy wasmtime.dll to test executable directory
+          Copy-Item build\_deps\wasmtime-c-api-src\lib\wasmtime.dll build\Release\ -ErrorAction SilentlyContinue
           cd build
           ctest --output-on-failure -C Release
 

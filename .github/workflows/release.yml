@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macos-universal
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: windows-latest
+            name: windows-x86_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache Wasmtime SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps
+            plugin/build/_deps
+          key: ${{ runner.os }}-wasmtime-release-${{ hashFiles('wasmtime-fetched.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-wasmtime-release-
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libwebkit2gtk-4.1-dev
+
+      - name: Build library (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: Build library (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: Build plugin (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd plugin
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: Build plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd plugin
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          # Find and copy CLAP plugin
+          find plugin/build -name "*.clap" -type d -exec cp -r {} dist/ \;
+          # Find and copy VST3 plugin
+          find plugin/build -name "*.vst3" -type d -exec cp -r {} dist/ \;
+          # Copy static library and headers
+          cp build/libwclap-bridge.a dist/
+          cp -r include dist/
+          cd dist && zip -r ../wclap-bridge-${{ matrix.name }}.zip .
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          # Find and copy CLAP plugin
+          find plugin/build -name "*.clap" -exec cp {} dist/ \;
+          # Find and copy VST3 plugin
+          find plugin/build -name "*.vst3" -type d -exec cp -r {} dist/ \;
+          # Copy static library and headers
+          cp build/libwclap-bridge.a dist/
+          cp -r include dist/
+          cd dist && tar czf ../wclap-bridge-${{ matrix.name }}.tar.gz .
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          # Find and copy plugins
+          Get-ChildItem -Path plugin/build -Recurse -Filter "*.clap" | Copy-Item -Destination dist/ -Recurse
+          Get-ChildItem -Path plugin/build -Recurse -Filter "*.vst3" -Directory | Copy-Item -Destination dist/ -Recurse
+          # Copy static library and headers
+          Copy-Item build/Release/wclap-bridge.lib dist/ -ErrorAction SilentlyContinue
+          Copy-Item build/wclap-bridge.lib dist/ -ErrorAction SilentlyContinue
+          Copy-Item -Recurse include dist/
+          Compress-Archive -Path dist/* -DestinationPath wclap-bridge-${{ matrix.name }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wclap-bridge-${{ matrix.name }}
+          path: wclap-bridge-${{ matrix.name }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}

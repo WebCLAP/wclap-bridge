@@ -106,6 +106,40 @@ jobs:
           echo "=== Plugin ==="
           dir plugin\build\
 
+      # Download test .wclap plugin for validation
+      # Using clack_plugin_polysynth (Rust CLAP synth) for comprehensive testing
+      # - Implements audio-ports, note-ports, params, state extensions
+      # - Enables 29 validation tests (vs 16 for gain, 7 for hello-clap)
+      - name: Install test WCLAP plugin (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -L -o clack_plugin_polysynth.wasm \
+            https://github.com/Signalsmith-Audio/wasm-clap-browserhost/raw/main/plugin/clack_plugin_polysynth.wasm
+          mkdir -p ~/Library/Audio/Plug-Ins/WCLAP/clack-polysynth.wclap
+          mv clack_plugin_polysynth.wasm ~/Library/Audio/Plug-Ins/WCLAP/clack-polysynth.wclap/module.wasm
+          echo "Installed test WCLAP:"
+          ls -la ~/Library/Audio/Plug-Ins/WCLAP/clack-polysynth.wclap/
+
+      - name: Install test WCLAP plugin (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -L -o clack_plugin_polysynth.wasm \
+            https://github.com/Signalsmith-Audio/wasm-clap-browserhost/raw/main/plugin/clack_plugin_polysynth.wasm
+          mkdir -p ~/.wclap/clack-polysynth.wclap
+          mv clack_plugin_polysynth.wasm ~/.wclap/clack-polysynth.wclap/module.wasm
+          echo "Installed test WCLAP:"
+          ls -la ~/.wclap/clack-polysynth.wclap/
+
+      - name: Install test WCLAP plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Signalsmith-Audio/wasm-clap-browserhost/raw/main/plugin/clack_plugin_polysynth.wasm" -OutFile clack_plugin_polysynth.wasm
+          $wclapDir = "$env:LOCALAPPDATA\Programs\Common\WCLAP\clack-polysynth.wclap"
+          New-Item -ItemType Directory -Force -Path $wclapDir
+          Move-Item clack_plugin_polysynth.wasm "$wclapDir\module.wasm"
+          echo "Installed test WCLAP:"
+          dir $wclapDir
+
       # Validate plugin with clap-validator
       - name: Download clap-validator (macOS)
         if: runner.os == 'macOS'

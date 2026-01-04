@@ -11,6 +11,8 @@ if (PROJECT_IS_TOP_LEVEL)
 endif()
 
 add_library(wclap-bridge STATIC)
+# Required on Linux: static library is linked into shared plugin
+set_property(TARGET wclap-bridge PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_sources(wclap-bridge PRIVATE
 	source/wclap-bridge.cpp
 	source/wclap-instance-wasmtime/wclap-instance-wasmtime.cpp

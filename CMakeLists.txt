@@ -48,6 +48,20 @@ if(WCLAP_BRIDGE_BUILD_TESTS)
         Catch2::Catch2WithMain
     )
 
+    # Integration tests (headless CLAP host)
+    add_executable(wclap_integration_tests
+        tests/integration_test.cpp
+    )
+    target_link_libraries(wclap_integration_tests PRIVATE
+        wclap-bridge
+        Catch2::Catch2WithMain
+    )
+    target_include_directories(wclap_integration_tests PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/modules/clap/include
+    )
+
     enable_testing()
     add_test(NAME wclap_bridge_tests COMMAND wclap_bridge_tests)
+    add_test(NAME wclap_integration_tests COMMAND wclap_integration_tests
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

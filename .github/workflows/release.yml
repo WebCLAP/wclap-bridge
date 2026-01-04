@@ -45,7 +45,12 @@ jobs:
       - name: Build library (Unix)
         if: runner.os != 'Windows'
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          # Linux workaround: webview-gui missing <cstring> include
+          CMAKE_EXTRA=""
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-include\ cstring"
+          fi
+          cmake -B build -DCMAKE_BUILD_TYPE=Release $CMAKE_EXTRA
           cmake --build build --config Release --parallel
 
       - name: Build library (Windows)

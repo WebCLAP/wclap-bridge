@@ -37,7 +37,13 @@ jobs:
 
       - name: Configure (Unix)
         if: runner.os != 'Windows'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          # Linux workaround: webview-gui missing <cstring> include
+          CMAKE_EXTRA=""
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-include\ cstring"
+          fi
+          cmake -B build -DCMAKE_BUILD_TYPE=Release $CMAKE_EXTRA
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'

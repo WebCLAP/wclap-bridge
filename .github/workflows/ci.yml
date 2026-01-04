@@ -74,7 +74,13 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd plugin
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          # Linux workarounds for webview-gui and wclap-cpp
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cmake -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_CXX_FLAGS="-include cstring -include mutex -Wno-error=changes-meaning"
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release
+          fi
           cmake --build build --config Release --parallel
 
       - name: Build bridge plugin (Windows)
@@ -84,9 +90,18 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release --parallel
 
-      - name: List outputs
+      - name: List outputs (Unix)
+        if: runner.os != 'Windows'
         run: |
           echo "=== Library ==="
-          ls -la build/ || dir build\
+          ls -la build/
           echo "=== Plugin ==="
-          ls -la plugin/build/ || dir plugin\build\
+          ls -la plugin/build/
+
+      - name: List outputs (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Library ==="
+          dir build\
+          echo "=== Plugin ==="
+          dir plugin\build\

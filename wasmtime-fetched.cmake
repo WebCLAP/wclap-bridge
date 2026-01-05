@@ -38,6 +38,9 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 	FetchContent_MakeAvailable(wasmtime-c-api)
 	target_include_directories(wasmtime INTERFACE "${wasmtime-c-api_SOURCE_DIR}/include")
 	target_link_libraries(wasmtime INTERFACE "${wasmtime-c-api_SOURCE_DIR}/lib/wasmtime.lib")
+	# as suggested in wasmtime.h for static linking on Windows
+	target_compile_definitions(wasmtime INTERFACE WASM_API_EXTERN= WASI_API_EXTERN=)
+	target_link_libraries(wasmtime INTERFACE ws2_32.lib advapi32.lib userenv.lib ntdll.lib shell32.lib ole32.lib bcrypt.lib)
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 	if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
 		FetchContent_Declare(wasmtime-c-api

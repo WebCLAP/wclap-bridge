@@ -36,8 +36,3 @@ include(wasmtime-fetched.cmake)
 
 target_include_directories(wclap-bridge PRIVATE wasmtime)
 target_link_libraries(wclap-bridge PRIVATE wasmtime)
-
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-	# Although we don't use this functionality, Wasmtime *can* open sockets through WASI so we need this link
-	target_link_libraries(wasmtime INTERFACE ws2_32)
-endif()

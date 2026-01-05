@@ -48,7 +48,7 @@ struct WclapModule : public WclapModuleBase {
 		
 		auto scoped = arenaPool.scoped();
 		auto pathStr = scoped.writeString(mainThread->path());
-		auto version = mainThread->get(entryPtr[&wclap_plugin_entry::wclap_version]);
+		auto version = mainThread->get(entryPtr[&wclap_plugin_entry::clap_version]);
 		clapVersion = {version.major, version.minor, version.revision};
 
 		if (!mainThread->call(entryPtr[&wclap_plugin_entry::init], pathStr)) {

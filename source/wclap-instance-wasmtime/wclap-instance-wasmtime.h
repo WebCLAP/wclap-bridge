@@ -10,6 +10,7 @@
 #include "wasmtime.h"
 
 #include <iostream>
+#include <mutex>
 #include <shared_mutex>
 #include <type_traits>
 #include <string>

@@ -63,9 +63,9 @@ LOG_EXPR(pluginId);
 			auto wclapDesc = module.mainThread->get(descPtr);
 			descriptors.push_back({
 				.clap_version{
-					.major=wclapDesc.wclap_version.major,
-					.minor=wclapDesc.wclap_version.minor,
-					.revision=wclapDesc.wclap_version.revision,
+					.major=wclapDesc.clap_version.major,
+					.minor=wclapDesc.clap_version.minor,
+					.revision=wclapDesc.clap_version.revision,
 				},
 				.id=readString(wclapDesc.id, "unknown-clap-id", wclap_bridge::pluginIdPrefix.c_str()),
 				.name=readString(wclapDesc.name, "Unknown CLAP plugin", wclap_bridge::pluginNamePrefix.c_str(), wclap_bridge::pluginNameSuffix.c_str()),

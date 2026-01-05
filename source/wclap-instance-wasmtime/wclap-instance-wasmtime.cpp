@@ -6,10 +6,10 @@
 
 static std::atomic<wasm_engine_t *> globalWasmEngine;
 
-static std::atomic_flag globalEpochRunning = ATOMIC_FLAG_INIT;
+static std::atomic<bool> globalEpochRunning = false;
 static constexpr size_t epochCounterMs = 10;
 static void epochThreadFunction() {
-	while (globalEpochRunning.test()) {
+	while (globalEpochRunning) {
 		wasmtime_engine_increment_epoch(globalWasmEngine);
 		std::this_thread::sleep_for(std::chrono::milliseconds(epochCounterMs));
 	}
@@ -59,7 +59,7 @@ bool wclap_wasmtime::InstanceGroup::globalInit(unsigned int timeLimitMs) {
 
 	if (timeLimitMs > 0) {
 		// start the epoch thread
-		globalEpochRunning.test_and_set();
+		globalEpochRunning = true;
 		globalEpochThread = std::thread{epochThreadFunction};
 	}
 	return true;
@@ -67,7 +67,7 @@ bool wclap_wasmtime::InstanceGroup::globalInit(unsigned int timeLimitMs) {
 void wclap_wasmtime::InstanceGroup::globalDeinit() {
 	if (globalEpochThread.joinable()) {
 		// stop the epoch thread
-		globalEpochRunning.clear();
+		globalEpochRunning = false;
 		globalEpochThread.join();
 	}
 	

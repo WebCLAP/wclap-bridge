@@ -10,6 +10,7 @@
 #include "wasmtime.h"
 
 #include <iostream>
+#include <mutex>
 #include <shared_mutex>
 #include <type_traits>
 #include <string>
@@ -65,46 +66,55 @@ static std::string nameToStr(const wasm_name_t *name) {
 }
 
 // Convert arguments to Wasmtime values
-inline wasmtime_val_raw argToWasmVal(bool v) {
-	return {.i32=int32_t(v)};
-}
-inline wasmtime_val_raw argToWasmVal(int8_t v) {
-	return {.i32=int32_t(v)};
-}
-inline wasmtime_val_raw argToWasmVal(uint8_t v) {
-	return {.i32=int32_t(v)};
-}
-inline wasmtime_val_raw argToWasmVal(int16_t v) {
-	return {.i32=int32_t(v)};
-}
-inline wasmtime_val_raw argToWasmVal(uint16_t v) {
-	return {.i32=int32_t(v)};
-}
 inline wasmtime_val_raw argToWasmVal(int32_t v) {
-	return {.i32=v};
-}
-inline wasmtime_val_raw argToWasmVal(uint32_t v) {
-	return {.i32=int32_t(v)};
+	wasmtime_val_raw val = {};
+	val.i32 = v;
+	return val;
 }
 inline wasmtime_val_raw argToWasmVal(int64_t v) {
-	return {.i64=v};
-}
-inline wasmtime_val_raw argToWasmVal(uint64_t v) {
-	return {.i64=int64_t(v)};
+	wasmtime_val_raw val = {};
+	val.i64 = v;
+	return val;
 }
 inline wasmtime_val_raw argToWasmVal(float v) {
-	return {.f32=v};
+	wasmtime_val_raw val = {};
+	val.f32 = v;
+	return val;
 }
 inline wasmtime_val_raw argToWasmVal(double v) {
-	return {.f64=v};
+	wasmtime_val_raw val = {};
+	val.f64 = v;
+	return val;
+}
+// Cast others to the four main types
+inline wasmtime_val_raw argToWasmVal(bool v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(int8_t v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(uint8_t v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(int16_t v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(uint16_t v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(uint32_t v) {
+	return argToWasmVal(int32_t(v));
+}
+inline wasmtime_val_raw argToWasmVal(uint64_t v) {
+	return argToWasmVal(int64_t(v));
 }
 template<class V>
 inline wasmtime_val_raw argToWasmVal(wclap32::Pointer<V> v) {
-	return {.i32=int32_t(v.wasmPointer)};
+	return argToWasmVal(int32_t(v.wasmPointer));
 }
 template<class V>
 inline wasmtime_val_raw argToWasmVal(wclap64::Pointer<V> v) {
-	return {.i64=int64_t(v.wasmPointer)};
+	return argToWasmVal(int64_t(v.wasmPointer));
 }
 
 // generic form - has to be a class so we can do partial specialisation

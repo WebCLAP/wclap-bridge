@@ -7,3 +7,6 @@
 [submodule "modules/wclap-cpp"]
 	path = modules/wclap-cpp
 	url = https://github.com/WebCLAP/wclap-cpp.git
+[submodule "modules/choc"]
+	path = modules/choc
+	url = https://github.com/Tracktion/choc.git

@@ -45,7 +45,11 @@ void wclap_global_deinit() {
 
 static std::string ensureTrailingSlash(const char *dirC) {
 	std::string dir = dirC;
+#ifdef _WIN32
+	if (dir.size() && dir.back() != '\\') dir += "\\";
+#else
 	if (dir.size() && dir.back() != '/') dir += "/";
+#endif
 	return dir;
 }
 

@@ -1,18 +1,21 @@
 # WCLAP Bridge
 
-This provides a C-API library which loads a WCLAP and provides a native CLAP interface, starting from `get_factory()`.
+This repo provides:
+
+* a C-API library which loads a WCLAP and provides a native CLAP interface, starting from `get_factory()`.
+* a CLAP/VST3 bridge plugin (in `plugin/`) which makes WCLAPs available in native DAWs
 
 It's based on [Wasmtime](https://wasmtime.dev/), through the [C API](https://docs.wasmtime.dev/c-api/index.html).  Alternative runtimes (for different speed/binary-size tradeoffs) and `wasm64` support are on the wishlist.
 
-It *should* be cross-platform, but actually only OSX is supported by the CMake, because `wasmtime-fetched.cmake` needs to know how to fetch/link the OS-specific builds of Wasmtime.  If you're on Windows or Linux, help would be appreciated!
+It's only been properly tested on MacOS, but builds on Windows/Linux.
 
 ### Bridge plugin
 
-An example CLAP plugin which scans for WCLAPs, and proxies them to native hosts is in `plugin/`.
+The bridge plugin (in `plugin/`) scans standard locations for WCLAPs, and collects them into a single plugin factory.
 
-To keep things separate, it prefixes plugin IDs with `wclap:` and names with `[WCLAP]`.  For example, a WCLAP which provides "Example Plugin" as `com.example.plugin` will be advertised as "[WCLAP] Example Plugin" / `wclap:com.example.plugin`.
+To keep things separate (and allow native/WCLAP comparison), it prefixes plugin IDs with `wclap:` and names with `[WCLAP]`.  For example, a WCLAP which provides "Example Plugin" as `com.example.plugin` will be advertised as "[WCLAP] Example Plugin" / `wclap:com.example.plugin`.
 
-## How to use the bridge
+## How to use the C API
 
 The API is only 10 functions - see [`wclap-bridge.h`](include/wclap-bridge.h) for details.
 
@@ -29,13 +32,13 @@ The API is only 10 functions - see [`wclap-bridge.h`](include/wclap-bridge.h) fo
 
 The factories returned from `wclap_get_factory()` are equivalent to a native CLAP's `clap_entry.get_factory()`.
 
-## Errors
+### Errors
 
 The strings returned by `wclap_get_error()` are valid until the WCLAP is closed with `wclap_close()`.
 
 Errors reported by `wclap_get_error()` are recoverable (in that you can `wclap_close()`, with no memory corruptions or leaks), but the WCLAP instance won't work properly.  For now, catastrophic errors call `abort()`.
 
-## WCLAP virtual filesystem structure
+### WCLAP virtual filesystem structure
 
 WCLAPs _may_ use WASI for sandboxed access to plugin resources.  The structure of that virtual filesystem is unspecified, but here are some possible paths which this bridge will (in future) support:
 

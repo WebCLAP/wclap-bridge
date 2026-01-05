@@ -8,6 +8,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <filesystem>
 

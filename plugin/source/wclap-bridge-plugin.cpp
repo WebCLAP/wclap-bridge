@@ -28,8 +28,42 @@ void scanWclapDirectories() {
 		scanWclapDirectory(home + wclapPath);
 	}
 }
+#elif defined(_WIN32)
+#	include <shlobj.h>
+#	include <stringapiset.h>
+std::string stringFromPWSTR(PWSTR pwstr) {
+	auto length = WideCharToMultiByte(CP_UTF8, 0, pwstr, -1, nullptr, 0, nullptr, nullptr);
+	std::string result;
+	result.resize(length);
+	WideCharToMultiByte(CP_UTF8, 0, pwstr, -1, result.data(), length, nullptr, nullptr);
+	return result;
+}
+void scanWclapDirectories() {
+	PWSTR knownPath;
+	
+	if (SHGetKnownFolderPath(FOLDERID_ProgramFilesCommon, 0, nullptr, &knownPath) == S_OK) {
+		scanWclapDirectory(stringFromPWSTR(knownPath) + "\\WCLAP\\");
+	}
+	CoTaskMemFree(knownPath);
+
+	if (SHGetKnownFolderPath(FOLDERID_UserProgramFilesCommon, 0, nullptr, &knownPath) == S_OK) {
+		scanWclapDirectory(stringFromPWSTR(knownPath) + "\\WCLAP\\");
+	}
+	CoTaskMemFree(knownPath);
+}
+#elif defined(__linux__)
+#	include <stdlib.h>
+void scanWclapDirectories() {
+	scanWclapDirectory("/usr/lib/wclap/");
+
+	// ~/.wclap
+	const char *home = getenv("HOME");
+	if (home) {
+		scanWclapDirectory(home + std::string("/.wclap/"));
+	}
+}
 #else
-#	error "Only MacOS implemented - please add this OS to wclap-bridge-plugin.cpp"
+#	error "Unsupported OS - please add to wclap-bridge-plugin.cpp"
 #endif
 
 std::mutex initMutex;
@@ -133,6 +167,7 @@ CLAP_EXPORT bool clap_init(const char *modulePath) {
 	wclap_set_strings("wclap:", "[WCLAP] ", "");
 	
 	scanWclapDirectories();
+	// TODO: search CLAP_PATH environment variable
 	scanWclapPlugins();
 	
 	return true;

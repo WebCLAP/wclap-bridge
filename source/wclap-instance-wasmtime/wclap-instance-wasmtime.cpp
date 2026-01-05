@@ -450,12 +450,12 @@ void wclap_wasmtime::InstanceImpl::runThread(uint32_t threadId, uint64_t threadA
 		return stopWithError("wasi_thread_start isn't a function");
 	}
 
-	wasmtime_val_raw_t wasmVals[2];
-	wasmVals[0] = {.i32=int32_t(threadId)};
+	wasmtime_val_raw_t wasmVals[2] = {};
+	wasmVals[0].i32 = int32_t(threadId);
 	if (group.is64()) {
-		wasmVals[1] = {.i64=int64_t(threadArg)};
+		wasmVals[1].i64 = int64_t(threadArg);
 	} else {
-		wasmVals[1] = {.i32=int32_t(uint32_t(threadArg))};
+		wasmVals[1].i32 = int32_t(uint32_t(threadArg));
 	}
 
 	setWasmDeadline();

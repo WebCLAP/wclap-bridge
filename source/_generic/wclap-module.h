@@ -107,6 +107,7 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostAudioPorts, rescan);
 
 		// Skip this for now, because it needs a few more host structs
+		// TODO: implement later
 		/*
 		HOST_METHOD(hostContextMenu, populate);
 		HOST_METHOD(hostContextMenu, perform);

@@ -413,8 +413,8 @@ private:
 		if (!std::strcmp(pluginExtId, CLAP_EXT_AMBISONIC)) {
 			ambisonicExt = wclapExt.cast<const wclap_plugin_ambisonic>();
 			static const clap_plugin_ambisonic ext{
-				.is_config_supported=clapPluginMethod<&Plugin::ambisonicIsConfigSupported>(),
-				.get_config=clapPluginMethod<&Plugin::ambisonicGetConfig>(),
+				.is_config_supported=clapPluginMethod<&Plugin::ambisonic_is_config_supported>(),
+				.get_config=clapPluginMethod<&Plugin::ambisonic_get_config>(),
 			};
 			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_ACTIVATION)) {
@@ -422,6 +422,14 @@ private:
 			static const clap_plugin_audio_ports_activation ext{
 				.can_activate_while_processing=clapPluginMethod<&Plugin::audioPortsActivation_can_activate_while_processing>(),
 				.set_active=clapPluginMethod<&Plugin::audioPortsActivation_set_active>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_CONFIG)) {
+			audioPortsConfigExt = wclapExt.cast<const wclap_plugin_audio_ports_config>();
+			static const clap_plugin_audio_ports_config ext{
+				.count=clapPluginMethod<&Plugin::audioPortsConfig_count>(),
+				.get=clapPluginMethod<&Plugin::audioPortsConfig_get>(),
+				.select=clapPluginMethod<&Plugin::audioPortsConfig_select>(),
 			};
 			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_CONFIG_INFO)) {
@@ -584,13 +592,27 @@ private:
 		return nullptr;
 	}
 
+	const char * translateWclapPortType(Instance &instance, Pointer<const char> portType) {
+		auto wclapPortStr = mainThread->getString(wclapInfo.port_type, 16);
+		if (wclapPortType == CLAP_PORT_MONO) {
+			return CLAP_PORT_MONO;
+		} else if (wclapPortType == CLAP_PORT_STEREO) {
+			return CLAP_PORT_STEREO;
+		} else if (wclapPortType == CLAP_PORT_SURROUND) {
+			return CLAP_PORT_SURROUND;
+		} else if (wclapPortType == CLAP_PORT_AMBISONIC) {
+			return CLAP_PORT_AMBISONIC;
+		}
+		return "(unknown WCLAP port type)";
+	}
+
 	Pointer<const wclap_plugin_ambisonic> ambisonicExt;
-	bool ambisonicIsConfigSupported(const clap_ambisonic_config_t *config) {
+	bool ambisonic_is_config_supported(const clap_ambisonic_config_t *config) {
 		auto scoped = module.arenaPool.scoped();
 		auto configPtr = scoped.copyAcross(wclap_ambisonic_config{config->ordering, config->normalization});
 		return mainThread->call(ambisonicExt[&wclap_plugin_ambisonic::is_config_supported], ptr, configPtr);
 	}
-	bool ambisonicGetConfig(bool isInput, uint32_t portIndex, clap_ambisonic_config_t *config) {
+	bool ambisonic_get_config(bool isInput, uint32_t portIndex, clap_ambisonic_config_t *config) {
 		auto scoped = module.arenaPool.scoped();
 		auto configPtr = scoped.reserveBlank<wclap_ambisonic_config>();
 		if (!mainThread->call(ambisonicExt[&wclap_plugin_ambisonic::get_config], ptr, isInput, portIndex, configPtr)) {
@@ -598,6 +620,66 @@ private:
 		}
 		auto wConfig = scoped.instance.get(configPtr);
 		*config = {.ordering=wConfig.ordering, .normalization=wConfig.normalization};
+		return true;
+	}
+
+	Pointer<const wclap_plugin_audio_ports_activation> audioPortsActivationExt;
+	bool audioPortsActivation_can_activate_while_processing() {
+		return mainThread->call(audioPortsActivationExt[&wclap_plugin_audio_ports_activation::can_activate_while_processing], ptr);
+	}
+	bool audioPortsActivation_set_active(bool is_input, uint32_t port_index, bool is_active, uint32_t sample_size) {
+		return mainThread->call(audioPortsActivationExt[&wclap_plugin_audio_ports_activation::set_active], ptr, is_input, port_index, is_active, sample_size);
+	}
+	
+	Pointer<const wclap_plugin_audio_ports_config> audioPortsConfigExt;
+	uint32_t audioPortsConfig_count() {
+		return mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::count], ptr);
+	}
+	bool audioPortsConfig_get(uint32_t index, clap_audio_ports_config *config) {
+		auto scoped = module.arenaPool.scoped();
+		auto configPtr = scoped.reserveBlank<wclap_audio_ports_config>();
+		if (!mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::get], ptr, index, configPtr)) return false;
+		auto wConfig = scoped.instance.get(configPtr);
+		*config = clap_audio_ports_config{
+			.id=wConfig.id,
+			.name=wConfig[&wclap_audio_ports_config::name],
+			.input_port_count=wConfig.input_port_count,
+			.output_port_count=wConfig.output_port_count,
+			.has_main_input=wConfig.has_main_input,
+			.main_input_channel_count=wConfig.main_input_channel_count,
+			.main_input_port_type=translateWclapPortType(scoped.instance, wConfig.main_input_port_type),
+			.has_main_output=wConfig.has_main_output,
+			.main_output_channel_count=wConfig.main_output_channel_count,
+			.main_output_port_type=translateWclapPortType(scoped.instance, wConfig.main_output_port_type),
+		};
+		//scoped.instance->getArray(, config->name, CLAP_NAME_SIZE);
+		return true;
+	}
+	bool audioPortsConfig_select(uint32_t config_id) {
+		return mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::select], ptr, config_id);
+	}
+
+	Pointer<const wclap_plugin_audio_ports_config_info> audioPortsConfigInfoExt;
+	uint32_t audioPortsConfigInfo_current_config() {
+		return mainThread->call(audioPortsConfigInfoExt[&wclap_plugin_audio_ports_config_info::current_config], ptr);
+	}
+	bool audioPortsConfigInfo_get(uint32_t config_id, uint32_t index, bool isInput, clap_audio_port_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.reserveBlank<wclap_audio_port_info>();
+		if (!mainThread->call(audioPortsConfigInfoExt[&wclap_plugin_audio_ports_config_info::get], ptr, config_id, index, isInput, infoPtr)) return false;
+		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
+		
+		const char *portType = nullptr;
+		
+		*info = clap_audio_port_info{
+			.id=wclapInfo.id,
+			.name="",
+			.flags=wclapInfo.flags,
+			.channel_count=wclapInfo.channel_count,
+			.port_type=translateWclapPortType(mainThread, wclapInfo.port_type),
+			.in_place_pair=wclapInfo.in_place_pair
+		};
+		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
 		return true;
 	}
 
@@ -612,27 +694,56 @@ private:
 		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
 		
 		const char *portType = nullptr;
-		auto wclapPortType = mainThread->getString(wclapInfo.port_type, 16);
-		if (wclapPortType == CLAP_PORT_MONO) {
-			portType = CLAP_PORT_MONO;
-		} else if (wclapPortType == CLAP_PORT_STEREO) {
-			portType = CLAP_PORT_STEREO;
-		} else if (wclapPortType == CLAP_PORT_SURROUND) {
-			portType = CLAP_PORT_SURROUND;
-		} else if (wclapPortType == CLAP_PORT_AMBISONIC) {
-			portType = CLAP_PORT_AMBISONIC;
-		}
 		
 		*info = clap_audio_port_info{
 			.id=wclapInfo.id,
 			.name="",
 			.flags=wclapInfo.flags,
 			.channel_count=wclapInfo.channel_count,
-			.port_type=portType,
+			.port_type=translateWclapPortType(mainThread, wclapInfo.port_type),
 			.in_place_pair=wclapInfo.in_place_pair
 		};
 		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
 		return result;
+	}
+
+	Pointer<const wclap_plugin_configurable_audio_ports> configurableAudioPortsExt;
+	// Both methods have the same shape, but one actually applies the changes
+	template<bool applyChanges>
+	bool configurableAudioPorts_method(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		auto scoped = module.arenaPool.scoped();
+		auto requestsPtr = scoped.array<wclap_audio_port_configuration_request>(request_count);
+		for (size_t i = 0; i < request_count; ++i) {
+			auto &request = requests[i];
+			wclap_audio_port_configuration_request wRequest{
+				.is_input=request.is_input,
+				.port_index=request.port_index,
+				.channel_count=request.channel_count,
+				.port_type=module.translatePortType(request.port_type),
+				.port_details={0}
+			};
+			if (!std::strcmp(request.port_type, CLAP_PORT_SURROUND) && request.port_details) {
+				auto channelMapPtr = scoped.array<uint8_t>(request.channel_count);
+				scoped.instance.setArray(channelMapPtr, (const uint8_t *)request.port_details, request.channel_count);
+				wRequest.port_details = channelMapPtr.cast<const void>();
+			} else if (!std::strcmp(request.port_type, CLAP_PORT_AMBISONIC) && request.port_details) {
+				auto &info = *(const clap_ambisonic_config *)request.port_details;
+				auto infoPtr = scoped.copyAcross(wclap_ambisonic_config{info.ordering, info.normalization});
+				wRequest.port_details = infoPtr.cast<const void>();
+			}
+			scoped.instance.set(requestsPtr + i, wRequest);
+		}
+		if (applyChanges) {
+			return mainThread->call(configurableAudioPortsExt[&wclap_plugin_configurable_audio_ports::apply_configuration], ptr, requestsPtr, request_count);
+		} else {
+			return mainThread->call(configurableAudioPortsExt[&wclap_plugin_configurable_audio_ports::can_apply_configuration], ptr, requestsPtr, request_count);
+		}
+	}
+	bool configurableAudioPorts_can_apply_configuration(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		return configurableAudioPorts_method<false>(requests, request_count);
+	}
+	bool configurableAudioPorts_apply_configuration(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		return configurableAudioPorts_method<true>(requests, request_count);
 	}
 	
 	Pointer<const wclap_plugin_gui> guiExt;
@@ -743,7 +854,25 @@ private:
 	uint32_t latency_get() {
 		return mainThread->call(latencyExt[&wclap_plugin_latency::get], ptr);
 	}
-	
+
+	Pointer<const wclap_plugin_note_name> noteNameExt;
+	uint32_t noteName_count() {
+		return mainThread->call(notePortsExt[&wclap_plugin_note_name::count], ptr);
+	}
+	bool noteName_get(uint32_t index, clap_note_name *note_name) {
+		auto scoped = module.arenaPool.scoped();
+		auto namePtr = scoped.reserveBlank<wclap_note_name>();
+		if (!mainThread->call(notePortsExt[&wclap_plugin_note_name::get], ptr, index namePtr)) return false;
+		auto wName = scoped.instance.get(namePtr);
+		*note_name = clap_note_name{
+			.name=wName.name,
+			.port=wName.port,
+			.key=wName.key,
+			.channel=wName.channel
+		};
+		return true;
+	}
+
 	Pointer<const wclap_plugin_note_ports> notePortsExt;
 	uint32_t notePorts_count(bool isInput) {
 		return mainThread->call(notePortsExt[&wclap_plugin_note_ports::count], ptr, isInput);
@@ -762,6 +891,20 @@ private:
 		};
 		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
 		return result;
+	}
+
+	Pointer<const wclap_plugin_param_indication> paramIndicationExt;
+	void paramIndication_set_mapping(uint32_t param_id, bool has_mapping, const clap_color *color, const char *label, const char *description) {
+		auto scoped = module.arenaPool.scoped();
+		Pointer<wclap_color> colorPtr = (color ? scoped.copyAcross(wclap_color{color->alpha, color->red, color->green, color->blue}) : {0});
+		Pointer<const char> labelPtr = (label ? scoped.writeString(label) : {0});
+		Pointer<const char> descriptionPtr = (description ? scoped.writeString(description) : {0});
+		return mainThread->call(paramIndicationExt[&wclap_plugin_param_indication::set_mapping], ptr, param_id, has_mapping, colorPtr, labelPtr, descriptionPtr);
+	}
+	void paramIndication_set_automation(uint32_t param_id, uint32_t automation_state, const clap_color *color) {
+		auto scoped = module.arenaPool.scoped();
+		Pointer<wclap_color> colorPtr = (color ? scoped.copyAcross(wclap_color{color->alpha, color->red, color->green, color->blue}) : {0});
+		return mainThread->call(paramIndicationExt[&wclap_plugin_param_indication::set_automation], ptr, param_id, automation_state, colorPtr);
 	}
 
 	Pointer<const wclap_plugin_params> paramsExt;

@@ -198,7 +198,7 @@ struct WclapModule : public WclapModuleBase {
 		wclapPortStereoPtr = scoped.writeString(CLAP_PORT_STEREO);
 		wclapPortSurroundPtr = scoped.writeString(CLAP_PORT_SURROUND);
 		wclapPortAmbisonicPtr = scoped.writeString(CLAP_PORT_AMBISONIC);
-		wclapPortOtherPtr = scoped.writeString("(untranslated)");
+		wclapPortOtherPtr = scoped.writeString("(unknown host port type)");
 		hostTrackInfoPtr = scoped.copyAcross(hostTrackInfo);
 		hostVoiceInfoPtr = scoped.copyAcross(hostVoiceInfo);
 		
@@ -558,15 +558,7 @@ LOG_EXPR(hostExtStr);
 				wclapInfo.audio_port_type = plugin->module.wclapPortOtherPtr;
 				// Only assign port-type string if it's one of the known values
 				if (info.flags&CLAP_TRACK_INFO_HAS_AUDIO_CHANNEL) {
-					if (!std::strcmp(info.audio_port_type, CLAP_PORT_MONO)) {
-						wclapInfo.audio_port_type = plugin->module.wclapPortMonoPtr;
-					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_STEREO)) {
-						wclapInfo.audio_port_type = plugin->module.wclapPortStereoPtr;
-					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_SURROUND)) {
-						wclapInfo.audio_port_type = plugin->module.wclapPortSurroundPtr;
-					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_AMBISONIC)) {
-						wclapInfo.audio_port_type = plugin->module.wclapPortAmbisonicPtr;
-					}
+					wclapInfo.audio_port_type = plugin->module.translatePortType(info.audio_port_type);
 				};
 				plugin->mainThread->set(infoPtr, wclapInfo);
 				return true;

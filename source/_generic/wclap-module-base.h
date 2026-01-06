@@ -132,6 +132,18 @@ struct WclapModuleBase {
 
 	// Other constants
 	Pointer<const char> wclapPortMonoPtr, wclapPortStereoPtr, wclapPortSurroundPtr, wclapPortAmbisonicPtr, wclapPortOtherPtr;
+	Pointer<const char> translatePortType(const char *portType) {
+		if (!std::strcmp(portType, CLAP_PORT_MONO)) {
+			return wclapPortMonoPtr;
+		} else if (!std::strcmp(portType, CLAP_PORT_STEREO)) {
+			return wclapPortStereoPtr;
+		} else if (!std::strcmp(portType, CLAP_PORT_SURROUND)) {
+			return wclapPortSurroundPtr;
+		} else if (!std::strcmp(portType, CLAP_PORT_AMBISONIC)) {
+			return wclapPortAmbisonicPtr;
+		}
+		return wclapPortOtherPtr;
+	}
 
 	struct Thread {
 		uint32_t index;

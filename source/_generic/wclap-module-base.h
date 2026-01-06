@@ -130,6 +130,9 @@ struct WclapModuleBase {
 	wclap_istream istreamTemplate;
 	wclap_ostream ostreamTemplate;
 
+	// Other constants
+	Pointer<const char> wclapPortMonoPtr, wclapPortStereoPtr, wclapPortSurroundPtr, wclapPortAmbisonicPtr, wclapPortOtherPtr;
+
 	struct Thread {
 		uint32_t index;
 		uint64_t threadArg;

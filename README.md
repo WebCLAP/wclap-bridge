@@ -77,9 +77,13 @@ If a WCLAP doesn't implement threads (i.e. it has no imported shared memory) the
 
 ## Limitations
 
-### Extensions
+### Extensions and extended values
 
-Currently, only the audio-ports/latency/params/state extensions are supported.  All extensions (including drafts) are on the wishlist, including using the (draft) webview extension for GUIs.
+The bridge supports all the (non-draft) extensions aside from context-menu and posix-fd-support.  It also provides the hosts's side of the webview draft extension, and translates this into a `clap.gui` for the actual host.
+
+Extensions outside of this won't be exposed to the host.  WCLAPs only have access to sandboxed WebAssembly memory, so the bridge needs to know how to translate pointers to/from this memory space.
+
+There are similar restrictions for string constants like `clap_track_info.audio_port_type`, which is restricted to one of the known constants (mono/stereo/surround/ambisonic). 
 
 ### Threads
 

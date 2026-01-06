@@ -24,12 +24,25 @@ struct Plugin {
 	std::atomic<bool> destroyCalled = false;
 
 	const clap_host *host;
+	const clap_host_ambisonic *hostAmbisonic = nullptr;
+	const clap_host_audio_ports_config *hostAudioPortsConfig = nullptr;
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
 	const clap_host_gui *hostGui = nullptr;
 	const clap_host_latency *hostLatency = nullptr;
+	const clap_host_log *hostLog = nullptr;
+	const clap_host_note_name *hostNoteName = nullptr;
 	const clap_host_note_ports *hostNotePorts = nullptr;
 	const clap_host_params *hostParams = nullptr;
+	const clap_host_preset_load *hostPresetLoad = nullptr;
+	const clap_host_remote_controls *hostRemoteControls = nullptr;
 	const clap_host_state *hostState = nullptr;
+	const clap_host_surround *hostSurround = nullptr;
+	const clap_host_tail *hostTail = nullptr;
+	const clap_host_thread_check *hostThreadCheck = nullptr;
+	const clap_host_thread_pool *hostThreadPool = nullptr;
+	const clap_host_timer_support *hostTimerSupport = nullptr;
+	const clap_host_track_info *hostTrackInfo = nullptr;
+	const clap_host_voice_info *hostVoiceInfo = nullptr;
 	const clap_host_webview *hostWebview = nullptr;
 		
 	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {

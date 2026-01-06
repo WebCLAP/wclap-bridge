@@ -96,11 +96,37 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(istreamTemplate, read);
 		HOST_METHOD(ostreamTemplate, write);
 
-		// Extensions - no context pointers, so these will get copied across below
+		//---- Extensions ----
+		// There's no global arena at this point, so the pointers get copied across later
+
+		HOST_METHOD(hostAmbisonic, changed);
+
+		HOST_METHOD(hostAudioPortsConfig, rescan);
+
 		HOST_METHOD(hostAudioPorts, is_rescan_flag_supported);
 		HOST_METHOD(hostAudioPorts, rescan);
 
+		// Skip this for now, because it needs a few more host structs
+		/*
+		HOST_METHOD(hostContextMenu, populate);
+		HOST_METHOD(hostContextMenu, perform);
+		HOST_METHOD(hostContextMenu, can_popup);
+		HOST_METHOD(hostContextMenu, popup);
+		*/
+
+		// event-registry extension is skipped because we whitelist events for safety
+
+		HOST_METHOD(hostGui, resize_hints_changed);
+		HOST_METHOD(hostGui, request_resize);
+		HOST_METHOD(hostGui, request_show);
+		HOST_METHOD(hostGui, request_hide);
+		HOST_METHOD(hostGui, closed);
+
 		HOST_METHOD(hostLatency, changed);
+
+		HOST_METHOD(hostLog, log);
+
+		HOST_METHOD(hostNoteName, changed);
 
 		HOST_METHOD(hostNotePorts, supported_dialects);
 		HOST_METHOD(hostNotePorts, rescan);
@@ -108,8 +134,36 @@ struct WclapModule : public WclapModuleBase {
 		HOST_METHOD(hostParams, rescan);
 		HOST_METHOD(hostParams, clear);
 		HOST_METHOD(hostParams, request_flush);
+		
+		// posix-fd-support.h skipped, unless we figure out a way to make it portable
+
+		HOST_METHOD(hostPresetLoad, on_error);
+		HOST_METHOD(hostPresetLoad, loaded);
+
+		HOST_METHOD(hostRemoteControls, changed);
+		HOST_METHOD(hostRemoteControls, suggest_page);
 
 		HOST_METHOD(hostState, mark_dirty);
+
+		HOST_METHOD(hostSurround, changed);
+
+		HOST_METHOD(hostTail, changed);
+
+		HOST_METHOD(hostThreadCheck, is_main_thread);
+		HOST_METHOD(hostThreadCheck, is_audio_thread);
+
+		HOST_METHOD(hostThreadPool, request_exec);
+
+		HOST_METHOD(hostTimerSupport, register_timer);
+		HOST_METHOD(hostTimerSupport, unregister_timer);
+
+		HOST_METHOD(hostTrackInfo, get);
+
+		HOST_METHOD(hostVoiceInfo, changed);
+		
+		//---- Draft extensions ----
+		// The webview one is essential for WCLAP GUIs
+		// We skip the others because the versioning seems like a compatibility headache
 
 		HOST_METHOD(hostWebview, send);
 
@@ -120,11 +174,33 @@ struct WclapModule : public WclapModuleBase {
 		auto scoped = arenaPool.scoped();
 		
 		// The global arena holds all the extensions, for the lifetime of the module
+		hostAmbisonicPtr = scoped.copyAcross(hostAmbisonic);
+		hostAudioPortsConfigPtr = scoped.copyAcross(hostAudioPortsConfig);
 		hostAudioPortsPtr = scoped.copyAcross(hostAudioPorts);
+		//hostContextMenuPtr = scoped.copyAcross(hostContextMenu);
+		hostGuiPtr = scoped.copyAcross(hostGui);
 		hostLatencyPtr = scoped.copyAcross(hostLatency);
+		hostLogPtr = scoped.copyAcross(hostLog);
+		hostNoteNamePtr = scoped.copyAcross(hostNoteName);
 		hostNotePortsPtr = scoped.copyAcross(hostNotePorts);
 		hostParamsPtr = scoped.copyAcross(hostParams);
+		hostPresetLoadPtr = scoped.copyAcross(hostPresetLoad);
+		hostRemoteControlsPtr = scoped.copyAcross(hostRemoteControls);
 		hostStatePtr = scoped.copyAcross(hostState);
+		hostSurroundPtr = scoped.copyAcross(hostSurround);
+		hostTailPtr = scoped.copyAcross(hostTail);
+		hostThreadCheckPtr = scoped.copyAcross(hostThreadCheck);
+		hostThreadPoolPtr = scoped.copyAcross(hostThreadPool);
+		hostTimerSupportPtr = scoped.copyAcross(hostTimerSupport);
+		// need to be able to point to these constants
+		wclapPortMonoPtr = scoped.writeString(CLAP_PORT_MONO);
+		wclapPortStereoPtr = scoped.writeString(CLAP_PORT_STEREO);
+		wclapPortSurroundPtr = scoped.writeString(CLAP_PORT_SURROUND);
+		wclapPortAmbisonicPtr = scoped.writeString(CLAP_PORT_AMBISONIC);
+		wclapPortOtherPtr = scoped.writeString("(untranslated)");
+		hostTrackInfoPtr = scoped.copyAcross(hostTrackInfo);
+		hostVoiceInfoPtr = scoped.copyAcross(hostVoiceInfo);
+		
 		hostWebviewPtr = scoped.copyAcross(hostWebview);
 		
 		globalArena = scoped.commit();
@@ -185,15 +261,47 @@ struct WclapModule : public WclapModuleBase {
 		
 		const void *nativeHostExt = plugin->host->get_extension(plugin->host, hostExtStr.c_str());
 		if (!nativeHostExt) return {0};
-
-		if (hostExtStr == CLAP_EXT_AUDIO_PORTS) {
+		
+		if (hostExtStr == CLAP_EXT_AMBISONIC) {
+			return self.hostAmbisonicPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_AUDIO_PORTS_CONFIG) {
+			return self.hostAudioPortsConfigPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_AUDIO_PORTS) {
 			return self.hostAudioPortsPtr.cast<const void>();
+		//} else if (hostExtStr == CLAP_EXT_CONTEXT_MENU) {
+		//	return self.hostContextMenuPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_GUI) {
+			return self.hostGuiPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_LATENCY) {
 			return self.hostLatencyPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_LOG) {
+			return self.hostLogPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_NOTE_NAME) {
+			return self.hostNoteNamePtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_NOTE_PORTS) {
+			return self.hostNotePortsPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_PARAMS) {
 			return self.hostParamsPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_PRESET_LOAD) {
+			return self.hostPresetLoadPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_REMOTE_CONTROLS) {
+			return self.hostRemoteControlsPtr.cast<const void>();
 		} else if (hostExtStr == CLAP_EXT_STATE) {
 			return self.hostStatePtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_SURROUND) {
+			return self.hostSurroundPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TAIL) {
+			return self.hostTailPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_THREAD_CHECK) {
+			return self.hostThreadCheckPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_THREAD_POOL) {
+			return self.hostThreadPoolPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TIMER_SUPPORT) {
+			return self.hostTimerSupportPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_TRACK_INFO) {
+			return self.hostTrackInfoPtr.cast<const void>();
+		} else if (hostExtStr == CLAP_EXT_VOICE_INFO) {
+			return self.hostVoiceInfoPtr.cast<const void>();
 		}
 		// null, no extensions for now
 LOG_EXPR(hostExtStr);
@@ -238,6 +346,20 @@ LOG_EXPR(hostExtStr);
 		return -1;
 	}
 
+	wclap_host_ambisonic hostAmbisonic;
+	Pointer<wclap_host_ambisonic> hostAmbisonicPtr;
+	static void hostAmbisonic_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostAmbisonic->changed(plugin->host);
+	}
+
+	wclap_host_audio_ports_config hostAudioPortsConfig;
+	Pointer<wclap_host_audio_ports_config> hostAudioPortsConfigPtr;
+	static void hostAudioPortsConfig_rescan(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostAudioPortsConfig->rescan(plugin->host);
+	}
+
 	wclap_host_audio_ports hostAudioPorts;
 	Pointer<wclap_host_audio_ports> hostAudioPortsPtr;
 	static bool hostAudioPorts_is_rescan_flag_supported(void *context, Pointer<const wclap_host> wHost, uint32_t flag) {
@@ -250,11 +372,54 @@ LOG_EXPR(hostExtStr);
 		if (plugin) return plugin->hostAudioPorts->rescan(plugin->host, flags);
 	}
 
+	wclap_host_gui hostGui;
+	Pointer<wclap_host_gui> hostGuiPtr;
+	static void hostGui_resize_hints_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostGui->resize_hints_changed(plugin->host);
+	}
+	static bool hostGui_request_resize(void *context, Pointer<const wclap_host> wHost, uint32_t width, uint32_t height) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostGui->request_resize(plugin->host, width, height);
+		return false;
+	}
+	static bool hostGui_request_show(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostGui->request_show(plugin->host);
+		return false;
+	}
+	static bool hostGui_request_hide(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostGui->request_hide(plugin->host);
+		return false;
+	}
+	static void hostGui_closed(void *context, Pointer<const wclap_host> wHost, bool was_destroyed) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostGui->closed(plugin->host, was_destroyed);
+	}
+
 	wclap_host_latency hostLatency;
 	Pointer<wclap_host_latency> hostLatencyPtr;
 	static void hostLatency_changed(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostLatency->changed(plugin->host);
+	}
+
+	wclap_host_log hostLog;
+	Pointer<wclap_host_log> hostLogPtr;
+	static void hostLog_log(void *context, Pointer<const wclap_host> wHost, int32_t severity, Pointer<const char> msg) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) {
+			auto msgString = plugin->mainThread->getString(msg, wclap_bridge::maxLogStringLength);
+			return plugin->hostLog->log(plugin->host, severity, msgString.c_str());
+		}
+	}
+
+	wclap_host_note_name hostNoteName;
+	Pointer<wclap_host_note_name> hostNoteNamePtr;
+	static void hostNoteName_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostNoteName->changed(plugin->host);
 	}
 
 	wclap_host_note_ports hostNotePorts;
@@ -284,11 +449,137 @@ LOG_EXPR(hostExtStr);
 		if (plugin) return plugin->hostParams->request_flush(plugin->host);
 	}
 
+	wclap_host_preset_load hostPresetLoad;
+	Pointer<wclap_host_preset_load> hostPresetLoadPtr;
+	static void hostPresetLoad_on_error(void *context, Pointer<const wclap_host> wHost, uint32_t location_kind, Pointer<const char> location, Pointer<const char> load_key, int32_t os_error, Pointer<const char> msg) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) {
+			auto locationString = plugin->mainThread->getString(location, wclap_bridge::maxLogStringLength);
+			auto loadKeyString = plugin->mainThread->getString(load_key, wclap_bridge::maxLogStringLength);
+			auto msgString = plugin->mainThread->getString(msg, wclap_bridge::maxLogStringLength);
+			return plugin->hostPresetLoad->on_error(plugin->host, location_kind, locationString.c_str(), loadKeyString.c_str(), os_error, msgString.c_str());
+		}
+	}
+	static void hostPresetLoad_loaded(void *context, Pointer<const wclap_host> wHost, uint32_t location_kind, Pointer<const char> location, Pointer<const char> load_key) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) {
+			auto locationString = plugin->mainThread->getString(location, wclap_bridge::maxLogStringLength);
+			auto loadKeyString = plugin->mainThread->getString(load_key, wclap_bridge::maxLogStringLength);
+			return plugin->hostPresetLoad->loaded(plugin->host, location_kind, locationString.c_str(), loadKeyString.c_str());
+		}
+	}
+
+	wclap_host_remote_controls hostRemoteControls;
+	Pointer<wclap_host_remote_controls> hostRemoteControlsPtr;
+	static void hostRemoteControls_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostRemoteControls->changed(plugin->host);
+	}
+	static void hostRemoteControls_suggest_page(void *context, Pointer<const wclap_host> wHost, uint32_t page_id) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostRemoteControls->suggest_page(plugin->host, page_id);
+	}
+
 	wclap_host_state hostState;
 	Pointer<wclap_host_state> hostStatePtr;
 	static void hostState_mark_dirty(void *context, Pointer<const wclap_host> wHost) {
 		auto *plugin = getPlugin(context, wHost);
 		if (plugin) return plugin->hostState->mark_dirty(plugin->host);
+	}
+
+	wclap_host_surround hostSurround;
+	Pointer<wclap_host_surround> hostSurroundPtr;
+	static void hostSurround_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostSurround->changed(plugin->host);
+	}
+
+	wclap_host_tail hostTail;
+	Pointer<wclap_host_tail> hostTailPtr;
+	static void hostTail_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostTail->changed(plugin->host);
+	}
+
+	wclap_host_thread_check hostThreadCheck;
+	Pointer<wclap_host_thread_check> hostThreadCheckPtr;
+	static bool hostThreadCheck_is_main_thread(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostThreadCheck->is_main_thread(plugin->host);
+		return true;
+	}
+	static bool hostThreadCheck_is_audio_thread(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostThreadCheck->is_audio_thread(plugin->host);
+		return true;
+	}
+
+	wclap_host_thread_pool hostThreadPool;
+	Pointer<wclap_host_thread_pool> hostThreadPoolPtr;
+	static bool hostThreadPool_request_exec(void *context, Pointer<const wclap_host> wHost, uint32_t num_tasks) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostThreadPool->request_exec(plugin->host, num_tasks);
+		return false;
+	}
+
+	wclap_host_timer_support hostTimerSupport;
+	Pointer<wclap_host_timer_support> hostTimerSupportPtr;
+	static bool hostTimerSupport_register_timer(void *context, Pointer<const wclap_host> wHost, uint32_t period_ms, Pointer<uint32_t> timer_id) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) {
+			uint32_t nativeTimerId = 0;
+			if (plugin->hostTimerSupport->register_timer(plugin->host, period_ms, &nativeTimerId)) {
+				plugin->mainThread->set(timer_id, nativeTimerId);
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+	static bool hostTimerSupport_unregister_timer(void *context, Pointer<const wclap_host> wHost, uint32_t timer_id) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostTimerSupport->unregister_timer(plugin->host, timer_id);
+		return false;
+	}
+
+	wclap_host_track_info hostTrackInfo;
+	Pointer<wclap_host_track_info> hostTrackInfoPtr;
+	static bool hostTrackInfo_get(void *context, Pointer<const wclap_host> wHost, Pointer<wclap_track_info> infoPtr) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) {
+			clap_track_info info{.flags=0, .name={}, .color={0, 0, 0, 0}, .audio_channel_count=0, .audio_port_type=nullptr};
+			if (plugin->hostTrackInfo->get(plugin->host, &info)) {
+				wclap_track_info wclapInfo;
+				wclapInfo.flags = info.flags;
+				std::memcpy(wclapInfo.name, info.name, CLAP_NAME_SIZE);
+				wclapInfo.color = {info.color.alpha, info.color.red, info.color.green, info.color.blue};
+				wclapInfo.audio_channel_count = info.audio_channel_count;
+				wclapInfo.audio_port_type = plugin->module.wclapPortOtherPtr;
+				// Only assign port-type string if it's one of the known values
+				if (info.flags&CLAP_TRACK_INFO_HAS_AUDIO_CHANNEL) {
+					if (!std::strcmp(info.audio_port_type, CLAP_PORT_MONO)) {
+						wclapInfo.audio_port_type = plugin->module.wclapPortMonoPtr;
+					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_STEREO)) {
+						wclapInfo.audio_port_type = plugin->module.wclapPortStereoPtr;
+					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_SURROUND)) {
+						wclapInfo.audio_port_type = plugin->module.wclapPortSurroundPtr;
+					} else if (!std::strcmp(info.audio_port_type, CLAP_PORT_AMBISONIC)) {
+						wclapInfo.audio_port_type = plugin->module.wclapPortAmbisonicPtr;
+					}
+				};
+				plugin->mainThread->set(infoPtr, wclapInfo);
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	wclap_host_voice_info hostVoiceInfo;
+	Pointer<wclap_host_voice_info> hostVoiceInfoPtr;
+	static void hostVoiceInfo_changed(void *context, Pointer<const wclap_host> wHost) {
+		auto *plugin = getPlugin(context, wHost);
+		if (plugin) return plugin->hostVoiceInfo->changed(plugin->host);
 	}
 
 	wclap_host_webview hostWebview;

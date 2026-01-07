@@ -24,12 +24,25 @@ struct Plugin {
 	std::atomic<bool> destroyCalled = false;
 
 	const clap_host *host;
+	const clap_host_ambisonic *hostAmbisonic = nullptr;
+	const clap_host_audio_ports_config *hostAudioPortsConfig = nullptr;
 	const clap_host_audio_ports *hostAudioPorts = nullptr;
 	const clap_host_gui *hostGui = nullptr;
 	const clap_host_latency *hostLatency = nullptr;
+	const clap_host_log *hostLog = nullptr;
+	const clap_host_note_name *hostNoteName = nullptr;
 	const clap_host_note_ports *hostNotePorts = nullptr;
 	const clap_host_params *hostParams = nullptr;
+	const clap_host_preset_load *hostPresetLoad = nullptr;
+	const clap_host_remote_controls *hostRemoteControls = nullptr;
 	const clap_host_state *hostState = nullptr;
+	const clap_host_surround *hostSurround = nullptr;
+	const clap_host_tail *hostTail = nullptr;
+	const clap_host_thread_check *hostThreadCheck = nullptr;
+	const clap_host_thread_pool *hostThreadPool = nullptr;
+	const clap_host_timer_support *hostTimerSupport = nullptr;
+	const clap_host_track_info *hostTrackInfo = nullptr;
+	const clap_host_voice_info *hostVoiceInfo = nullptr;
 	const clap_host_webview *hostWebview = nullptr;
 		
 	Plugin(WclapModuleBase &module, const clap_host *host, Pointer<wclap_host> hostPtr, Pointer<const wclap_plugin> ptr, MemoryArenaPtr arena, const clap_plugin_descriptor *desc) : module(module), mainThread(module.mainThread.get()), ptr(ptr), arena(std::move(arena)), maybeAudioThread(module.instanceGroup->startInstance()), audioThread(maybeAudioThread ? maybeAudioThread.get() : mainThread), host(host) {
@@ -228,12 +241,25 @@ private:
 	bool pluginInit() {
 #define GET_HOST_EXT(field, extId) \
 		field = (decltype(field))host->get_extension(host, extId);
+		GET_HOST_EXT(hostAmbisonic, CLAP_EXT_AMBISONIC);
+		GET_HOST_EXT(hostAudioPortsConfig, CLAP_EXT_AUDIO_PORTS_CONFIG);
 		GET_HOST_EXT(hostAudioPorts, CLAP_EXT_AUDIO_PORTS);
 		GET_HOST_EXT(hostGui, CLAP_EXT_GUI);
 		GET_HOST_EXT(hostLatency, CLAP_EXT_LATENCY);
+		GET_HOST_EXT(hostLog, CLAP_EXT_LOG);
+		GET_HOST_EXT(hostNoteName, CLAP_EXT_NOTE_NAME);
 		GET_HOST_EXT(hostNotePorts, CLAP_EXT_NOTE_PORTS);
 		GET_HOST_EXT(hostParams, CLAP_EXT_PARAMS);
+		GET_HOST_EXT(hostPresetLoad, CLAP_EXT_PRESET_LOAD);
+		GET_HOST_EXT(hostRemoteControls, CLAP_EXT_REMOTE_CONTROLS);
 		GET_HOST_EXT(hostState, CLAP_EXT_STATE);
+		GET_HOST_EXT(hostSurround, CLAP_EXT_SURROUND);
+		GET_HOST_EXT(hostTail, CLAP_EXT_TAIL);
+		GET_HOST_EXT(hostThreadCheck, CLAP_EXT_THREAD_CHECK);
+		GET_HOST_EXT(hostThreadPool, CLAP_EXT_THREAD_POOL);
+		GET_HOST_EXT(hostTimerSupport, CLAP_EXT_TIMER_SUPPORT);
+		GET_HOST_EXT(hostTrackInfo, CLAP_EXT_TRACK_INFO);
+		GET_HOST_EXT(hostVoiceInfo, CLAP_EXT_VOICE_INFO);
 #undef GET_HOST_EXT
 
 		// Webview -> GUI helper
@@ -384,120 +410,359 @@ private:
 		auto wclapExt = mainThread->call(ptr[&wclap_plugin::get_extension], ptr, extIdPtr);
 		if (!wclapExt) return nullptr;
 		
-		if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS)) {
-			static const clap_plugin_audio_ports ext{
-				.count=clapPluginMethod<&Plugin::audioPortsCount>(),
-				.get=clapPluginMethod<&Plugin::audioPortsGet>(),
+		if (!std::strcmp(pluginExtId, CLAP_EXT_AMBISONIC)) {
+			ambisonicExt = wclapExt.cast<const wclap_plugin_ambisonic>();
+			static const clap_plugin_ambisonic ext{
+				.is_config_supported=clapPluginMethod<&Plugin::ambisonic_is_config_supported>(),
+				.get_config=clapPluginMethod<&Plugin::ambisonic_get_config>(),
 			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_ACTIVATION)) {
+			audioPortsActivationExt = wclapExt.cast<const wclap_plugin_audio_ports_activation>();
+			static const clap_plugin_audio_ports_activation ext{
+				.can_activate_while_processing=clapPluginMethod<&Plugin::audioPortsActivation_can_activate_while_processing>(),
+				.set_active=clapPluginMethod<&Plugin::audioPortsActivation_set_active>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_CONFIG)) {
+			audioPortsConfigExt = wclapExt.cast<const wclap_plugin_audio_ports_config>();
+			static const clap_plugin_audio_ports_config ext{
+				.count=clapPluginMethod<&Plugin::audioPortsConfig_count>(),
+				.get=clapPluginMethod<&Plugin::audioPortsConfig_get>(),
+				.select=clapPluginMethod<&Plugin::audioPortsConfig_select>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS_CONFIG_INFO)) {
+			audioPortsConfigInfoExt = wclapExt.cast<const wclap_plugin_audio_ports_config_info>();
+			static const clap_plugin_audio_ports_config_info ext{
+				.current_config=clapPluginMethod<&Plugin::audioPortsConfigInfo_current_config>(),
+				.get=clapPluginMethod<&Plugin::audioPortsConfigInfo_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_AUDIO_PORTS)) {
 			audioPortsExt = wclapExt.cast<const wclap_plugin_audio_ports>();
-			return audioPortsExt ? &ext : nullptr;
+			static const clap_plugin_audio_ports ext{
+				.count=clapPluginMethod<&Plugin::audioPorts_count>(),
+				.get=clapPluginMethod<&Plugin::audioPorts_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_CONFIGURABLE_AUDIO_PORTS)) {
+			configurableAudioPortsExt = wclapExt.cast<const wclap_plugin_configurable_audio_ports>();
+			static const clap_plugin_configurable_audio_ports ext{
+				.can_apply_configuration=clapPluginMethod<&Plugin::configurableAudioPorts_can_apply_configuration>(),
+				.apply_configuration=clapPluginMethod<&Plugin::configurableAudioPorts_apply_configuration>(),
+			};
+			return &ext;
+		// TODO: context-menu (CLAP_EXT_CONTEXT_MENU)
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_GUI)) {
 			static const clap_plugin_gui ext{
-				.is_api_supported=clapPluginMethod<&Plugin::guiIsApiSupported>(),
-				.get_preferred_api=clapPluginMethod<&Plugin::guiGetPreferredApi>(),
-				.create=clapPluginMethod<&Plugin::guiCreate>(),
-				.destroy=clapPluginMethod<&Plugin::guiDestroy>(),
-				.set_scale=clapPluginMethod<&Plugin::guiSetScale>(),
-				.get_size=clapPluginMethod<&Plugin::guiGetSize>(),
-				.can_resize=clapPluginMethod<&Plugin::guiCanResize>(),
-				.get_resize_hints=clapPluginMethod<&Plugin::guiGetResizeHints>(),
-				.adjust_size=clapPluginMethod<&Plugin::guiAdjustSize>(),
-				.set_size=clapPluginMethod<&Plugin::guiSetSize>(),
-				.set_parent=clapPluginMethod<&Plugin::guiSetParent>(),
-				.set_transient=clapPluginMethod<&Plugin::guiSetTransient>(),
-				.suggest_title=clapPluginMethod<&Plugin::guiSuggestTitle>(),
-				.show=clapPluginMethod<&Plugin::guiShow>(),
-				.hide=clapPluginMethod<&Plugin::guiHide>(),
+				.is_api_supported=clapPluginMethod<&Plugin::gui_is_api_supported>(),
+				.get_preferred_api=clapPluginMethod<&Plugin::gui_get_preferred_api>(),
+				.create=clapPluginMethod<&Plugin::gui_create>(),
+				.destroy=clapPluginMethod<&Plugin::gui_destroy>(),
+				.set_scale=clapPluginMethod<&Plugin::gui_set_scale>(),
+				.get_size=clapPluginMethod<&Plugin::gui_get_size>(),
+				.can_resize=clapPluginMethod<&Plugin::gui_can_resize>(),
+				.get_resize_hints=clapPluginMethod<&Plugin::gui_get_resize_hints>(),
+				.adjust_size=clapPluginMethod<&Plugin::gui_adjust_size>(),
+				.set_size=clapPluginMethod<&Plugin::gui_set_size>(),
+				.set_parent=clapPluginMethod<&Plugin::gui_set_parent>(),
+				.set_transient=clapPluginMethod<&Plugin::gui_set_transient>(),
+				.suggest_title=clapPluginMethod<&Plugin::gui_suggest_title>(),
+				.show=clapPluginMethod<&Plugin::gui_show>(),
+				.hide=clapPluginMethod<&Plugin::gui_hide>(),
 			};
 			guiExt = wclapExt.cast<const wclap_plugin_gui>();
 			if (!webviewExt) webviewExt = wclapExt.cast<const wclap_plugin_webview>();
 			return guiExt ? &ext : nullptr; // depends on the WCLAP's webview extension, not the GUI one
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_LATENCY)) {
-			static const clap_plugin_latency ext{
-				.get=clapPluginMethod<&Plugin::latencyGet>(),
-			};
 			latencyExt = wclapExt.cast<const wclap_plugin_latency>();
-			return latencyExt ? &ext : nullptr;
+			static const clap_plugin_latency ext{
+				.get=clapPluginMethod<&Plugin::latency_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_NOTE_NAME)) {
+			noteNameExt = wclapExt.cast<const wclap_plugin_note_name>();
+			static const clap_plugin_note_name ext{
+				.count=clapPluginMethod<&Plugin::noteName_count>(),
+				.get=clapPluginMethod<&Plugin::noteName_get>(),
+			};
+			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_NOTE_PORTS)) {
-			static const clap_plugin_note_ports ext{
-				.count=clapPluginMethod<&Plugin::notePortsCount>(),
-				.get=clapPluginMethod<&Plugin::notePortsGet>(),
-			};
 			notePortsExt = wclapExt.cast<const wclap_plugin_note_ports>();
-			return notePortsExt ? &ext : nullptr;
+			static const clap_plugin_note_ports ext{
+				.count=clapPluginMethod<&Plugin::notePorts_count>(),
+				.get=clapPluginMethod<&Plugin::notePorts_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAM_INDICATION)) {
+			paramIndicationExt = wclapExt.cast<const wclap_plugin_param_indication>();
+			static const clap_plugin_param_indication ext{
+				.set_mapping=clapPluginMethod<&Plugin::paramIndication_set_mapping>(),
+				.set_automation=clapPluginMethod<&Plugin::paramIndication_set_automation>(),
+			};
+			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PARAMS)) {
-			static const clap_plugin_params ext{
-				.count=clapPluginMethod<&Plugin::paramsCount>(),
-				.get_info=clapPluginMethod<&Plugin::paramsGetInfo>(),
-				.get_value=clapPluginMethod<&Plugin::paramsGetValue>(),
-				.value_to_text=clapPluginMethod<&Plugin::paramsValueToText>(),
-				.text_to_value=clapPluginMethod<&Plugin::paramsTextToValue>(),
-				.flush=clapPluginMethod<&Plugin::paramsFlush>(),
-			};
 			paramsExt = wclapExt.cast<const wclap_plugin_params>();
-			return paramsExt ? &ext : nullptr;
+			static const clap_plugin_params ext{
+				.count=clapPluginMethod<&Plugin::params_count>(),
+				.get_info=clapPluginMethod<&Plugin::params_get_info>(),
+				.get_value=clapPluginMethod<&Plugin::params_get_value>(),
+				.value_to_text=clapPluginMethod<&Plugin::params_value_to_text>(),
+				.text_to_value=clapPluginMethod<&Plugin::params_text_to_value>(),
+				.flush=clapPluginMethod<&Plugin::params_flush>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_PRESET_LOAD)) {
+			presetLoadExt = wclapExt.cast<const wclap_plugin_preset_load>();
+			static const clap_plugin_preset_load ext{
+				.from_location=clapPluginMethod<&Plugin::presetLoad_from_location>(),
+			};
+			return &ext;
+		// skipping posix-fd-support
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_REMOTE_CONTROLS)) {
+			remoteControlsExt = wclapExt.cast<const wclap_plugin_remote_controls>();
+			static const clap_plugin_remote_controls ext{
+				.count=clapPluginMethod<&Plugin::remoteControls_count>(),
+				.get=clapPluginMethod<&Plugin::remoteControls_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_RENDER)) {
+			renderExt = wclapExt.cast<const wclap_plugin_render>();
+			static const clap_plugin_render ext{
+				.has_hard_realtime_requirement=clapPluginMethod<&Plugin::render_has_hard_realtime_requirement>(),
+				.set=clapPluginMethod<&Plugin::render_set>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_STATE_CONTEXT)) {
+			stateContextExt = wclapExt.cast<const wclap_plugin_state_context>();
+			static const clap_plugin_state_context ext{
+				.save=clapPluginMethod<&Plugin::stateContext_save>(),
+				.load=clapPluginMethod<&Plugin::stateContext_load>(),
+			};
+			return &ext;
 		} else if (!std::strcmp(pluginExtId, CLAP_EXT_STATE)) {
-			static const clap_plugin_state ext{
-				.save=clapPluginMethod<&Plugin::stateSave>(),
-				.load=clapPluginMethod<&Plugin::stateLoad>(),
-			};
 			stateExt = wclapExt.cast<const wclap_plugin_state>();
-			return stateExt ? &ext : nullptr;
-		} else if (!std::strcmp(pluginExtId, CLAP_EXT_WEBVIEW)) {
-			static const clap_plugin_webview ext{
-				.get_uri=clapPluginMethod<&Plugin::webviewGetUri>(),
-				.get_resource=clapPluginMethod<&Plugin::webviewGetResource>(),
-				.receive=clapPluginMethod<&Plugin::webviewReceive>()
+			static const clap_plugin_state ext{
+				.save=clapPluginMethod<&Plugin::state_save>(),
+				.load=clapPluginMethod<&Plugin::state_load>(),
 			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_SURROUND)) {
+			surroundExt = wclapExt.cast<const wclap_plugin_surround>();
+			static const clap_plugin_surround ext{
+				.is_channel_mask_supported=clapPluginMethod<&Plugin::surround_is_channel_mask_supported>(),
+				.get_channel_map=clapPluginMethod<&Plugin::surround_get_channel_map>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TAIL)) {
+			tailExt = wclapExt.cast<const wclap_plugin_tail>();
+			static const clap_plugin_tail ext{
+				.get=clapPluginMethod<&Plugin::tail_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_THREAD_POOL)) {
+			threadPoolExt = wclapExt.cast<const wclap_plugin_thread_pool>();
+			static const clap_plugin_thread_pool ext{
+				.exec=clapPluginMethod<&Plugin::threadPool_exec>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TIMER_SUPPORT)) {
+			timerSupportExt = wclapExt.cast<const wclap_plugin_timer_support>();
+			static const clap_plugin_timer_support ext{
+				.on_timer=clapPluginMethod<&Plugin::timerSupport_on_timer>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_TRACK_INFO)) {
+			trackInfoExt = wclapExt.cast<const wclap_plugin_track_info>();
+			static const clap_plugin_track_info ext{
+				.changed=clapPluginMethod<&Plugin::trackInfo_changed>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_VOICE_INFO)) {
+			voiceInfoExt = wclapExt.cast<const wclap_plugin_voice_info>();
+			static const clap_plugin_voice_info ext{
+				.get=clapPluginMethod<&Plugin::voiceInfo_get>(),
+			};
+			return &ext;
+		} else if (!std::strcmp(pluginExtId, CLAP_EXT_WEBVIEW)) {
 			webviewExt = wclapExt.cast<const wclap_plugin_webview>();
-			return webviewExt ? &ext : nullptr;
+			static const clap_plugin_webview ext{
+				.get_uri=clapPluginMethod<&Plugin::webview_get_uri>(),
+				.get_resource=clapPluginMethod<&Plugin::webview_get_resource>(),
+				.receive=clapPluginMethod<&Plugin::webview_receive>()
+			};
+			return &ext;
 		}
 		LOG_EXPR(pluginExtId);
 		return nullptr;
 	}
-	
-	Pointer<const wclap_plugin_audio_ports> audioPortsExt;
-	uint32_t audioPortsCount(bool isInput) {
-		return mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::count], ptr, isInput);
-	}
-	bool audioPortsGet(uint32_t index, bool isInput, clap_audio_port_info *info) {
-		auto scoped = module.arenaPool.scoped();
-		auto infoPtr = scoped.copyAcross(wclap_audio_port_info{});
-		auto result = mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::get], ptr, index, isInput, infoPtr);
-		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
-		
-		const char *portType = nullptr;
-		auto wclapPortType = mainThread->getString(wclapInfo.port_type, 16);
+
+	const char * translateWclapPortType(Instance &instance, Pointer<const char> portType) {
+		auto wclapPortType = mainThread->getString(portType, 16);
 		if (wclapPortType == CLAP_PORT_MONO) {
-			portType = CLAP_PORT_MONO;
+			return CLAP_PORT_MONO;
 		} else if (wclapPortType == CLAP_PORT_STEREO) {
-			portType = CLAP_PORT_STEREO;
+			return CLAP_PORT_STEREO;
 		} else if (wclapPortType == CLAP_PORT_SURROUND) {
-			portType = CLAP_PORT_SURROUND;
+			return CLAP_PORT_SURROUND;
 		} else if (wclapPortType == CLAP_PORT_AMBISONIC) {
-			portType = CLAP_PORT_AMBISONIC;
+			return CLAP_PORT_AMBISONIC;
 		}
+		return "(unknown WCLAP port type)";
+	}
+	void copyName(char *to, const char *from) {
+		for (size_t i = 0; i < CLAP_NAME_SIZE; ++i) to[i] = from[i];
+	}
+	template<typename V>
+	void copy(V *to, V *from, size_t count) {
+		for (size_t i = 0; i < count; ++i) to[i] = from[i];
+	}
+
+	Pointer<const wclap_plugin_ambisonic> ambisonicExt;
+	bool ambisonic_is_config_supported(const clap_ambisonic_config_t *config) {
+		auto scoped = module.arenaPool.scoped();
+		auto configPtr = scoped.copyAcross(wclap_ambisonic_config{config->ordering, config->normalization});
+		return mainThread->call(ambisonicExt[&wclap_plugin_ambisonic::is_config_supported], ptr, configPtr);
+	}
+	bool ambisonic_get_config(bool isInput, uint32_t portIndex, clap_ambisonic_config_t *config) {
+		auto scoped = module.arenaPool.scoped();
+		auto configPtr = scoped.reserveBlank<wclap_ambisonic_config>();
+		if (!mainThread->call(ambisonicExt[&wclap_plugin_ambisonic::get_config], ptr, isInput, portIndex, configPtr)) {
+			return false;
+		}
+		auto wConfig = scoped.instance.get(configPtr);
+		*config = {.ordering=wConfig.ordering, .normalization=wConfig.normalization};
+		return true;
+	}
+
+	Pointer<const wclap_plugin_audio_ports_activation> audioPortsActivationExt;
+	bool audioPortsActivation_can_activate_while_processing() {
+		return mainThread->call(audioPortsActivationExt[&wclap_plugin_audio_ports_activation::can_activate_while_processing], ptr);
+	}
+	bool audioPortsActivation_set_active(bool is_input, uint32_t port_index, bool is_active, uint32_t sample_size) {
+		return mainThread->call(audioPortsActivationExt[&wclap_plugin_audio_ports_activation::set_active], ptr, is_input, port_index, is_active, sample_size);
+	}
+	
+	Pointer<const wclap_plugin_audio_ports_config> audioPortsConfigExt;
+	uint32_t audioPortsConfig_count() {
+		return mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::count], ptr);
+	}
+	bool audioPortsConfig_get(uint32_t index, clap_audio_ports_config *config) {
+		auto scoped = module.arenaPool.scoped();
+		auto configPtr = scoped.reserveBlank<wclap_audio_ports_config>();
+		if (!mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::get], ptr, index, configPtr)) return false;
+		auto wConfig = scoped.instance.get(configPtr);
+		*config = clap_audio_ports_config{
+			.id=wConfig.id,
+			.name={},
+			.input_port_count=wConfig.input_port_count,
+			.output_port_count=wConfig.output_port_count,
+			.has_main_input=wConfig.has_main_input,
+			.main_input_channel_count=wConfig.main_input_channel_count,
+			.main_input_port_type=translateWclapPortType(scoped.instance, wConfig.main_input_port_type),
+			.has_main_output=wConfig.has_main_output,
+			.main_output_channel_count=wConfig.main_output_channel_count,
+			.main_output_port_type=translateWclapPortType(scoped.instance, wConfig.main_output_port_type),
+		};
+		copyName(config->name, wConfig.name);
+		return true;
+	}
+	bool audioPortsConfig_select(uint32_t config_id) {
+		return mainThread->call(audioPortsConfigExt[&wclap_plugin_audio_ports_config::select], ptr, config_id);
+	}
+
+	Pointer<const wclap_plugin_audio_ports_config_info> audioPortsConfigInfoExt;
+	uint32_t audioPortsConfigInfo_current_config() {
+		return mainThread->call(audioPortsConfigInfoExt[&wclap_plugin_audio_ports_config_info::current_config], ptr);
+	}
+	bool audioPortsConfigInfo_get(uint32_t config_id, uint32_t index, bool isInput, clap_audio_port_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.reserveBlank<wclap_audio_port_info>();
+		if (!mainThread->call(audioPortsConfigInfoExt[&wclap_plugin_audio_ports_config_info::get], ptr, config_id, index, isInput, infoPtr)) return false;
+		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
 		
 		*info = clap_audio_port_info{
 			.id=wclapInfo.id,
 			.name="",
 			.flags=wclapInfo.flags,
 			.channel_count=wclapInfo.channel_count,
-			.port_type=portType,
+			.port_type=translateWclapPortType(*mainThread, wclapInfo.port_type),
 			.in_place_pair=wclapInfo.in_place_pair
 		};
-		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
+		copyName(info->name, wclapInfo.name);
+		return true;
+	}
+
+	Pointer<const wclap_plugin_audio_ports> audioPortsExt;
+	uint32_t audioPorts_count(bool isInput) {
+		return mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::count], ptr, isInput);
+	}
+	bool audioPorts_get(uint32_t index, bool isInput, clap_audio_port_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.reserveBlank<wclap_audio_port_info>();
+		auto result = mainThread->call(audioPortsExt[&wclap_plugin_audio_ports::get], ptr, index, isInput, infoPtr);
+		wclap_audio_port_info wclapInfo = mainThread->get(infoPtr);
+		
+		*info = clap_audio_port_info{
+			.id=wclapInfo.id,
+			.name="",
+			.flags=wclapInfo.flags,
+			.channel_count=wclapInfo.channel_count,
+			.port_type=translateWclapPortType(*mainThread, wclapInfo.port_type),
+			.in_place_pair=wclapInfo.in_place_pair
+		};
+		copyName(info->name, wclapInfo.name);
 		return result;
+	}
+
+	Pointer<const wclap_plugin_configurable_audio_ports> configurableAudioPortsExt;
+	// Both methods have the same shape, but one actually applies the changes
+	template<bool applyChanges>
+	bool configurableAudioPorts_method(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		auto scoped = module.arenaPool.scoped();
+		auto requestsPtr = scoped.array<wclap_audio_port_configuration_request>(request_count);
+		for (size_t i = 0; i < request_count; ++i) {
+			auto &request = requests[i];
+			wclap_audio_port_configuration_request wRequest{
+				.is_input=request.is_input,
+				.port_index=request.port_index,
+				.channel_count=request.channel_count,
+				.port_type=module.translatePortType(request.port_type),
+				.port_details={0}
+			};
+			if (!std::strcmp(request.port_type, CLAP_PORT_SURROUND) && request.port_details) {
+				auto channelMapPtr = scoped.array<uint8_t>(request.channel_count);
+				scoped.instance.setArray(channelMapPtr, (const uint8_t *)request.port_details, request.channel_count);
+				wRequest.port_details = channelMapPtr.cast<const void>();
+			} else if (!std::strcmp(request.port_type, CLAP_PORT_AMBISONIC) && request.port_details) {
+				auto &info = *(const clap_ambisonic_config *)request.port_details;
+				auto infoPtr = scoped.copyAcross(wclap_ambisonic_config{info.ordering, info.normalization});
+				wRequest.port_details = infoPtr.cast<const void>();
+			}
+			scoped.instance.set(requestsPtr + i, wRequest);
+		}
+		if (applyChanges) {
+			return mainThread->call(configurableAudioPortsExt[&wclap_plugin_configurable_audio_ports::apply_configuration], ptr, requestsPtr, request_count);
+		} else {
+			return mainThread->call(configurableAudioPortsExt[&wclap_plugin_configurable_audio_ports::can_apply_configuration], ptr, requestsPtr, request_count);
+		}
+	}
+	bool configurableAudioPorts_can_apply_configuration(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		return configurableAudioPorts_method<false>(requests, request_count);
+	}
+	bool configurableAudioPorts_apply_configuration(const clap_audio_port_configuration_request *requests, uint32_t request_count) {
+		return configurableAudioPorts_method<true>(requests, request_count);
 	}
 	
 	Pointer<const wclap_plugin_gui> guiExt;
-	bool guiIsApiSupported(const char *api, bool isFloating) {
+	bool gui_is_api_supported(const char *api, bool isFloating) {
 		return webviewGui.isApiSupported(api, isFloating);
 	}
-	bool guiGetPreferredApi(const char **api, bool *isFloating) {
+	bool gui_get_preferred_api(const char **api, bool *isFloating) {
 		return webviewGui.getPreferredApi(api, isFloating);
 	}
-	bool guiCreate(const char *api, bool isFloating) {
+	bool gui_create(const char *api, bool isFloating) {
 		if (!webviewGui.create(api, isFloating)) return false;
 		if (guiExt) {
 			// Create a webview GUI in the WCLAP, but continue whether it succeeds or not
@@ -507,16 +772,16 @@ private:
 		}
 		return true;
 	}
-	void guiDestroy() {
+	void gui_destroy() {
 		if (guiExt) {
 			mainThread->call(guiExt[&wclap_plugin_gui::destroy], ptr);
 		}
 		webviewGui.destroy();
 	}
-	bool guiSetScale(double scale) {
+	bool gui_set_scale(double scale) {
 		return webviewGui.setScale(scale);
 	}
-	bool guiGetSize(uint32_t *w, uint32_t *h) {
+	bool gui_get_size(uint32_t *w, uint32_t *h) {
 		if (guiExt) {
 			auto scoped = module.arenaPool.scoped();
 			auto wPtr = scoped.copyAcross(uint32_t(0));
@@ -530,13 +795,13 @@ private:
 		}
 		return webviewGui.getSize(w, h);
 	}
-	bool guiCanResize() {
+	bool gui_can_resize() {
 		if (guiExt) {
 			return mainThread->call(guiExt[&wclap_plugin_gui::can_resize], ptr);
 		}
 		return webviewGui.canResize();
 	}
-	bool guiGetResizeHints(clap_gui_resize_hints *hints) {
+	bool gui_get_resize_hints(clap_gui_resize_hints *hints) {
 		if (guiExt) {
 			auto scoped = module.arenaPool.scoped();
 			auto hintsPtr = scoped.copyAcross(wclap_gui_resize_hints{});
@@ -548,7 +813,7 @@ private:
 		}
 		return webviewGui.getResizeHints(hints);
 	}
-	bool guiAdjustSize(uint32_t *w, uint32_t *h) {
+	bool gui_adjust_size(uint32_t *w, uint32_t *h) {
 		if (guiExt) {
 			auto scoped = module.arenaPool.scoped();
 			auto wPtr = scoped.copyAcross(*w);
@@ -561,19 +826,19 @@ private:
 		}
 		return webviewGui.adjustSize(w, h);
 	}
-	bool guiSetSize(uint32_t w, uint32_t h) {
+	bool gui_set_size(uint32_t w, uint32_t h) {
 		if (guiExt) {
 			mainThread->call(guiExt[&wclap_plugin_gui::set_size], ptr, w, h);
 		}
 		return webviewGui.setSize(w, h);
 	}
-	bool guiSetParent(const clap_window *window) {
+	bool gui_set_parent(const clap_window *window) {
 		return webviewGui.setParent(window);
 	}
-	bool guiSetTransient(const clap_window *window) {
+	bool gui_set_transient(const clap_window *window) {
 		return webviewGui.setTransient(window);
 	}
-	void guiSuggestTitle(const char *title) {
+	void gui_suggest_title(const char *title) {
 		if (guiExt) {
 			auto scoped = module.arenaPool.scoped();
 			auto titlePtr = scoped.writeString(title);
@@ -581,13 +846,13 @@ private:
 		}
 		webviewGui.suggestTitle(title);
 	}
-	bool guiShow() {
+	bool gui_show() {
 		if (guiExt) {
 			mainThread->call(guiExt[&wclap_plugin_gui::show], ptr);
 		}
 		return webviewGui.show();
 	}
-	bool guiHide() {
+	bool gui_hide() {
 		if (guiExt) {
 			mainThread->call(guiExt[&wclap_plugin_gui::hide], ptr);
 		}
@@ -595,15 +860,34 @@ private:
 	}
 
 	Pointer<const wclap_plugin_latency> latencyExt;
-	uint32_t latencyGet() {
+	uint32_t latency_get() {
 		return mainThread->call(latencyExt[&wclap_plugin_latency::get], ptr);
 	}
-	
+
+	Pointer<const wclap_plugin_note_name> noteNameExt;
+	uint32_t noteName_count() {
+		return mainThread->call(noteNameExt[&wclap_plugin_note_name::count], ptr);
+	}
+	bool noteName_get(uint32_t index, clap_note_name *note_name) {
+		auto scoped = module.arenaPool.scoped();
+		auto namePtr = scoped.reserveBlank<wclap_note_name>();
+		if (!mainThread->call(noteNameExt[&wclap_plugin_note_name::get], ptr, index, namePtr)) return false;
+		auto wName = scoped.instance.get(namePtr);
+		*note_name = clap_note_name{
+			.name={},
+			.port=wName.port,
+			.key=wName.key,
+			.channel=wName.channel
+		};
+		copyName(note_name->name, wName.name);
+		return true;
+	}
+
 	Pointer<const wclap_plugin_note_ports> notePortsExt;
-	uint32_t notePortsCount(bool isInput) {
+	uint32_t notePorts_count(bool isInput) {
 		return mainThread->call(notePortsExt[&wclap_plugin_note_ports::count], ptr, isInput);
 	}
-	bool notePortsGet(uint32_t index, bool isInput, clap_note_port_info *info) {
+	bool notePorts_get(uint32_t index, bool isInput, clap_note_port_info *info) {
 		auto scoped = module.arenaPool.scoped();
 		auto infoPtr = scoped.copyAcross(wclap_note_port_info{});
 		auto result = mainThread->call(notePortsExt[&wclap_plugin_note_ports::get], ptr, index, isInput, infoPtr);
@@ -615,15 +899,32 @@ private:
 			.preferred_dialect=wclapInfo.preferred_dialect,
 			.name="",
 		};
-		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
+		copyName(info->name, wclapInfo.name);
 		return result;
 	}
 
+	Pointer<const wclap_plugin_param_indication> paramIndicationExt;
+	void paramIndication_set_mapping(uint32_t param_id, bool has_mapping, const clap_color *color, const char *label, const char *description) {
+		auto scoped = module.arenaPool.scoped();
+		Pointer<wclap_color> colorPtr{0};
+		if (color) colorPtr = scoped.copyAcross(wclap_color{color->alpha, color->red, color->green, color->blue});
+		Pointer<const char> labelPtr{0}, descriptionPtr{0};
+		if (label) labelPtr = scoped.writeString(label);
+		if (description) descriptionPtr = scoped.writeString(description);
+		return mainThread->call(paramIndicationExt[&wclap_plugin_param_indication::set_mapping], ptr, param_id, has_mapping, colorPtr, labelPtr, descriptionPtr);
+	}
+	void paramIndication_set_automation(uint32_t param_id, uint32_t automation_state, const clap_color *color) {
+		auto scoped = module.arenaPool.scoped();
+		Pointer<wclap_color> colorPtr{0};
+		if (color) colorPtr = scoped.copyAcross(wclap_color{color->alpha, color->red, color->green, color->blue});
+		return mainThread->call(paramIndicationExt[&wclap_plugin_param_indication::set_automation], ptr, param_id, automation_state, colorPtr);
+	}
+
 	Pointer<const wclap_plugin_params> paramsExt;
-	uint32_t paramsCount() {
+	uint32_t params_count() {
 		return mainThread->call(paramsExt[&wclap_plugin_params::count], ptr);
 	}
-	bool paramsGetInfo(uint32_t index, clap_param_info *info) {
+	bool params_get_info(uint32_t index, clap_param_info *info) {
 		auto scoped = module.arenaPool.scoped();
 		auto infoPtr = scoped.copyAcross(wclap_param_info{});
 		auto result = mainThread->call(paramsExt[&wclap_plugin_params::get_info], ptr, index, infoPtr);
@@ -645,29 +946,26 @@ private:
 			.max_value=wclapInfo.max_value,
 			.default_value=wclapInfo.default_value
 		};
-		std::memcpy(info->name, wclapInfo.name, CLAP_NAME_SIZE);
-		std::memcpy(info->module, wclapInfo.module, CLAP_PATH_SIZE);
+		copyName(info->name, wclapInfo.name);
+		copy(info->module, wclapInfo.module, CLAP_PATH_SIZE);
 		
 		return result;
 	}
-	
-	bool paramsGetValue(clap_id paramId, double *value) {
+	bool params_get_value(clap_id paramId, double *value) {
 		auto scoped = module.arenaPool.scoped();
 		auto valuePtr = scoped.copyAcross(0.0);
 		auto result = mainThread->call(paramsExt[&wclap_plugin_params::get_value], ptr, paramId, valuePtr);
 		*value = mainThread->get(valuePtr);
 		return result;
 	}
-	
-	bool paramsValueToText(clap_id paramId, double value, char *text, uint32_t textCapacity) {
+	bool params_value_to_text(clap_id paramId, double value, char *text, uint32_t textCapacity) {
 		auto scoped = module.arenaPool.scoped();
 		auto wclapText = scoped.array<char>(textCapacity);
 		auto result = mainThread->call(paramsExt[&wclap_plugin_params::value_to_text], ptr, paramId, value, wclapText, textCapacity);
 		mainThread->getArray(wclapText, text, textCapacity);
 		return result;
 	}
-
-	bool paramsTextToValue(clap_id paramId, const char *text, double *value) {
+	bool params_text_to_value(clap_id paramId, const char *text, double *value) {
 		auto scoped = module.arenaPool.scoped();
 		auto wclapText = scoped.writeString(text);
 		auto valuePtr = scoped.copyAcross(0.0);
@@ -675,8 +973,7 @@ private:
 		*value = mainThread->get(valuePtr);
 		return result;
 	}
-	
-	void paramsFlush(const clap_input_events *eventsIn, const clap_output_events *eventsOut) {
+	void params_flush(const clap_input_events *eventsIn, const clap_output_events *eventsOut) {
 		auto scoped = arena->scoped(); // use the audio-thread arena
 		auto inEvents = scoped.copyAcross(module.inputEventsTemplate);
 		auto outEvents = scoped.copyAcross(module.outputEventsTemplate);
@@ -697,8 +994,71 @@ private:
 		hostOutputEvents = nullptr;
 	}
 
+	Pointer<const wclap_plugin_preset_load> presetLoadExt;
+	bool presetLoad_from_location(uint32_t location_kind, const char *location, const char *load_key) {
+		auto scoped = module.arenaPool.scoped();
+		Pointer<const char> locationPtr{0}, loadKeyPtr{0};
+		if (location) locationPtr = scoped.writeString(location);
+		if (load_key) loadKeyPtr = scoped.writeString(load_key);
+		return mainThread->call(presetLoadExt[&wclap_plugin_preset_load::from_location], ptr, location_kind, locationPtr, loadKeyPtr);
+	}
+
+	Pointer<const wclap_plugin_remote_controls> remoteControlsExt;
+	uint32_t remoteControls_count() {
+		return mainThread->call(remoteControlsExt[&wclap_plugin_remote_controls::count], ptr);
+	}
+	bool remoteControls_get(uint32_t page_index, clap_remote_controls_page *page) {
+		auto scoped = module.arenaPool.scoped();
+		auto pagePtr = scoped.reserveBlank<wclap_remote_controls_page>();
+		if (!mainThread->call(remoteControlsExt[&wclap_plugin_remote_controls::get], ptr, page_index, pagePtr)) return false;
+		auto wPage = mainThread->get(pagePtr);
+		*page = clap_remote_controls_page{
+			.section_name={},
+			.page_id=wPage.page_id,
+			.page_name={},
+			.param_ids={},
+			.is_for_preset=wPage.is_for_preset
+		};
+		copyName(page->section_name, wPage.section_name);
+		copyName(page->page_name, wPage.page_name);
+		copy(page->param_ids, wPage.param_ids, CLAP_REMOTE_CONTROLS_COUNT);
+		return true;
+	}
+
+	Pointer<const wclap_plugin_render> renderExt;
+	bool render_has_hard_realtime_requirement() {
+		return mainThread->call(renderExt[&wclap_plugin_render::has_hard_realtime_requirement], ptr);
+	}
+	bool render_set(clap_plugin_render_mode mode) {
+		return mainThread->call(renderExt[&wclap_plugin_render::set], ptr, mode);
+	}
+
+	Pointer<const wclap_plugin_state_context> stateContextExt;
+	bool stateContext_save(const clap_ostream_t *stream, uint32_t context_type) {
+		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
+		auto streamPtr = scoped.copyAcross(module.ostreamTemplate);
+		module.setPlugin(streamPtr, pluginListIndex);
+
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		hostOstream = stream;
+		auto result = mainThread->call(stateContextExt[&wclap_plugin_state_context::save], ptr, streamPtr, context_type);
+		hostOstream = nullptr;
+		return result;
+	}
+	bool stateContext_load(const clap_istream_t *stream, uint32_t context_type) {
+		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
+		auto streamPtr = scoped.copyAcross(module.istreamTemplate);
+		module.setPlugin(streamPtr, pluginListIndex);
+
+		std::unique_lock<std::recursive_mutex> lock{hostStreamsMutex};
+		hostIstream = stream;
+		auto result = mainThread->call(stateContextExt[&wclap_plugin_state_context::load], ptr, streamPtr, context_type);
+		hostIstream = nullptr;
+		return result;
+	}
+	
 	Pointer<const wclap_plugin_state> stateExt;
-	bool stateSave(const clap_ostream_t *stream) {
+	bool state_save(const clap_ostream_t *stream) {
 		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
 		auto streamPtr = scoped.copyAcross(module.ostreamTemplate);
 		module.setPlugin(streamPtr, pluginListIndex);
@@ -709,7 +1069,7 @@ private:
 		hostOstream = nullptr;
 		return result;
 	}
-	bool stateLoad(const clap_istream_t *stream) {
+	bool state_load(const clap_istream_t *stream) {
 		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
 		auto streamPtr = scoped.copyAcross(module.istreamTemplate);
 		module.setPlugin(streamPtr, pluginListIndex);
@@ -720,10 +1080,56 @@ private:
 		hostIstream = nullptr;
 		return result;
 	}
+	
+	Pointer<const wclap_plugin_surround> surroundExt;
+	bool surround_is_channel_mask_supported(uint64_t channel_mask) {
+		return mainThread->call(surroundExt[&wclap_plugin_surround::is_channel_mask_supported], ptr, channel_mask);
+	}
+	uint32_t surround_get_channel_map(bool is_input, uint32_t port_index, uint8_t *channel_map, uint32_t channel_map_capacity) {
+		auto scoped = module.arenaPool.scoped();
+		auto channelMapPtr = scoped.array<uint8_t>(channel_map_capacity);
+		auto result = mainThread->call(surroundExt[&wclap_plugin_surround::get_channel_map], ptr, is_input, port_index, channelMapPtr, channel_map_capacity);
+		scoped.instance.getArray(channelMapPtr, channel_map, channel_map_capacity);
+		return result;
+	}
+
+	Pointer<const wclap_plugin_tail> tailExt;
+	uint32_t tail_get() {
+		return mainThread->call(tailExt[&wclap_plugin_tail::get], ptr);
+	}
+
+	Pointer<const wclap_plugin_thread_pool> threadPoolExt;
+	void threadPool_exec(uint32_t task_index) {
+		return mainThread->call(threadPoolExt[&wclap_plugin_thread_pool::exec], ptr, task_index);
+	}
+
+	Pointer<const wclap_plugin_timer_support> timerSupportExt;
+	void timerSupport_on_timer(clap_id timer_id) {
+		return mainThread->call(timerSupportExt[&wclap_plugin_timer_support::on_timer], ptr, timer_id);
+	}
+
+	Pointer<const wclap_plugin_track_info> trackInfoExt;
+	void trackInfo_changed() {
+		return mainThread->call(trackInfoExt[&wclap_plugin_track_info::changed], ptr);
+	}
+
+	Pointer<const wclap_plugin_voice_info> voiceInfoExt;
+	bool voiceInfo_get(clap_voice_info *info) {
+		auto scoped = module.arenaPool.scoped();
+		auto infoPtr = scoped.reserveBlank<wclap_voice_info>();
+		if (!mainThread->call(voiceInfoExt[&wclap_plugin_voice_info::get], ptr, infoPtr)) return false;
+		auto wInfo = scoped.instance.get(infoPtr);
+		*info = clap_voice_info{
+			.voice_count=wInfo.voice_count,
+			.voice_capacity=wInfo.voice_capacity,
+			.flags=wInfo.flags
+		};
+		return true;
+	}
 
 	std::atomic<bool> wasFileUri = false;
 	Pointer<const wclap_plugin_webview> webviewExt;
-	int32_t webviewGetUri(char *uri, uint32_t uriCapacity) {
+	int32_t webview_get_uri(char *uri, uint32_t uriCapacity) {
 		auto scoped = module.arenaPool.scoped(); // use any arena (main thread)
 		auto uriPtr = scoped.array<char>(uriCapacity);
 		auto result = mainThread->call(webviewExt[&wclap_plugin_webview::get_uri], ptr, uriPtr, uriCapacity);
@@ -746,7 +1152,7 @@ private:
 		wasFileUri = false;
 		return result;
 	}
-	bool webviewGetResource(const char *path, char *mime, uint32_t mimeCapacity, const clap_ostream *ostream) {
+	bool webview_get_resource(const char *path, char *mime, uint32_t mimeCapacity, const clap_ostream *ostream) {
 		if (wasFileUri) {
 			auto mapped = module.instanceGroup->mapPath(path);
 			if (!mapped) return false;
@@ -806,7 +1212,7 @@ private:
 		hostOstream = nullptr;
 		return result;
 	}
-	bool webviewReceive(const void *buffer, uint32_t size) {
+	bool webview_receive(const void *buffer, uint32_t size) {
 		auto scoped = module.arenaPool.scoped();
 		auto bufferPtr = scoped.array<unsigned char>(size);
 		mainThread->setArray(bufferPtr, (const unsigned char *)buffer, size);

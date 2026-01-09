@@ -464,6 +464,7 @@ struct InstanceImpl {
 
 	void setWasmDeadline();
 	bool wasiInit(); // calls `_initialize()`, only once per InstanceGroup
+	bool updateClapEntry();
 	
 	uint64_t wtMalloc(size_t bytes);
 

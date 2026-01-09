@@ -302,24 +302,7 @@ bool wclap_wasmtime::InstanceImpl::setup() {
 		return stopWithError("must either export memory or import shared memory");
 	}
 
-	if (!wasmtime_instance_export_get(wtContext, &wtInstance, "clap_entry", 10, &item)) {
-		return stopWithError("clap_entry not exported");
-	}
-	if (item.kind == WASMTIME_EXTERN_GLOBAL) {
-		wasmtime_val_t v;
-		wasmtime_global_get(wtContext, &item.of.global, &v);
-		if (v.kind == WASM_I32 && !group.is64()) {
-			wclapEntryAs64 = v.of.i32; // We store it as 64 bits, even though we know it's a 32-bit one
-		} else if (v.kind == WASM_I64 && group.is64()) {
-			wclapEntryAs64 = v.of.i64;
-		} else {
-			return stopWithError("clap_entry is not a (correctly-sized) pointer");
-		}
-	} else {
-		wasmtime_extern_delete(&item);
-		return stopWithError("clap_entry isn't a Global");
-	}
-	wasmtime_extern_delete(&item);
+	if (!updateClapEntry()) return false;
 
 	if (!wasmtime_instance_export_get(wtContext, &wtInstance, "malloc", 6, &item)) {
 		return stopWithError("malloc not exported");
@@ -429,6 +412,37 @@ bool wclap_wasmtime::InstanceImpl::wasiInit() {
 		}
 		wasmtime_extern_delete(&item);
 	}
+
+	if (!updateClapEntry()) return false;
+
+	return true;
+}
+
+bool wclap_wasmtime::InstanceImpl::updateClapEntry() {
+	auto stopWithError = [&](const char *message) -> bool {
+		group.setError(message);
+		return false;
+	};
+
+	wasmtime_extern_t item;
+	if (!wasmtime_instance_export_get(wtContext, &wtInstance, "clap_entry", 10, &item)) {
+		return stopWithError("clap_entry not exported");
+	}
+	if (item.kind == WASMTIME_EXTERN_GLOBAL) {
+		wasmtime_val_t v;
+		wasmtime_global_get(wtContext, &item.of.global, &v);
+		if (v.kind == WASM_I32 && !group.is64()) {
+			wclapEntryAs64 = v.of.i32; // We store it as 64 bits, even though we know it's a 32-bit one
+		} else if (v.kind == WASM_I64 && group.is64()) {
+			wclapEntryAs64 = v.of.i64;
+		} else {
+			return stopWithError("clap_entry is not a (correctly-sized) pointer");
+		}
+	} else {
+		wasmtime_extern_delete(&item);
+		return stopWithError("clap_entry isn't a Global");
+	}
+	wasmtime_extern_delete(&item);
 	return true;
 }
 
